@@ -93,6 +93,26 @@ export interface DriveOps {
     format: "docx" | "pdf",
     fileName: string,
   ): { fileId: string; url: string; fileName: string };
+
+  /**
+   * Read a Drive file's binary contents and return a base64 string plus
+   * metadata. Used by the templated-DOCX flow to ship the user's template
+   * to the browser-side filler.
+   */
+  downloadFileAsBase64(
+    fileId: string,
+  ): { base64: string; fileName: string; mimeType: string };
+
+  /**
+   * Decode the given base64 bytes and save them as a file inside the given
+   * folder under the requested filename. The MIME type is fixed to DOCX.
+   * Returns the file id and direct URL.
+   */
+  uploadDocxFromBase64(
+    folderId: string,
+    fileName: string,
+    base64: string,
+  ): { fileId: string; url: string; fileName: string };
 }
 
 export interface SheetRow {

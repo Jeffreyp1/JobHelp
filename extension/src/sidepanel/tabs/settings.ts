@@ -146,6 +146,19 @@ export function renderSettingsTab(hooks: SettingsTabHooks = {}): HTMLElement {
 
   form.appendChild(
     makeStorageRow({
+      key: 'driveTemplateDocxId',
+      label: 'Drive: template DOCX file ID',
+      type: 'text',
+      placeholder: 'Drive file ID (optional)',
+      help:
+        'Optional. File ID of your uploaded resume template .docx (containing '
+          + 'docxtemplater placeholders like {name}, {#experiences}…). When set, '
+          + '"Convert via Template (DOCX)" appears in the Generate tab.',
+    }),
+  );
+
+  form.appendChild(
+    makeStorageRow({
       key: 'sheetId',
       label: 'Tracking sheet ID',
       type: 'text',

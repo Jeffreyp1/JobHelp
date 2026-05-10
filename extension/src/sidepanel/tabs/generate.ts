@@ -54,6 +54,15 @@ export function extractFolderId(url: string): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * Extract a Drive file ID from a generic Drive file URL like
+ * https://drive.google.com/file/d/{id}/view or .../edit.
+ */
+export function extractFileIdFromUrl(url: string): string | null {
+  const m = url.match(/\/file\/d\/([\w-]+)/) ?? url.match(/[?&]id=([\w-]+)/);
+  return m ? m[1] : null;
+}
+
 export interface GenerateTabController {
   root: HTMLElement;
   applyScraperOutput(output: ScraperOutput): void;
@@ -80,6 +89,16 @@ export interface GenerateTabHooks {
    * Should call apiClient.finalize and return the result.
    */
   onFinalize: (req: FinalizeRequest) => Promise<{ ok: true; url: string; fileName: string } | { ok: false; message: string }>;
+  /**
+   * Invoked when the user clicks "Convert via Template (DOCX)".
+   * The hook handles: fetching the user's template, parsing markdown,
+   * filling, and uploading to Drive. Returns the resulting file URL or an
+   * error message for surface-level display.
+   */
+  onConvertViaTemplate?: (req: {
+    markdown: string;
+    jobFolderId: string;
+  }) => Promise<{ ok: true; url: string; fileName: string; fileId?: string } | { ok: false; message: string }>;
 }
 
 export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabController {
@@ -243,8 +262,19 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
   docxBtn.textContent = 'Convert to DOCX';
   docxBtn.disabled = true;
 
+  const templateBtn = document.createElement('button');
+  templateBtn.type = 'button';
+  templateBtn.className =
+    'btn btn-secondary generate__finalize-btn generate__finalize-btn--template';
+  templateBtn.textContent = 'Convert via Template (DOCX)';
+  templateBtn.disabled = true;
+  templateBtn.title =
+    'Fills your uploaded template (Settings → "Drive: template DOCX file ID") '
+      + 'with the current resume markdown and saves it into the job folder.';
+
   finalizeButtons.appendChild(pdfBtn);
   finalizeButtons.appendChild(docxBtn);
+  finalizeButtons.appendChild(templateBtn);
   finalizeSection.appendChild(finalizeButtons);
 
   const finalizeStatusEl = document.createElement('div');
@@ -258,6 +288,9 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     const canFinalize = state.docId !== null && state.jobFolderId !== null;
     pdfBtn.disabled = !canFinalize;
     docxBtn.disabled = !canFinalize;
+    // Template button only requires the job folder; it doesn't go through
+    // the Doc export pipeline.
+    templateBtn.disabled = state.jobFolderId === null || !hooks.onConvertViaTemplate;
     if (!canFinalize) {
       const tip = 'Not available — could not extract document IDs from generate result';
       pdfBtn.title = tip;
@@ -320,8 +353,66 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
   pdfBtn.addEventListener('click', () => void handleFinalizeClick('pdf'));
   docxBtn.addEventListener('click', () => void handleFinalizeClick('docx'));
 
+  /** Run the template-fill pipeline, displaying status and a download link. */
+  async function handleTemplateClick(): Promise<void> {
+    if (!hooks.onConvertViaTemplate || !state.jobFolderId) return;
+    pdfBtn.disabled = true;
+    docxBtn.disabled = true;
+    templateBtn.disabled = true;
+    finalizeStatusEl.textContent = 'Filling template…';
+    finalizeStatusEl.className = 'generate__finalize-status generate__finalize-status--working';
+
+    const markdown = currentMarkdownGetter ? currentMarkdownGetter() : '';
+    const result = await hooks.onConvertViaTemplate({
+      markdown,
+      jobFolderId: state.jobFolderId,
+    });
+
+    if (result.ok) {
+      finalizeStatusEl.textContent = '';
+      finalizeStatusEl.className = 'generate__finalize-status';
+
+      // Open in Drive
+      const openBtn = document.createElement('a');
+      openBtn.href = result.url;
+      openBtn.target = '_blank';
+      openBtn.rel = 'noopener noreferrer';
+      openBtn.className = 'btn btn-primary';
+      openBtn.textContent = 'Open final DOCX';
+      openBtn.style.marginRight = '8px';
+      finalizeStatusEl.appendChild(openBtn);
+
+      // Direct download — uses Drive's `uc?export=download&id=X` endpoint
+      // which pushes the file to the browser's download manager.
+      const fileId = result.fileId ?? extractFileIdFromUrl(result.url);
+      if (fileId) {
+        const dlBtn = document.createElement('a');
+        dlBtn.href = `https://drive.google.com/uc?export=download&id=${fileId}`;
+        dlBtn.target = '_blank';
+        dlBtn.rel = 'noopener noreferrer';
+        dlBtn.download = result.fileName;
+        dlBtn.className = 'btn btn-secondary';
+        dlBtn.textContent = 'Download';
+        finalizeStatusEl.appendChild(dlBtn);
+      }
+    } else {
+      finalizeStatusEl.textContent = `Template fill failed: ${result.message}`;
+      finalizeStatusEl.className = 'generate__finalize-status generate__finalize-status--error';
+    }
+
+    updateFinalizeButtons();
+  }
+  templateBtn.addEventListener('click', () => void handleTemplateClick());
+
   // ─── Generate click handler ─────────────────────────────────
   generateBtn.addEventListener('click', async () => {
+    // Clear any previous resume preview + finalize results before starting
+    resumeSlot.replaceChildren();
+    finalizeStatusEl.textContent = '';
+    finalizeStatusEl.className = 'generate__finalize-status';
+    state.docId = null;
+    state.jobFolderId = null;
+
     const cfg = await loadConfigFromStorage();
     const req: Omit<GenerateRequest, 'action'> = {
       jd: state.jd,
@@ -367,6 +458,10 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     const textarea = editor.querySelector<HTMLTextAreaElement>('.resume-editor__textarea');
     currentMarkdownGetter = textarea ? () => textarea.value : () => md;
     resumeSlot.replaceChildren(editor);
+    // Auto-scroll the panel to the new preview so the user sees it landed.
+    requestAnimationFrame(() => {
+      resumeSlot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }
 
   /**

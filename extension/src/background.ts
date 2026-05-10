@@ -233,24 +233,79 @@ if (isExtensionContext()) {
 
   // Route side-panel messages
   c.runtime.onMessage.addListener(
-    (msg: unknown, _sender: chrome.runtime.MessageSender, _sendResponse: () => void) => {
-      const message = msg as Message;
+    (
+      msg: unknown,
+      _sender: chrome.runtime.MessageSender,
+      sendResponse: (response?: unknown) => void,
+    ) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const message = msg as Message | { type: string; payload?: any };
+
       switch (message.type) {
         case 'generate_request':
-          void handleGenerateRequest(message.payload);
-          break;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          void handleGenerateRequest((message as any).payload);
+          return false;
+
         case 'rescan_request':
           void handleRescanRequest();
-          break;
+          return false;
+
         case 'settings_update':
-          // Persist settings changes from the panel
           void (async () => {
-            for (const [key, value] of Object.entries(message.payload)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            for (const [key, value] of Object.entries((message as any).payload)) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               await set(key as Parameters<typeof set>[0], value as never);
             }
           })();
-          break;
+          return false;
+
+        // Async handlers that need to send a response back to the sender
+        // (the side panel awaits sendMessage's promise). Returning `true`
+        // keeps the response channel open until sendResponse is called.
+        case 'list_files_request': {
+          void (async () => {
+            try {
+              const url = await get('appsScriptUrl');
+              if (!url) {
+                sendResponse({ ok: false, error: { type: 'config', message: 'No Apps Script URL configured', retryable: false } });
+                return;
+              }
+              const client = new ApiClient(url);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { folderId, folderType } = (message as any).payload;
+              const resp = await client.listFiles({ folderId, folderType });
+              sendResponse(resp);
+            } catch (err) {
+              sendResponse({ ok: false, error: { type: 'server', message: (err as Error).message, retryable: true } });
+            }
+          })();
+          return true; // async response
+        }
+
+        case 'seed_defaults_request': {
+          void (async () => {
+            try {
+              const url = await get('appsScriptUrl');
+              if (!url) {
+                sendResponse({ ok: false, error: { type: 'config', message: 'No Apps Script URL configured', retryable: false } });
+                return;
+              }
+              const client = new ApiClient(url);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const payload = (message as any).payload;
+              const resp = await client.seedDefaults(payload);
+              sendResponse(resp);
+            } catch (err) {
+              sendResponse({ ok: false, error: { type: 'server', message: (err as Error).message, retryable: true } });
+            }
+          })();
+          return true;
+        }
+
+        default:
+          return false;
       }
     },
   );

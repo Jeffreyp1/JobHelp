@@ -142,6 +142,17 @@ function makeDriveMock(overrides: Partial<DriveOps> = {}): DriveOps {
       url: `https://drive.google.com/file/d/exported-${format}-file-id/view`,
       fileName,
     })),
+    downloadFileAsBase64: vi.fn(() => ({
+      base64: 'AAAA',
+      fileName: 'engineering-resume-template.docx',
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })),
+    uploadDocxFromBase64: vi.fn((_folderId: string, fileName: string, _b64: string) => ({
+      fileId: 'uploaded-docx-id',
+      url: 'https://drive.google.com/file/d/uploaded-docx-id/view',
+      fileName,
+    })),
     ...overrides,
   };
 }

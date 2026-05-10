@@ -17,9 +17,31 @@ import { renderGenerateTab, type GenerateTabController } from './tabs/generate.j
 import { renderFilesTab, type FilesTabController } from './tabs/files.js';
 import { renderSettingsTab } from './tabs/settings.js';
 import { ApiClient } from '../lib/apiClient.js';
+import { fillResumeTemplate, parseResumeMarkdown } from '../lib/templateFiller.js';
 import type { Message } from '../types/message-bus.js';
 import type { FileSummary, FolderType } from '../types/api-contract.js';
 import { get } from '../lib/storage.js';
+
+// ─── Base64 helpers (browser-safe; rely on btoa/atob + binary string) ────
+function base64ToArrayBuffer(b64: string): ArrayBuffer {
+  const bin = atob(b64);
+  const buf = new ArrayBuffer(bin.length);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
+  return buf;
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  // Chunked conversion avoids "argument list too long" for large blobs.
+  const CHUNK = 0x8000;
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
 
 type TabName = 'generate' | 'files' | 'settings';
 
@@ -83,6 +105,56 @@ function buildControllers(): PanelControllers {
         return { ok: false, message: 'Backend returned no files.' };
       }
       return { ok: true, url: file.url, fileName: file.fileName };
+    },
+    onConvertViaTemplate: async ({ markdown, jobFolderId }) => {
+      let appsScriptUrl: string | null = null;
+      let templateId: string | null = null;
+      try {
+        [appsScriptUrl, templateId] = await Promise.all([
+          get('appsScriptUrl'),
+          get('driveTemplateDocxId'),
+        ]);
+      } catch {
+        // fall through with empty values
+      }
+      if (!appsScriptUrl) {
+        return { ok: false, message: 'Apps Script URL not configured. Check Settings.' };
+      }
+      if (!templateId) {
+        return {
+          ok: false,
+          message:
+            'No template configured. Set "Drive: template DOCX file ID" in Settings first.',
+        };
+      }
+
+      const client = new ApiClient(appsScriptUrl);
+
+      // 1. Download template bytes
+      const dl = await client.downloadTemplate({ fileId: templateId });
+      if (!dl.ok) return { ok: false, message: dl.error.message };
+
+      // 2. Fill template client-side
+      let filled: Blob;
+      try {
+        const buf = base64ToArrayBuffer(dl.base64);
+        const data = parseResumeMarkdown(markdown);
+        filled = await fillResumeTemplate(buf, data);
+      } catch (err) {
+        return { ok: false, message: (err as Error).message };
+      }
+
+      // 3. Upload back to Drive in the job folder
+      const b64 = await blobToBase64(filled);
+      const fileName = 'tailored_resume_template.docx';
+      const up = await client.uploadFilledDocx({
+        folderId: jobFolderId,
+        fileName,
+        base64: b64,
+      });
+      if (!up.ok) return { ok: false, message: up.error.message };
+
+      return { ok: true, url: up.url, fileName: up.fileName, fileId: up.fileId };
     },
   });
 

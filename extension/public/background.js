@@ -5,6 +5,7 @@ var STORAGE_DEFAULTS = {
   driveSourceFolderId: null,
   driveRulesFolderId: null,
   driveOutputFolderId: null,
+  driveTemplateDocxId: null,
   sheetId: null,
   defaultGenerateModel: "claude-haiku-4-5-20251001",
   lastToggles: {},
@@ -100,6 +101,20 @@ var ApiClient = class {
    */
   async finalize(req) {
     return this.post({ action: "finalize", ...req });
+  }
+  /**
+   * Download the user's uploaded resume template DOCX from Drive as base64.
+   * Used by the "Convert via Template (DOCX)" flow before client-side fill.
+   */
+  async downloadTemplate(req) {
+    return this.post({ action: "download_template", ...req });
+  }
+  /**
+   * Upload a base64-encoded DOCX (the result of fillResumeTemplate) into a
+   * Drive folder and return the resulting file URL.
+   */
+  async uploadFilledDocx(req) {
+    return this.post({ action: "upload_filled_docx", ...req });
   }
 };
 
@@ -246,22 +261,60 @@ if (isExtensionContext()) {
     }
   });
   c.runtime.onMessage.addListener(
-    (msg, _sender, _sendResponse) => {
+    (msg, _sender, sendResponse) => {
       const message = msg;
       switch (message.type) {
         case "generate_request":
           void handleGenerateRequest(message.payload);
-          break;
+          return false;
         case "rescan_request":
           void handleRescanRequest();
-          break;
+          return false;
         case "settings_update":
           void (async () => {
             for (const [key, value] of Object.entries(message.payload)) {
               await set(key, value);
             }
           })();
-          break;
+          return false;
+        case "list_files_request": {
+          void (async () => {
+            try {
+              const url = await get("appsScriptUrl");
+              if (!url) {
+                sendResponse({ ok: false, error: { type: "config", message: "No Apps Script URL configured", retryable: false } });
+                return;
+              }
+              const client = new ApiClient(url);
+              const { folderId, folderType } = message.payload;
+              const resp = await client.listFiles({ folderId, folderType });
+              sendResponse(resp);
+            } catch (err) {
+              sendResponse({ ok: false, error: { type: "server", message: err.message, retryable: true } });
+            }
+          })();
+          return true;
+        }
+        case "seed_defaults_request": {
+          void (async () => {
+            try {
+              const url = await get("appsScriptUrl");
+              if (!url) {
+                sendResponse({ ok: false, error: { type: "config", message: "No Apps Script URL configured", retryable: false } });
+                return;
+              }
+              const client = new ApiClient(url);
+              const payload = message.payload;
+              const resp = await client.seedDefaults(payload);
+              sendResponse(resp);
+            } catch (err) {
+              sendResponse({ ok: false, error: { type: "server", message: err.message, retryable: true } });
+            }
+          })();
+          return true;
+        }
+        default:
+          return false;
       }
     }
   );

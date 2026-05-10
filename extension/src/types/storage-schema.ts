@@ -30,6 +30,12 @@ export interface StorageSchema {
   driveSourceFolderId: string | null;
   driveRulesFolderId: string | null;
   driveOutputFolderId: string | null;
+  /**
+   * Drive file id of the user's uploaded template .docx (containing
+   * docxtemplater placeholders). When set, the Generate tab's
+   * "Convert via Template (DOCX)" button is enabled.
+   */
+  driveTemplateDocxId: string | null;
   /** Tracking sheet id */
   sheetId: string | null;
 
@@ -52,6 +58,7 @@ export const STORAGE_DEFAULTS: StorageSchema = {
   driveSourceFolderId: null,
   driveRulesFolderId: null,
   driveOutputFolderId: null,
+  driveTemplateDocxId: null,
   sheetId: null,
   defaultGenerateModel: "claude-haiku-4-5-20251001",
   lastToggles: {},

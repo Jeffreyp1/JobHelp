@@ -23,6 +23,10 @@ import type {
   WriteFileRequest,
   SeedDefaultsRequest,
   SeedDefaultsResult,
+  DownloadTemplateRequest,
+  DownloadTemplateResult,
+  UploadFilledDocxRequest,
+  UploadFilledDocxResult,
   KeywordCoverage,
 } from './types/api-contract.js';
 import type { DriveOps, FileEntry } from './types/drive-ops.js';
@@ -86,7 +90,16 @@ export function doPost(
 // Router
 // ---------------------------------------------------------------------------
 
-const VALID_ACTIONS: ApiAction[] = ['generate', 'finalize', 'list_files', 'write_file', 'seed_defaults', 'ping'];
+const VALID_ACTIONS: ApiAction[] = [
+  'generate',
+  'finalize',
+  'list_files',
+  'write_file',
+  'seed_defaults',
+  'download_template',
+  'upload_filled_docx',
+  'ping',
+];
 
 function route(body: unknown, deps: Deps): ApiResult<unknown> {
   if (typeof body !== 'object' || body === null) {
@@ -136,6 +149,18 @@ function route(body: unknown, deps: Deps): ApiResult<unknown> {
       const validateErr = validateSeedDefaults(raw);
       if (validateErr) return validateErr;
       return handleSeedDefaults(deps, raw as unknown as SeedDefaultsRequest);
+    }
+
+    case 'download_template': {
+      const validateErr = validateDownloadTemplate(raw);
+      if (validateErr) return validateErr;
+      return handleDownloadTemplate(deps, raw as unknown as DownloadTemplateRequest);
+    }
+
+    case 'upload_filled_docx': {
+      const validateErr = validateUploadFilledDocx(raw);
+      if (validateErr) return validateErr;
+      return handleUploadFilledDocx(deps, raw as unknown as UploadFilledDocxRequest);
     }
   }
 }
@@ -323,6 +348,22 @@ function handleSeedDefaults(deps: Deps, req: SeedDefaultsRequest): ApiResult<See
   return { ok: true, ...result };
 }
 
+function handleDownloadTemplate(
+  deps: Deps,
+  req: DownloadTemplateRequest,
+): ApiResult<DownloadTemplateResult> {
+  const result = deps.drive.downloadFileAsBase64(req.fileId);
+  return { ok: true, ...result };
+}
+
+function handleUploadFilledDocx(
+  deps: Deps,
+  req: UploadFilledDocxRequest,
+): ApiResult<UploadFilledDocxResult> {
+  const result = deps.drive.uploadDocxFromBase64(req.folderId, req.fileName, req.base64);
+  return { ok: true, ...result };
+}
+
 function handleFinalize(deps: Deps, req: FinalizeRequest): ApiResult<FinalizeResult> {
   const { drive } = deps;
 
@@ -383,6 +424,26 @@ function validateSeedDefaults(raw: Record<string, unknown>): ApiErrorResponse | 
   }
   if (!Array.isArray(raw['filenames'])) {
     return validationError('Missing required field: filenames (must be an array)');
+  }
+  return null;
+}
+
+function validateDownloadTemplate(raw: Record<string, unknown>): ApiErrorResponse | null {
+  if (!raw['fileId'] || typeof raw['fileId'] !== 'string') {
+    return validationError('Missing required field: fileId');
+  }
+  return null;
+}
+
+function validateUploadFilledDocx(raw: Record<string, unknown>): ApiErrorResponse | null {
+  if (!raw['folderId'] || typeof raw['folderId'] !== 'string') {
+    return validationError('Missing required field: folderId');
+  }
+  if (!raw['fileName'] || typeof raw['fileName'] !== 'string') {
+    return validationError('Missing required field: fileName');
+  }
+  if (typeof raw['base64'] !== 'string' || raw['base64'].length === 0) {
+    return validationError('Missing required field: base64');
   }
   return null;
 }

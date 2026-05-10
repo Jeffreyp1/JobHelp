@@ -17,6 +17,8 @@ export type ApiAction =
   | "list_files"
   | "write_file"
   | "seed_defaults"
+  | "download_template"
+  | "upload_filled_docx"
   | "ping";
 
 export interface ToggleSetting {
@@ -219,6 +221,53 @@ export interface SeedDefaultsResult {
 export type SeedDefaultsResponse = ApiResult<SeedDefaultsResult>;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Action: download_template
+// Returns the contents of a Drive file (the user's uploaded resume template
+// .docx) as a base64 string so the extension can fill it client-side.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DownloadTemplateRequest {
+  action: "download_template";
+  /** Drive file id of the template DOCX */
+  fileId: string;
+}
+
+export interface DownloadTemplateResult {
+  /** Base64-encoded bytes of the .docx file. */
+  base64: string;
+  /** File name as stored in Drive (for telemetry / display). */
+  fileName: string;
+  /** MIME type as reported by Drive. */
+  mimeType: string;
+}
+
+export type DownloadTemplateResponse = ApiResult<DownloadTemplateResult>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Action: upload_filled_docx
+// Saves a base64-encoded DOCX (produced by the client-side templateFiller)
+// to a Drive folder and returns the resulting file URL.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface UploadFilledDocxRequest {
+  action: "upload_filled_docx";
+  /** Drive folder id to write into (typically the per-job folder) */
+  folderId: string;
+  /** File name to use, e.g. "tailored_resume_filled.docx" */
+  fileName: string;
+  /** Base64 of the filled DOCX bytes. */
+  base64: string;
+}
+
+export interface UploadFilledDocxResult {
+  fileId: string;
+  url: string;
+  fileName: string;
+}
+
+export type UploadFilledDocxResponse = ApiResult<UploadFilledDocxResult>;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Action: ping (health check)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -238,4 +287,6 @@ export type ApiRequest =
   | ListFilesRequest
   | WriteFileRequest
   | SeedDefaultsRequest
+  | DownloadTemplateRequest
+  | UploadFilledDocxRequest
   | PingRequest;

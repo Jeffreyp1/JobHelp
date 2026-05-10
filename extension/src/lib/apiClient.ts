@@ -17,6 +17,10 @@ import type {
   WriteFileResponse,
   SeedDefaultsRequest,
   SeedDefaultsResponse,
+  DownloadTemplateRequest,
+  DownloadTemplateResponse,
+  UploadFilledDocxRequest,
+  UploadFilledDocxResponse,
   PingResponse,
   ApiError,
 } from '../types/api-contract.js';
@@ -94,5 +98,25 @@ export class ApiClient {
    */
   async finalize(req: Omit<FinalizeRequest, 'action'>): Promise<FinalizeResponse> {
     return this.post<FinalizeResponse>({ action: 'finalize', ...req });
+  }
+
+  /**
+   * Download the user's uploaded resume template DOCX from Drive as base64.
+   * Used by the "Convert via Template (DOCX)" flow before client-side fill.
+   */
+  async downloadTemplate(
+    req: Omit<DownloadTemplateRequest, 'action'>,
+  ): Promise<DownloadTemplateResponse> {
+    return this.post<DownloadTemplateResponse>({ action: 'download_template', ...req });
+  }
+
+  /**
+   * Upload a base64-encoded DOCX (the result of fillResumeTemplate) into a
+   * Drive folder and return the resulting file URL.
+   */
+  async uploadFilledDocx(
+    req: Omit<UploadFilledDocxRequest, 'action'>,
+  ): Promise<UploadFilledDocxResponse> {
+    return this.post<UploadFilledDocxResponse>({ action: 'upload_filled_docx', ...req });
   }
 }

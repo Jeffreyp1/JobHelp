@@ -14,6 +14,8 @@ export type ApiAction =
   | "list_files"
   | "write_file"
   | "seed_defaults"
+  | "download_template"
+  | "upload_filled_docx"
   | "ping";
 
 export interface ToggleSetting {
@@ -167,6 +169,34 @@ export interface SeedDefaultsResult {
 
 export type SeedDefaultsResponse = ApiResult<SeedDefaultsResult>;
 
+export interface DownloadTemplateRequest {
+  action: "download_template";
+  fileId: string;
+}
+
+export interface DownloadTemplateResult {
+  base64: string;
+  fileName: string;
+  mimeType: string;
+}
+
+export type DownloadTemplateResponse = ApiResult<DownloadTemplateResult>;
+
+export interface UploadFilledDocxRequest {
+  action: "upload_filled_docx";
+  folderId: string;
+  fileName: string;
+  base64: string;
+}
+
+export interface UploadFilledDocxResult {
+  fileId: string;
+  url: string;
+  fileName: string;
+}
+
+export type UploadFilledDocxResponse = ApiResult<UploadFilledDocxResult>;
+
 export interface PingRequest {
   action: "ping";
 }
@@ -179,4 +209,6 @@ export type ApiRequest =
   | ListFilesRequest
   | WriteFileRequest
   | SeedDefaultsRequest
+  | DownloadTemplateRequest
+  | UploadFilledDocxRequest
   | PingRequest;
