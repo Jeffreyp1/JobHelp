@@ -606,6 +606,99 @@ export const driveOps: DriveOps = {
   },
 
   // -------------------------------------------------------------------------
+  // downloadFileAsBase64
+  //
+  // Read a Drive file's binary contents and return base64 + name + MIME type.
+  // Backbone of the template-fill flow: the extension downloads the user's
+  // uploaded template DOCX, fills it client-side, then re-uploads.
+  // -------------------------------------------------------------------------
+  downloadFileAsBase64(fileId: string): {
+    base64: string;
+    fileName: string;
+    mimeType: string;
+  } {
+    const DriveApp = getDriveApp();
+    const file = DriveApp.getFileById(fileId);
+    const blob = file.getBlob();
+    const bytes: number[] = blob.getBytes();
+    // Apps Script ships Utilities.base64Encode globally; in tests we fall
+    // back to the Buffer API.
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const Utilities = (globalThis as any).Utilities as
+      | { base64Encode: (bytes: number[]) => string }
+      | undefined;
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    let base64: string;
+    if (Utilities && typeof Utilities.base64Encode === 'function') {
+      base64 = Utilities.base64Encode(bytes);
+    } else {
+      // Test fallback — bytes is a number[] of signed bytes per GAS convention.
+      const buf = Buffer.from(Uint8Array.from(bytes));
+      base64 = buf.toString('base64');
+    }
+
+    const mimeType: string =
+      typeof file.getMimeType === 'function' ? file.getMimeType() : '';
+
+    return {
+      base64,
+      fileName: file.getName(),
+      mimeType,
+    };
+  },
+
+  // -------------------------------------------------------------------------
+  // uploadDocxFromBase64
+  //
+  // Counterpart to downloadFileAsBase64: decode incoming base64 bytes into a
+  // DOCX-typed Drive file inside the requested folder. Used by the
+  // "Convert via Template (DOCX)" flow once the client has filled the template.
+  // -------------------------------------------------------------------------
+  uploadDocxFromBase64(
+    folderId: string,
+    fileName: string,
+    base64: string,
+  ): { fileId: string; url: string; fileName: string } {
+    const DriveApp = getDriveApp();
+    const folder = DriveApp.getFolderById(folderId);
+
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const Utilities = (globalThis as any).Utilities as
+      | {
+          base64Decode: (s: string) => number[];
+          newBlob: (data: number[], mimeType: string, name: string) => any;
+        }
+      | undefined;
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    const DOCX_MIME =
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    let createdFile: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (Utilities && typeof Utilities.base64Decode === 'function') {
+      const bytes = Utilities.base64Decode(base64);
+      const blob = Utilities.newBlob(bytes, DOCX_MIME, fileName);
+      createdFile = folder.createFile(blob);
+    } else {
+      // Test fallback: drop the bytes through Buffer + a synthetic blob.
+      const buf = Buffer.from(base64, 'base64');
+      const fakeBlob = {
+        getBytes: () => Array.from(buf),
+        getName: () => fileName,
+        setName: (n: string) => fileName = n,
+        getContentType: () => DOCX_MIME,
+      };
+      createdFile = folder.createFile(fakeBlob);
+    }
+
+    return {
+      fileId: createdFile.getId(),
+      url: createdFile.getUrl(),
+      fileName,
+    };
+  },
+
+  // -------------------------------------------------------------------------
   // appendSheetRow
   // -------------------------------------------------------------------------
   appendSheetRow(
