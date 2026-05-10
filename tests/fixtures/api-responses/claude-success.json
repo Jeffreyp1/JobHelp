@@ -1,0 +1,20 @@
+{
+  "id": "msg_01ABCdefGHIjklMNOpqrsTUV",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-haiku-4-5-20251001",
+  "content": [
+    {
+      "type": "text",
+      "text": "# Jordan Rivera\nSenior Backend Engineer · Brooklyn, NY · jordan.rivera@example.com · linkedin.com/in/jordan-rivera-eng\n\n## Summary\nSenior software engineer with 7 years building distributed systems handling 1.2M req/sec. Track record of shipping production infrastructure that improves throughput, reliability, and team velocity at p99 latencies under 20ms.\n\n## Experience\n\n### Acme Cloud Inc — Senior Software Engineer\n**Brooklyn, NY · Mar 2022 – Present**\n\n- Shipped multi-region message broker at 1.2M req/sec, p99 18ms; cut cross-region failover from 90s to 6s\n- Migrated customer-facing API from REST to gRPC, reducing payload 62% and tail latency 41%\n- Built self-serve CI/CD template adopted by 38 services across 11 teams; service onboarding 4 days → 6 hours\n- Mentored 4 mid-level engineers; promoted 2 to senior\n\n### Brightline Analytics — Software Engineer\n**New York, NY · Jul 2019 – Feb 2022**\n\n- Built streaming ETL platform ingesting 4TB/day clickstream data into Snowflake\n- Owned production observability stack (Prometheus, Grafana, OpenTelemetry); MTTD reduced 73%\n- Open-sourced `bright-rate`, Go-based distributed rate limiter (1.4k stars, used by 7 companies)\n- Reduced AWS spend by $380k/yr through right-sizing and reserved-instance planning\n\n## Skills\n\n**Languages:** Go, Python, TypeScript, Rust, SQL\n**Distributed Systems:** gRPC, Kafka, NATS, distributed tracing, Raft\n**Cloud & Infra:** AWS (EC2, EKS, S3, Lambda), Terraform, Kubernetes, Helm\n**Observability:** Prometheus, Grafana, OpenTelemetry, Datadog, Honeycomb\n\n## Education\n\n**B.S. Computer Science** — Carnegie Mellon University (2019) · GPA 3.84"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 1247,
+    "output_tokens": 612,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 6420
+  }
+}
