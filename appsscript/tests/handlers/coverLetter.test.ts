@@ -541,4 +541,47 @@ describe('handleCoverLetter', () => {
       .mock.calls[0][0].system[0].text as string;
     expect(systemText).not.toContain('=== TONE:');
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sheet column back-fill (B1 / B6 — updateSheetRow integration)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  it('sheetId + rowUrl provided → updateSheetRow called once with coverLetterUrl=docUrl', () => {
+    const deps = makeDeps();
+    const result = handleCoverLetter(
+      deps,
+      makeRequest({
+        sheetId: 'sheet-abc',
+        rowUrl: 'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      }),
+    );
+    if (!result.ok) throw new Error('expected ok');
+    expect(deps.drive.updateSheetRow).toHaveBeenCalledTimes(1);
+    expect(deps.drive.updateSheetRow).toHaveBeenCalledWith(
+      'sheet-abc',
+      'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      { coverLetterUrl: result.docUrl },
+    );
+  });
+
+  it('sheetId/rowUrl omitted → updateSheetRow NOT called', () => {
+    const deps = makeDeps();
+    handleCoverLetter(deps, makeRequest()); // no sheetId/rowUrl
+    expect(deps.drive.updateSheetRow).not.toHaveBeenCalled();
+  });
+
+  it('updateSheetRow throwing does NOT fail handler — returns ok:true (graceful degradation)', () => {
+    const deps = makeDeps({
+      updateSheetRow: vi.fn(() => { throw new Error('sheet quota'); }),
+    });
+    const result = handleCoverLetter(
+      deps,
+      makeRequest({
+        sheetId: 'sheet-abc',
+        rowUrl: 'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      }),
+    );
+    expect(result.ok).toBe(true);
+    expect(deps.drive.updateSheetRow).toHaveBeenCalledOnce();
+  });
 });

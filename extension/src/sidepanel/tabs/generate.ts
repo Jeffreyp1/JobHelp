@@ -19,7 +19,7 @@
 import { renderJobInsightsCard } from '../components/jobInsights.js';
 import { renderToggleRow } from '../components/toggleRow.js';
 import { renderCostEstimator } from '../components/costEstimator.js';
-import { renderResumeEditor } from '../components/resumeEditor.js';
+import { renderResumeEditor, type ResumeReviseEventDetail } from '../components/resumeEditor.js';
 import { estimateCost } from '../../lib/costCalculator.js';
 import { formatTokens } from '../../lib/tokenFormatter.js';
 import { get, set } from '../../lib/storage.js';
@@ -38,6 +38,7 @@ import type {
   AutoReviseResponse,
   CoverLetterRequest,
   CoverLetterResponse,
+  CoverLetterTone,
   VerifyClHooksRequest,
   VerifyClHooksResponse,
   MultiVersionRequest,
@@ -159,6 +160,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     autoReviseModel: HAIKU,
     coverLetterEnabled: false,
     coverLetterModel: HAIKU,
+    coverLetterTone: 'neutral' as 'neutral' | 'formal' | 'casual' | 'technical' | 'persuasive',
     verifyHooksModel: HAIKU,
     multiVersionEnabled: false,
     multiVersionModel: SONNET,
@@ -243,8 +245,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       featureKey: 'research',
       models: ALL_MODELS,
       selectedModel: state.researchModel,
-      onToggle: (v) => { state.researchEnabled = v; void persistTogglesState(); },
-      onModelChange: (m) => { state.researchModel = m; void persistTogglesState(); },
+      onToggle: (v) => { state.researchEnabled = v; void persistTogglesState(); renderCostBlock(); },
+      onModelChange: (m) => { state.researchModel = m; void persistTogglesState(); renderCostBlock(); },
     }),
   );
 
@@ -256,8 +258,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       featureKey: 'benchmark',
       models: ALL_MODELS,
       selectedModel: state.benchmarkModel,
-      onToggle: (v) => { state.benchmarkEnabled = v; void persistTogglesState(); },
-      onModelChange: (m) => { state.benchmarkModel = m; void persistTogglesState(); },
+      onToggle: (v) => { state.benchmarkEnabled = v; void persistTogglesState(); renderCostBlock(); },
+      onModelChange: (m) => { state.benchmarkModel = m; void persistTogglesState(); renderCostBlock(); },
     }),
   );
 
@@ -269,8 +271,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       featureKey: 'critique',
       models: ALL_MODELS,
       selectedModel: state.critiqueModel,
-      onToggle: (v) => { state.critiqueEnabled = v; void persistTogglesState(); },
-      onModelChange: (m) => { state.critiqueModel = m; void persistTogglesState(); },
+      onToggle: (v) => { state.critiqueEnabled = v; void persistTogglesState(); renderCostBlock(); },
+      onModelChange: (m) => { state.critiqueModel = m; void persistTogglesState(); renderCostBlock(); },
     }),
   );
   const critiqueResultSlot = document.createElement('div');
@@ -286,8 +288,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       featureKey: 'autoRevise',
       models: ALL_MODELS,
       selectedModel: state.autoReviseModel,
-      onToggle: (v) => { state.autoReviseEnabled = v; void persistTogglesState(); },
-      onModelChange: (m) => { state.autoReviseModel = m; void persistTogglesState(); },
+      onToggle: (v) => { state.autoReviseEnabled = v; void persistTogglesState(); renderCostBlock(); },
+      onModelChange: (m) => { state.autoReviseModel = m; void persistTogglesState(); renderCostBlock(); },
     }),
   );
   const reviseDiffSlot = document.createElement('div');
@@ -305,9 +307,9 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       selectedModel: state.multiVersionModel,
       counts: [2, 3, 4, 5],
       selectedCount: state.multiVersionCount,
-      onToggle: (v) => { state.multiVersionEnabled = v; void persistTogglesState(); },
-      onModelChange: (m) => { state.multiVersionModel = m; void persistTogglesState(); },
-      onCountChange: (n) => { state.multiVersionCount = n; void persistTogglesState(); },
+      onToggle: (v) => { state.multiVersionEnabled = v; void persistTogglesState(); renderCostBlock(); },
+      onModelChange: (m) => { state.multiVersionModel = m; void persistTogglesState(); renderCostBlock(); },
+      onCountChange: (n) => { state.multiVersionCount = n; void persistTogglesState(); renderCostBlock(); },
     }),
   );
 
@@ -319,8 +321,15 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       featureKey: 'coverLetter',
       models: ALL_MODELS,
       selectedModel: state.coverLetterModel,
-      onToggle: (v) => { state.coverLetterEnabled = v; void persistTogglesState(); },
-      onModelChange: (m) => { state.coverLetterModel = m; void persistTogglesState(); },
+      tones: ['neutral', 'formal', 'casual', 'technical', 'persuasive'],
+      selectedTone: state.coverLetterTone,
+      onToggle: (v) => { state.coverLetterEnabled = v; void persistTogglesState(); renderCostBlock(); },
+      onModelChange: (m) => { state.coverLetterModel = m; void persistTogglesState(); renderCostBlock(); },
+      onToneChange: (t) => {
+        state.coverLetterTone = t as typeof state.coverLetterTone;
+        void persistTogglesState();
+        renderCostBlock();
+      },
     }),
   );
   const clResultSlot = document.createElement('div');
@@ -336,7 +345,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       featureKey: 'verifyHooks',
       models: ALL_MODELS,
       selectedModel: state.verifyHooksModel,
-      onModelChange: (m) => { state.verifyHooksModel = m; void persistTogglesState(); },
+      onModelChange: (m) => { state.verifyHooksModel = m; void persistTogglesState(); renderCostBlock(); },
     }),
   );
   const verifyResultSlot = document.createElement('div');
@@ -360,6 +369,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
         autoReviseModel: state.autoReviseModel,
         coverLetterEnabled: state.coverLetterEnabled,
         coverLetterModel: state.coverLetterModel,
+        coverLetterTone: state.coverLetterTone,
         verifyHooksModel: state.verifyHooksModel,
         multiVersionEnabled: state.multiVersionEnabled,
         multiVersionModel: state.multiVersionModel,
@@ -375,7 +385,25 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
   costContainer.className = 'generate__cost';
   function renderCostBlock() {
     costContainer.replaceChildren(
-      renderCostEstimator(estimateCost(state.toggles, state.generateModel)),
+      renderCostEstimator(
+        estimateCost(state.toggles, state.generateModel, {
+          researchEnabled: state.researchEnabled,
+          researchModel: state.researchModel,
+          benchmarkEnabled: state.benchmarkEnabled,
+          benchmarkModel: state.benchmarkModel,
+          critiqueEnabled: state.critiqueEnabled,
+          critiqueModel: state.critiqueModel,
+          autoReviseEnabled: state.autoReviseEnabled,
+          autoReviseModel: state.autoReviseModel,
+          coverLetterEnabled: state.coverLetterEnabled,
+          coverLetterModel: state.coverLetterModel,
+          verifyHooksEnabled: state.coverLetterEnabled,
+          verifyHooksModel: state.verifyHooksModel,
+          multiVersionEnabled: state.multiVersionEnabled,
+          multiVersionModel: state.multiVersionModel,
+          multiVersionCount: state.multiVersionCount,
+        }),
+      ),
     );
   }
   renderCostBlock();
@@ -697,9 +725,15 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     const textarea = editor.querySelector<HTMLTextAreaElement>('.resume-editor__textarea');
     currentMarkdownGetter = textarea ? () => textarea.value : () => md;
     resumeSlot.replaceChildren(editor);
+    editor.addEventListener('resume:revise', (ev) => {
+      const detail = (ev as CustomEvent<ResumeReviseEventDetail>).detail;
+      void runAutoReviseScoped(detail.scope, detail.currentMarkdown);
+    });
     // Auto-scroll the panel to the new preview so the user sees it landed.
     requestAnimationFrame(() => {
-      resumeSlot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (typeof resumeSlot.scrollIntoView === 'function') {
+        resumeSlot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     });
   }
 
@@ -744,11 +778,9 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     if (state.coverLetterEnabled && hooks.onCoverLetter && jobFolderId) {
       tasks.push(runCoverLetter(resumeMd, jobFolderId));
     }
-    if (state.autoReviseEnabled && hooks.onAutoRevise) {
-      // For v2, auto-revise is triggered manually after generate via a button;
-      // we expose the button as soon as the resume editor renders.
-      renderAutoReviseButton(resumeMd);
-    }
+    // Auto-revise is now triggered by the resume editor's own "Revise…"
+    // buttons (which dispatch a 'resume:revise' CustomEvent). No redundant
+    // whole-resume button needed here.
 
     await Promise.allSettled(tasks);
   }
@@ -785,6 +817,11 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
         rulesFolderId: cfg.rulesFolderId,
         jobFolderId,
         model: state.coverLetterModel,
+        // Omit "neutral" so the backend default applies (backwards-compat).
+        tone:
+          state.coverLetterTone === 'neutral'
+            ? undefined
+            : (state.coverLetterTone as CoverLetterTone),
       });
       renderCoverLetterResult(result);
     } catch (e) {
@@ -862,17 +899,10 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     `;
   }
 
-  function renderAutoReviseButton(resumeMd: string): void {
-    reviseDiffSlot.replaceChildren();
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn btn-secondary revise-whole-resume';
-    btn.textContent = 'Revise whole resume…';
-    btn.addEventListener('click', () => void runAutoRevise(resumeMd));
-    reviseDiffSlot.appendChild(btn);
-  }
-
-  async function runAutoRevise(currentMd: string): Promise<void> {
+  async function runAutoReviseScoped(
+    scope: ReviseTargetScope,
+    currentMd: string,
+  ): Promise<void> {
     if (!hooks.onAutoRevise) return;
     const instruction = typeof globalThis !== 'undefined' && globalThis.prompt
       ? globalThis.prompt('Revision instruction (e.g. "tighten verbs, add metrics"):')
@@ -880,7 +910,6 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     if (!instruction || !instruction.trim()) return;
 
     const md = currentMarkdownGetter ? currentMarkdownGetter() : currentMd;
-    const scope: ReviseTargetScope = { kind: 'whole-resume' };
 
     reviseDiffSlot.textContent = 'Revising…';
     try {
@@ -895,11 +924,9 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
         onRevisionAccepted: (revisedMd: string) => {
           showResume(revisedMd);
           reviseDiffSlot.replaceChildren();
-          renderAutoReviseButton(revisedMd);
         },
         onRevisionRejected: () => {
           reviseDiffSlot.replaceChildren();
-          renderAutoReviseButton(md);
         },
       });
     } catch (e) {
@@ -970,7 +997,9 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     activate(0);
 
     requestAnimationFrame(() => {
-      resumeSlot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (typeof resumeSlot.scrollIntoView === 'function') {
+        resumeSlot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     });
   }
 
@@ -1006,6 +1035,9 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
         state.autoReviseModel = v2.autoReviseModel;
         state.coverLetterEnabled = v2.coverLetterEnabled;
         state.coverLetterModel = v2.coverLetterModel;
+        if (v2.coverLetterTone) {
+          state.coverLetterTone = v2.coverLetterTone as typeof state.coverLetterTone;
+        }
         state.verifyHooksModel = v2.verifyHooksModel;
         state.multiVersionEnabled = v2.multiVersionEnabled;
         state.multiVersionModel = v2.multiVersionModel;
@@ -1039,10 +1071,13 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
               if (modelSel) modelSel.value = state.multiVersionModel;
               if (countSel) countSel.value = String(state.multiVersionCount);
               break;
-            case 'coverLetter':
+            case 'coverLetter': {
               if (cb) cb.checked = state.coverLetterEnabled;
               if (modelSel) modelSel.value = state.coverLetterModel;
+              const toneSel = row.querySelector<HTMLSelectElement>('select.tone-select');
+              if (toneSel) toneSel.value = state.coverLetterTone;
               break;
+            }
             case 'verifyHooks':
               if (modelSel) modelSel.value = state.verifyHooksModel;
               break;

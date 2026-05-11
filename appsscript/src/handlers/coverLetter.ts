@@ -310,6 +310,21 @@ export function handleCoverLetter(
     // docUrl stays ''
   }
 
+  // 8b. Optional sheet column update (non-fatal). When the caller provides
+  // both sheetId and rowUrl, back-fill the "Cover Letter URL" column (v2
+  // sheet column 20). Sheet update failures must NOT fail the handler.
+  if (req.sheetId && req.rowUrl && docUrl) {
+    try {
+      deps.drive.updateSheetRow(req.sheetId, req.rowUrl, {
+        coverLetterUrl: docUrl,
+      });
+    } catch (err) {
+      console.warn(
+        `[coverLetter] sheet update failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   // 9. Compute cost
   const cost = calculateCost(claudeResponse.usage, claudeResponse.model);
 

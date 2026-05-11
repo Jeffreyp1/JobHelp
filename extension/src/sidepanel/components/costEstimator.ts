@@ -16,6 +16,7 @@ interface Row {
 const ROWS: Row[] = [
   { key: 'generate', label: 'Generate' },
   { key: 'research', label: 'Research' },
+  { key: 'benchmark', label: 'Benchmark' },
   { key: 'critique', label: 'Critique' },
   { key: 'autoRevise', label: 'Auto-revise' },
   { key: 'multiVersion', label: 'Multi-version' },

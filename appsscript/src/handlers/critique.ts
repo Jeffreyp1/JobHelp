@@ -314,6 +314,22 @@ export function handleCritique(
 
   const totalScore = computeWeightedTotal(scores);
 
+  // ── Optional sheet column update (non-fatal) ───────────────────────────
+  // When the caller provides both sheetId and rowUrl, back-fill the
+  // "Critique Score" column (v2 sheet column 19). Sheet update failures
+  // must NOT fail the handler — the critique result itself is the
+  // load-bearing output; the sheet column is a non-essential side effect.
+  if (req.sheetId && req.rowUrl) {
+    try {
+      deps.drive.updateSheetRow(req.sheetId, req.rowUrl, {
+        critiqueScore: totalScore,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[critique] sheet update failed (non-fatal): ${msg}`);
+    }
+  }
+
   // ── Optional drive write (non-fatal) ───────────────────────────────────
   let critiqueDocUrl: string | null = null;
   if (req.jobFolderId) {

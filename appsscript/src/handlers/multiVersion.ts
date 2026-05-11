@@ -228,5 +228,13 @@ export function handleMultiVersion(
 
   console.log(`[multiVersion] done totalCost=$${accumulatedCost.totalUsd}`);
 
+  // TODO: Sheet column "Multi-Version Label" is written by the
+  // finalize-variant flow (which knows which variant the user picked),
+  // not here. Multi-version produces N variants — the user selects one in
+  // the UI before saving, so the chosen label isn't known until that
+  // downstream step. The CritiqueRequest-shaped `sheetId` / `rowUrl`
+  // fields are accepted on this request for forward compatibility but
+  // intentionally unused right now.
+
   return { ok: true, variants, cost: accumulatedCost };
 }

@@ -253,4 +253,47 @@ describe('handleCritique', () => {
     if (!result.ok) throw new Error('expected ok');
     expect(result.critiqueDocUrl).toBeNull();
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sheet column back-fill (B1 / B6 — updateSheetRow integration)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  it('sheetId + rowUrl provided → updateSheetRow called once with critiqueScore', () => {
+    const drive = makeDriveMock();
+    const result = handleCritique(
+      { ...deps, drive },
+      makeRequest({
+        sheetId: 'sheet-abc',
+        rowUrl: 'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      }),
+    );
+    if (!result.ok) throw new Error('expected ok');
+    expect(drive.updateSheetRow).toHaveBeenCalledTimes(1);
+    expect(drive.updateSheetRow).toHaveBeenCalledWith(
+      'sheet-abc',
+      'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      { critiqueScore: result.totalScore },
+    );
+  });
+
+  it('sheetId/rowUrl omitted → updateSheetRow NOT called', () => {
+    const drive = makeDriveMock();
+    handleCritique({ ...deps, drive }, makeRequest()); // no sheetId/rowUrl
+    expect(drive.updateSheetRow).not.toHaveBeenCalled();
+  });
+
+  it('updateSheetRow throwing does NOT fail handler — returns ok:true (graceful degradation)', () => {
+    const drive = makeDriveMock({
+      updateSheetRow: vi.fn(() => { throw new Error('sheet quota'); }),
+    });
+    const result = handleCritique(
+      { ...deps, drive },
+      makeRequest({
+        sheetId: 'sheet-abc',
+        rowUrl: 'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      }),
+    );
+    expect(result.ok).toBe(true);
+    expect(drive.updateSheetRow).toHaveBeenCalledOnce();
+  });
 });
