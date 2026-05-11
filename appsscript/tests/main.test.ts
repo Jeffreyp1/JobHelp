@@ -136,6 +136,7 @@ function makeDriveMock(overrides: Partial<DriveOps> = {}): DriveOps {
     writeFile: vi.fn(() => ({ updatedAt: 1_700_000_000_000 })),
     seedDefaults: vi.fn(() => ({ seeded: ['01-priority.md'], errors: [] })),
     appendSheetRow: vi.fn(() => ({ rowIndex: 2, rowUrl: 'https://docs.google.com/spreadsheets/d/sheet-id/edit#gid=0&range=A2' })),
+    updateSheetRow: vi.fn(() => undefined),
     replaceDocContents: vi.fn(() => undefined),
     exportDocAs: vi.fn((_docId: string, _folderId: string, format: FinalizeFormat, fileName: string) => ({
       fileId: `exported-${format}-file-id`,
@@ -152,6 +153,14 @@ function makeDriveMock(overrides: Partial<DriveOps> = {}): DriveOps {
       fileId: 'uploaded-docx-id',
       url: 'https://drive.google.com/file/d/uploaded-docx-id/view',
       fileName,
+    })),
+    createFileInFolder: vi.fn((_folderId: string, _fileName: string, _content: string) => ({
+      fileId: 'md-file-id',
+      fileUrl: 'https://drive.google.com/file/d/md-file-id/view',
+    })),
+    createGoogleDoc: vi.fn((_folderId: string, _title: string, _content: string) => ({
+      docId: 'doc-id',
+      docUrl: 'https://docs.google.com/document/d/doc-id/edit',
     })),
     ...overrides,
   };

@@ -58,6 +58,18 @@ function getChrome(): typeof chrome | null {
   return null;
 }
 
+/** Resolve the Apps Script /exec URL from storage and return an ApiClient. */
+async function getApiClient(): Promise<ApiClient | null> {
+  let url: string | null = null;
+  try {
+    url = await get('appsScriptUrl');
+  } catch {
+    return null;
+  }
+  if (!url) return null;
+  return new ApiClient(url);
+}
+
 function buildControllers(): PanelControllers {
   const generate = renderGenerateTab({
     onGenerate: (req) => {
@@ -155,6 +167,78 @@ function buildControllers(): PanelControllers {
       if (!up.ok) return { ok: false, message: up.error.message };
 
       return { ok: true, url: up.url, fileName: up.fileName, fileId: up.fileId };
+    },
+
+    // ─── v2 feature hooks (direct ApiClient calls; bypass background) ──────
+    onResearchCompany: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: 'validation', message: 'Apps Script URL not configured.', retryable: false },
+        };
+      }
+      return client.researchCompany(req);
+    },
+    onBenchmarkRole: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: 'validation', message: 'Apps Script URL not configured.', retryable: false },
+        };
+      }
+      return client.benchmarkRole(req);
+    },
+    onCritique: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: 'validation', message: 'Apps Script URL not configured.', retryable: false },
+        };
+      }
+      return client.critique(req);
+    },
+    onAutoRevise: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: 'validation', message: 'Apps Script URL not configured.', retryable: false },
+        };
+      }
+      return client.autoRevise(req);
+    },
+    onCoverLetter: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: 'validation', message: 'Apps Script URL not configured.', retryable: false },
+        };
+      }
+      return client.coverLetter(req);
+    },
+    onVerifyClHooks: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: 'validation', message: 'Apps Script URL not configured.', retryable: false },
+        };
+      }
+      return client.verifyClHooks(req);
+    },
+    onMultiVersion: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: 'validation', message: 'Apps Script URL not configured.', retryable: false },
+        };
+      }
+      return client.multiVersion(req);
     },
   });
 

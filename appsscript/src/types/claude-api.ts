@@ -18,6 +18,12 @@ export interface UserMessage {
   content: string;
 }
 
+/** Tool definition for web_search_20250305 and other Anthropic tools */
+export interface ClaudeTool {
+  type: string;
+  name: string;
+}
+
 export interface ClaudeRequest {
   /** Anthropic model id, e.g. "claude-haiku-4-5-20251001" */
   model: string;
@@ -27,6 +33,11 @@ export interface ClaudeRequest {
   system: SystemBlock[];
   /** User messages */
   messages: UserMessage[];
+  /**
+   * Optional tools to enable (e.g. web_search_20250305).
+   * When provided, Claude may invoke tools during the response.
+   */
+  tools?: ClaudeTool[];
 }
 
 export interface ClaudeUsage {

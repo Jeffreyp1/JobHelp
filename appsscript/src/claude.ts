@@ -115,12 +115,15 @@ function throwApiError(status: number, rawBody: string): never {
 export function callClaude(req: ClaudeRequest): ClaudeResponse {
   const apiKey = getApiKey();
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     model: req.model,
     max_tokens: req.maxTokens,
     system: req.system,
     messages: req.messages,
   };
+  if (req.tools && req.tools.length > 0) {
+    payload['tools'] = req.tools;
+  }
 
   const response = UrlFetchApp.fetch(MESSAGES_URL, {
     method: "post",

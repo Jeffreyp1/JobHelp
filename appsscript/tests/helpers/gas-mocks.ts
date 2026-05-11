@@ -102,6 +102,30 @@ export function makeSpreadsheetApp(spreadsheets: Record<string, MockSpreadsheet>
     appendRow: vi.fn((row: unknown[]) => { sheet.rows.push(row); }),
     getRange: vi.fn((row: number, col: number, numRows?: number, numCols?: number) => ({
       getValues: () => sheet.rows.slice(row - 1, row - 1 + (numRows ?? 1)),
+      // Single-cell setter used by updateSheetRow. The mock stores rows as
+      // unknown[][]; we lazily widen the target row to col-1 with '' so that
+      // updates to columns beyond the row's current length still work even
+      // if the data row was appended with fewer values.
+      setValue: vi.fn((value: unknown) => {
+        const rowIdx = row - 1;
+        if (rowIdx < 0) return;
+        // Ensure the row exists
+        while (sheet.rows.length <= rowIdx) sheet.rows.push([]);
+        const target = sheet.rows[rowIdx];
+        while (target.length < col) target.push('');
+        target[col - 1] = value;
+      }),
+      setValues: vi.fn((values: unknown[][]) => {
+        for (let r = 0; r < values.length; r++) {
+          const rowIdx = row - 1 + r;
+          while (sheet.rows.length <= rowIdx) sheet.rows.push([]);
+          const target = sheet.rows[rowIdx];
+          for (let c = 0; c < values[r].length; c++) {
+            while (target.length < col + c) target.push('');
+            target[col - 1 + c] = values[r][c];
+          }
+        }
+      }),
     })),
     getSheetId: () => sheetIndex,
   });

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobHelp",
-  "version": "0.1.0",
-  "description": "Tailor resumes from job descriptions, log to your tracking sheet.",
+  "version": "0.2.0",
+  "description": "Tailor resumes to job descriptions with optional research, critique, cover letter, and multi-version generation.",
   "permissions": ["sidePanel", "storage", "scripting", "tabs"],
   "host_permissions": ["<all_urls>"],
   "background": {

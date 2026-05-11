@@ -19,6 +19,13 @@ export type ApiAction =
   | "seed_defaults"
   | "download_template"
   | "upload_filled_docx"
+  | "research_company"
+  | "benchmark_role"
+  | "critique"
+  | "auto_revise"
+  | "cover_letter"
+  | "verify_cl_hooks"
+  | "multi_version"
   | "ping";
 
 export interface ToggleSetting {
@@ -72,6 +79,10 @@ export interface GenerateRequest {
   sheetId: string;
   /** Default Anthropic model for the generate step */
   model: string;
+  /** Optional pre-fetched company research summary (rendered under "=== Company Research ===") */
+  researchSummary?: string;
+  /** Optional pre-fetched LinkedIn role benchmark patterns (rendered under "=== Role Benchmark ===") */
+  benchmarkPatterns?: string;
 }
 
 export interface ReframingApplied {
@@ -278,6 +289,186 @@ export interface PingRequest {
 export type PingResponse = ApiResult<{ version: string; serverTime: number }>;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// v2 feature actions (E1 research/benchmark, E2 critique/auto_revise,
+// E3 cover_letter/verify_cl_hooks, E4 multi_version). Each agent OWNS its
+// request/result/response triple here — DO NOT cross-edit.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── E1: research_company ───
+export interface ResearchCompanyRequest {
+  action: "research_company";
+  company: string;
+  role: string | null;
+  model: string;
+  /** Optional override of cache (skip cache + force a fresh call) */
+  forceRefresh?: boolean;
+}
+export interface ResearchCompanyResult {
+  summary: string;
+  keywords: string[];
+  sources: { title: string; url: string }[];
+  cached: boolean;
+  cost: CostBreakdown;
+}
+export type ResearchCompanyResponse = ApiResult<ResearchCompanyResult>;
+
+// ─── E1: benchmark_role ───
+export interface BenchmarkRoleRequest {
+  action: "benchmark_role";
+  company: string;
+  role: string;
+  model: string;
+  forceRefresh?: boolean;
+}
+export interface BenchmarkRoleResult {
+  patterns: string;
+  keywords: string[];
+  sources: { title: string; url: string }[];
+  cached: boolean;
+  cost: CostBreakdown;
+}
+export type BenchmarkRoleResponse = ApiResult<BenchmarkRoleResult>;
+
+// ─── E2: critique ───
+export interface CritiqueScore {
+  dimension: string;
+  score: number;
+  weight: number;
+  notes: string;
+}
+export interface CritiqueImprovement {
+  tier: 1 | 2 | 3;
+  text: string;
+  expectedDelta: number;
+}
+export interface CritiqueRequest {
+  action: "critique";
+  resumeMd: string;
+  jd: string;
+  jobInsights: JobInsights | null;
+  jobFolderId: string | null;
+  model: string;
+}
+export interface CritiqueResult {
+  scores: CritiqueScore[];
+  totalScore: number;
+  improvements: CritiqueImprovement[];
+  /** URL of the saved critique.md inside the job folder (null if no folder) */
+  critiqueDocUrl: string | null;
+  cost: CostBreakdown;
+}
+export type CritiqueResponse = ApiResult<CritiqueResult>;
+
+// ─── E2: auto_revise ───
+export type ReviseTargetScope =
+  | { kind: "bullet"; bulletId: string }
+  | { kind: "section"; sectionName: string }
+  | { kind: "role"; companyName: string }
+  | { kind: "whole-resume" };
+
+export interface AutoReviseRequest {
+  action: "auto_revise";
+  currentMarkdown: string;
+  targetScope: ReviseTargetScope;
+  instruction: string;
+  model: string;
+}
+export interface AutoReviseDiff {
+  lineIndex: number;
+  before: string;
+  after: string;
+}
+export interface AutoReviseResult {
+  revisedMarkdown: string;
+  diff: AutoReviseDiff[];
+  /** Lines that changed OUTSIDE the requested scope (must be empty per rule 14) */
+  unauthorizedChanges: AutoReviseDiff[];
+  cost: CostBreakdown;
+}
+export type AutoReviseResponse = ApiResult<AutoReviseResult>;
+
+// ─── E3: cover_letter ───
+/** Voice preset for the generated cover letter. Defaults to "neutral" when omitted. */
+export type CoverLetterTone =
+  | "formal"
+  | "casual"
+  | "technical"
+  | "persuasive"
+  | "neutral";
+
+export interface CoverLetterRequest {
+  action: "cover_letter";
+  resumeMd: string;
+  jd: string;
+  company: string | null;
+  role: string | null;
+  sourceFolderId: string;
+  rulesFolderId: string;
+  jobFolderId: string;
+  model: string;
+  /** Optional voice preset. When undefined or "neutral", produces the default balanced register. */
+  tone?: CoverLetterTone;
+}
+export interface CoverLetterResult {
+  coverLetterMd: string;
+  docUrl: string;
+  mdFileUrl: string;
+  cost: CostBreakdown;
+}
+export type CoverLetterResponse = ApiResult<CoverLetterResult>;
+
+// ─── E3: verify_cl_hooks ───
+export type HookStatus = "verified" | "unverified" | "uncertain";
+export interface HookVerification {
+  entity: string;
+  /** PI / product / program / company / paper / etc. */
+  entityType: string;
+  status: HookStatus;
+  /** Search results that backed the status decision */
+  sources: { title: string; url: string }[];
+  /** Explanation for unverified/uncertain */
+  reason?: string;
+}
+export interface VerifyClHooksRequest {
+  action: "verify_cl_hooks";
+  coverLetterMd: string;
+  model: string;
+}
+export interface VerifyClHooksResult {
+  verifications: HookVerification[];
+  /** Count of entities with status === "unverified" */
+  unverifiedCount: number;
+  cost: CostBreakdown;
+}
+export type VerifyClHooksResponse = ApiResult<VerifyClHooksResult>;
+
+// ─── E4: multi_version ───
+export interface MultiVersionVariant {
+  label: string;
+  framing: string;
+  markdown: string;
+}
+export interface MultiVersionRequest {
+  action: "multi_version";
+  jd: string;
+  company: string | null;
+  role: string | null;
+  jobInsights: JobInsights | null;
+  sourceFolderId: string;
+  rulesFolderId: string;
+  model: string;
+  /** How many variants to generate. Each gets a different framing prompt suffix. */
+  count: number;
+  /** Optional explicit framing labels; default ["Technical depth", "Leadership", "Business outcomes"] */
+  framings?: string[];
+}
+export interface MultiVersionResult {
+  variants: MultiVersionVariant[];
+  cost: CostBreakdown;
+}
+export type MultiVersionResponse = ApiResult<MultiVersionResult>;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Union types for routing
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -289,4 +480,11 @@ export type ApiRequest =
   | SeedDefaultsRequest
   | DownloadTemplateRequest
   | UploadFilledDocxRequest
+  | ResearchCompanyRequest
+  | BenchmarkRoleRequest
+  | CritiqueRequest
+  | AutoReviseRequest
+  | CoverLetterRequest
+  | VerifyClHooksRequest
+  | MultiVersionRequest
   | PingRequest;
