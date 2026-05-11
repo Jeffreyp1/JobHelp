@@ -21,6 +21,29 @@ import { fillResumeTemplate, parseResumeMarkdown } from '../lib/templateFiller.j
 import type { Message } from '../types/message-bus.js';
 import type { FileSummary, FolderType } from '../types/api-contract.js';
 import { get } from '../lib/storage.js';
+import { loadConfigFromDrive } from '../lib/configLoader.js';
+import type { JobhelpConfig } from '../types/jobhelp-config.js';
+
+// ─── Runtime config (v2.1, Approach C) ────────────────────────────────────
+// Module-scoped cache of the JobhelpConfig loaded from the user's Drive on
+// side-panel open. Other tabs read this via `getRuntimeConfig()` instead of
+// reaching directly into chrome.storage — which now only stores the file id.
+let runtimeConfig: JobhelpConfig | null = null;
+
+/**
+ * Return the currently-loaded `JobhelpConfig`, or null if the user has not
+ * yet linked a config file (or it failed to load). Tabs that need any of
+ * the settings (folder ids, API key, etc.) should call this on each use
+ * rather than capturing it at module-load time.
+ */
+export function getRuntimeConfig(): JobhelpConfig | null {
+  return runtimeConfig;
+}
+
+/** Internal: set the cached runtime config after a successful load. */
+function setRuntimeConfig(config: JobhelpConfig | null): void {
+  runtimeConfig = config;
+}
 
 // ─── Base64 helpers (browser-safe; rely on btoa/atob + binary string) ────
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
@@ -70,7 +93,7 @@ async function getApiClient(): Promise<ApiClient | null> {
   return new ApiClient(url);
 }
 
-function buildControllers(): PanelControllers {
+function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: false }): PanelControllers {
   const generate = renderGenerateTab({
     onGenerate: (req) => {
       const c = getChrome();
@@ -267,21 +290,9 @@ function buildControllers(): PanelControllers {
   });
 
   const settingsRoot = renderSettingsTab({
-    resetRulesToDefaults: async () => {
-      const c = getChrome();
-      if (!c) return;
-      await c.runtime.sendMessage({
-        type: 'seed_defaults_request',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
-    },
-    runOnboarding: () => {
-      const c = getChrome();
-      if (!c) return;
-      c.runtime.sendMessage({
-        type: 'restart_onboarding',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+    autoOpenWizard: opts.autoOpenWizard,
+    onConfigLoaded: (config) => {
+      setRuntimeConfig(config);
     },
   });
 
@@ -306,58 +317,131 @@ function init(): void {
   if (!tabContent) return;
   const navButtons = document.querySelectorAll<HTMLButtonElement>('nav.tabs button[data-tab]');
 
-  const controllers = buildControllers();
-  const panes: Record<TabName, HTMLElement> = {
-    generate: controllers.generate.root,
-    files: controllers.files.root,
-    settings: controllers.settingsRoot,
-  };
-  const buttons: Record<TabName, HTMLButtonElement> = {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    generate: document.querySelector('nav.tabs button[data-tab="generate"]')!,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    files: document.querySelector('nav.tabs button[data-tab="files"]')!,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    settings: document.querySelector('nav.tabs button[data-tab="settings"]')!,
-  };
-
-  navButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const tab = btn.dataset.tab as TabName;
-      if (tab) setActiveTab(tab, panes, buttons, tabContent);
-    });
-  });
-
-  // Default tab
-  setActiveTab('generate', panes, buttons, tabContent);
-
-  // Listen for background messages
-  const c = getChrome();
-  if (c?.runtime?.onMessage) {
-    c.runtime.onMessage.addListener((message: Message) => {
-      handleMessage(message, controllers);
-    });
-  }
-
-  // Restore last cached scrape (if any) so the Job Insights card isn't blank.
+  // ── Step 1: peek at chrome.storage to decide first-run vs. resumed-run. ──
+  // The actual config load is async — we kick it off below and treat the
+  // result as eventually-consistent. If the file id is missing we route the
+  // user to Settings and auto-open the onboarding wizard.
   void (async () => {
+    let fileId: string | null = null;
     try {
-      const cached = await get('lastJobInsights');
-      if (cached?.insights) {
-        controllers.generate.applyScraperOutput({
-          jd: '',
-          company: null,
-          role: null,
-          url: cached.url,
-          scrapeStrategy: 'generic',
-          jobInsights: cached.insights,
-          scrapedAt: cached.timestamp,
-        });
-      }
+      fileId = await get('jobhelpConfigFileId');
     } catch {
-      // ignore
+      // ignore — treat as first-run
+    }
+    const autoOpenWizard = !fileId;
+
+    const controllers = buildControllers({ autoOpenWizard });
+    const panes: Record<TabName, HTMLElement> = {
+      generate: controllers.generate.root,
+      files: controllers.files.root,
+      settings: controllers.settingsRoot,
+    };
+    const buttons: Record<TabName, HTMLButtonElement> = {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      generate: document.querySelector('nav.tabs button[data-tab="generate"]')!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      files: document.querySelector('nav.tabs button[data-tab="files"]')!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      settings: document.querySelector('nav.tabs button[data-tab="settings"]')!,
+    };
+
+    navButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab as TabName;
+        if (tab) setActiveTab(tab, panes, buttons, tabContent);
+      });
+    });
+
+    // First-run users land in Settings (with the wizard already open). Returning
+    // users land in Generate.
+    setActiveTab(fileId ? 'generate' : 'settings', panes, buttons, tabContent);
+
+    // Listen for background messages
+    const c = getChrome();
+    if (c?.runtime?.onMessage) {
+      c.runtime.onMessage.addListener((message: Message) => {
+        handleMessage(message, controllers);
+      });
+    }
+
+    // Restore last cached scrape (if any) so the Job Insights card isn't blank.
+    void (async () => {
+      try {
+        const cached = await get('lastJobInsights');
+        if (cached?.insights) {
+          controllers.generate.applyScraperOutput({
+            jd: '',
+            company: null,
+            role: null,
+            url: cached.url,
+            scrapeStrategy: 'generic',
+            jobInsights: cached.insights,
+            scrapedAt: cached.timestamp,
+          });
+        }
+      } catch {
+        // ignore
+      }
+    })();
+
+    // ── Step 2: hydrate runtime config from Drive (returning users). ────────
+    if (fileId) {
+      void hydrateRuntimeConfig(fileId, tabContent, panes, buttons);
     }
   })();
+}
+
+/**
+ * Fetch + validate the JobhelpConfig from Drive and cache it for the session.
+ * On failure, surface a banner above the active tab and switch the user over
+ * to Settings so they can fix the file id / config contents.
+ */
+async function hydrateRuntimeConfig(
+  fileId: string,
+  tabContent: HTMLElement,
+  panes: Record<TabName, HTMLElement>,
+  buttons: Record<TabName, HTMLButtonElement>,
+): Promise<void> {
+  // Build the ApiClient from the legacy storage URL (migration window) — once
+  // the config loads, downstream calls can switch to config.appsScriptUrl.
+  let appsScriptUrl: string | null = null;
+  try {
+    appsScriptUrl = await get('appsScriptUrl');
+  } catch {
+    // ignore
+  }
+  if (!appsScriptUrl) {
+    // No URL available yet. The Settings tab can still let the user paste a
+    // config — leave runtimeConfig null and don't show an error banner.
+    return;
+  }
+  const client = new ApiClient(appsScriptUrl);
+
+  try {
+    const config = await loadConfigFromDrive(fileId, client);
+    setRuntimeConfig(config);
+  } catch (err) {
+    const msg = (err as Error)?.message ?? 'Unknown error';
+    showRuntimeConfigError(msg, tabContent, panes, buttons);
+  }
+}
+
+/** Render a dismissable error banner and force-switch to the Settings tab. */
+function showRuntimeConfigError(
+  message: string,
+  tabContent: HTMLElement,
+  panes: Record<TabName, HTMLElement>,
+  buttons: Record<TabName, HTMLButtonElement>,
+): void {
+  const banner = document.createElement('div');
+  banner.className = 'runtime-config-error';
+  banner.setAttribute('role', 'alert');
+  banner.setAttribute('data-runtime-config-error', '');
+  banner.textContent = `Couldn't load JobHelp config: ${message}. Check the file ID in Settings.`;
+  // Insert above the tab content (sibling of <main>).
+  const parent = tabContent.parentElement ?? tabContent;
+  parent.insertBefore(banner, tabContent);
+  setActiveTab('settings', panes, buttons, tabContent);
 }
 
 function handleMessage(message: Message, controllers: PanelControllers): void {

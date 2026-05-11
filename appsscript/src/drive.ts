@@ -752,6 +752,35 @@ export const driveOps: DriveOps = {
   },
 
   // -------------------------------------------------------------------------
+  // createDriveFile
+  //
+  // Used by the onboarding wizard to scaffold `jobhelp-config.json`. When
+  // parentFolderId is supplied, the file is created inside the referenced
+  // folder; when omitted, it lands at the user's Drive root via
+  // DriveApp.createFile(name, content, mimeType).
+  // -------------------------------------------------------------------------
+  createDriveFile(
+    fileName: string,
+    content: string,
+    mimeType: string,
+    parentFolderId?: string,
+  ): { fileId: string; fileUrl: string } {
+    const DriveApp = getDriveApp();
+    let file: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (parentFolderId) {
+      const folder = DriveApp.getFolderById(parentFolderId); // throws if invalid
+      file = folder.createFile(fileName, content, mimeType);
+    } else {
+      // Drive root — DriveApp.createFile(name, content, mimeType)
+      file = DriveApp.createFile(fileName, content, mimeType);
+    }
+    return {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+    };
+  },
+
+  // -------------------------------------------------------------------------
   // createGoogleDoc
   // -------------------------------------------------------------------------
   createGoogleDoc(

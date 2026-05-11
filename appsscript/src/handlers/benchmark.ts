@@ -124,7 +124,8 @@ export function handleBenchmarkRole(
     return validationErr;
   }
 
-  const cacheKey = `benchmark:${req.company}:${req.role}`;
+  // JSON-encoded tuple to avoid colon-collision (see research.ts).
+  const cacheKey = `benchmark:${JSON.stringify([req.company, req.role])}`;
 
   // 1) Cache check unless forceRefresh
   if (!forceRefresh) {

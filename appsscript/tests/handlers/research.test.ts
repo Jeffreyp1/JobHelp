@@ -176,7 +176,7 @@ describe('handleResearchCompany', () => {
       },
     };
     cacheStub = makeCacheService({
-      'research:Acme:Senior Engineer': JSON.stringify(cached),
+      'research:["Acme","Senior Engineer"]': JSON.stringify(cached),
     });
     vi.stubGlobal('CacheService', cacheStub);
 
@@ -189,7 +189,7 @@ describe('handleResearchCompany', () => {
     expect(result.cached).toBe(true);
     expect(result.summary).toBe('Cached summary');
     expect(cacheStub.getScriptCache().get).toHaveBeenCalledWith(
-      'research:Acme:Senior Engineer',
+      'research:["Acme","Senior Engineer"]',
     );
     expect(claude.call).not.toHaveBeenCalled();
   });
@@ -205,13 +205,13 @@ describe('handleResearchCompany', () => {
     expect(claude.call).toHaveBeenCalledTimes(1);
     expect(cacheStub.getScriptCache().put).toHaveBeenCalledTimes(1);
     const putCall = (cacheStub.getScriptCache().put as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(putCall[0]).toBe('research:Acme:Senior Engineer');
+    expect(putCall[0]).toBe('research:["Acme","Senior Engineer"]');
     expect(putCall[2]).toBe(86400);
   });
 
   it('T3: forceRefresh=true skips cache and re-writes to cache', () => {
     cacheStub = makeCacheService({
-      'research:Acme:Senior Engineer': JSON.stringify({
+      'research:["Acme","Senior Engineer"]': JSON.stringify({
         summary: 'OLD',
         keywords: [],
         sources: [],
@@ -346,6 +346,6 @@ describe('handleResearchCompany', () => {
     const deps = makeDeps(claude);
     handleResearchCompany(deps, makeRequest({ role: null }));
     const putCall = (cacheStub.getScriptCache().put as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(putCall[0]).toBe('research:Acme:');
+    expect(putCall[0]).toBe('research:["Acme",""]');
   });
 });

@@ -27,6 +27,7 @@ import type {
   DownloadTemplateResult,
   UploadFilledDocxRequest,
   UploadFilledDocxResult,
+  CreateDriveFileRequest,
   KeywordCoverage,
   ResearchCompanyRequest,
   BenchmarkRoleRequest,
@@ -36,6 +37,8 @@ import type {
   VerifyClHooksRequest,
   MultiVersionRequest,
 } from './types/api-contract.js';
+
+import { handleCreateDriveFile, validateCreateDriveFile } from './handlers/createDriveFile.js';
 
 // v2 handler imports
 import { handleResearchCompany, validateResearchCompany } from './handlers/research.js';
@@ -115,6 +118,7 @@ const VALID_ACTIONS: ApiAction[] = [
   'seed_defaults',
   'download_template',
   'upload_filled_docx',
+  'create_drive_file',
   // v2 feature actions
   'research_company',
   'benchmark_role',
@@ -186,6 +190,12 @@ function route(body: unknown, deps: Deps): ApiResult<unknown> {
       const validateErr = validateUploadFilledDocx(raw);
       if (validateErr) return validateErr;
       return handleUploadFilledDocx(deps, raw as unknown as UploadFilledDocxRequest);
+    }
+
+    case 'create_drive_file': {
+      const validateErr = validateCreateDriveFile(raw);
+      if (validateErr) return validateErr;
+      return handleCreateDriveFile(deps, raw as unknown as CreateDriveFileRequest);
     }
 
     // ── v2 feature routes ──────────────────────────────────────────────────

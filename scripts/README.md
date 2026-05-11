@@ -110,3 +110,75 @@ node scripts/iterate-template.mjs
 ```
 
 Requires LibreOffice (`soffice`) and `poppler-utils` (`pdftoppm`) on `$PATH`.
+
+---
+
+## `verify-bundle.mjs`
+
+Post-build state verifier. Runs both build pipelines and asserts the produced
+artifacts are well-formed before you ship them: present, non-empty, within size
+budgets, contain the expected entry points and constants, and that
+`manifest.json`'s version matches the latest `CHANGELOG.md` entry.
+
+```bash
+node scripts/verify-bundle.mjs
+node scripts/verify-bundle.mjs --no-build   # skip the build step
+```
+
+### What it checks
+
+**Extension** (`extension/public/`):
+
+- `sidepanel/index.js` exists, non-empty, under **2 MB**
+- `background.js` exists, non-empty, under **500 KB**
+- `scraper.bundle.js` exists, non-empty
+- `sidepanel/style.css` exists, non-empty
+- `manifest.json` is valid JSON, `manifest_version === 3`, and `version`
+  matches the latest `## [x.y.z]` heading in `CHANGELOG.md`. **This is the
+  catch for "I bumped the changelog but forgot the manifest" (or vice versa).**
+
+**Apps Script** (`appsscript/dist/Code.gs`):
+
+- File exists, non-empty, under **200 KB**
+- First non-comment token is valid Apps Script JS (no leftover `import type`,
+  `interface`, or top-level `export` keyword)
+- Contains the literal `function doPost` (web-app entry point)
+- Contains every one of the 15 `VALID_ACTIONS` strings (`ping`, `generate`,
+  `finalize`, `list_files`, `write_file`, `seed_defaults`, `download_template`,
+  `upload_filled_docx`, `research_company`, `benchmark_role`, `critique`,
+  `auto_revise`, `cover_letter`, `verify_cl_hooks`, `multi_version`)
+
+Exit code is `0` on all-pass, `1` on any failure. Each check prints its
+wallclock duration; output respects `NO_COLOR`.
+
+---
+
+## `smoke-test.mjs`
+
+Pre-commit / CI smoke harness. Chains `verify-bundle.mjs` with an optional
+deployed-endpoint ping.
+
+```bash
+# Local: verifies bundles only.
+node scripts/smoke-test.mjs
+
+# With a deployed URL: also pings /exec and asserts response shape.
+APPS_SCRIPT_URL=https://script.google.com/macros/s/.../exec \
+  node scripts/smoke-test.mjs
+```
+
+### Phases
+
+1. **verify-bundle** — full bundle verification (above).
+2. **apps-script ping** — only when `APPS_SCRIPT_URL` is set (env var or
+   `.env`). Spawns `scripts/test-handler.mjs ping`, captures stdout, and
+   asserts the response body has `ok: true`, `version: <string>`, and
+   `serverTime: <string>`. When unset, the phase is explicitly skipped with a
+   clear message — exit code stays `0`.
+
+A summary block at the end prints per-phase elapsed time and total wallclock.
+Designed to run in CI (where `APPS_SCRIPT_URL` is typically absent) or
+locally as a pre-commit check.
+
+The matching vitest suite in [`tests/smoke/smoke.test.ts`](../tests/smoke/smoke.test.ts)
+runs both scripts via `child_process.spawnSync` and asserts exit code `0`.

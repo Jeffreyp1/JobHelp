@@ -694,7 +694,19 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       researchSummary,
       benchmarkPatterns,
     };
-    await hooks.onGenerate(req);
+    // Reset busy before delegating to onGenerate. In production the hook
+    // immediately calls setBusy(true, 'Generating…'), so UX is continuous;
+    // here it lets subsequent clicks proceed when the hook is fire-and-forget.
+    setBusy(false);
+    try {
+      await hooks.onGenerate(req);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[generate] onGenerate threw:', e);
+      // setBusy(false) clears the status text, so set the error AFTER it.
+      setBusy(false);
+      statusEl.textContent = `Generate failed: ${msg}`;
+    }
   });
 
   // ─── Controller methods ─────────────────────────────────────
@@ -1025,22 +1037,31 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       // selections are reflected in the DOM (otherwise the user sees defaults).
       const v2 = await get('v2Toggles');
       if (v2) {
+        // Validate model strings against ALL_MODELS — a previous version
+        // could have saved a model id that's no longer recognized. Falling
+        // back to HAIKU (default) instead of restoring an invalid string
+        // that would silently break the DOM select + cost preview.
+        const safeModel = (m: string): string => {
+          if (ALL_MODELS.includes(m)) return m;
+          console.warn(`[generate] unknown restored model "${m}", falling back to ${HAIKU}`);
+          return HAIKU;
+        };
         state.researchEnabled = v2.researchEnabled;
-        state.researchModel = v2.researchModel;
+        state.researchModel = safeModel(v2.researchModel);
         state.benchmarkEnabled = v2.benchmarkEnabled;
-        state.benchmarkModel = v2.benchmarkModel;
+        state.benchmarkModel = safeModel(v2.benchmarkModel);
         state.critiqueEnabled = v2.critiqueEnabled;
-        state.critiqueModel = v2.critiqueModel;
+        state.critiqueModel = safeModel(v2.critiqueModel);
         state.autoReviseEnabled = v2.autoReviseEnabled;
-        state.autoReviseModel = v2.autoReviseModel;
+        state.autoReviseModel = safeModel(v2.autoReviseModel);
         state.coverLetterEnabled = v2.coverLetterEnabled;
-        state.coverLetterModel = v2.coverLetterModel;
+        state.coverLetterModel = safeModel(v2.coverLetterModel);
         if (v2.coverLetterTone) {
           state.coverLetterTone = v2.coverLetterTone as typeof state.coverLetterTone;
         }
-        state.verifyHooksModel = v2.verifyHooksModel;
+        state.verifyHooksModel = safeModel(v2.verifyHooksModel);
         state.multiVersionEnabled = v2.multiVersionEnabled;
-        state.multiVersionModel = v2.multiVersionModel;
+        state.multiVersionModel = safeModel(v2.multiVersionModel);
         state.multiVersionCount = v2.multiVersionCount;
 
         // Reflect restored state into the live DOM (checkboxes + selects).

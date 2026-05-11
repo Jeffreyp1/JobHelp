@@ -20,6 +20,7 @@ export type ApiAction =
   | "seed_defaults"
   | "download_template"
   | "upload_filled_docx"
+  | "create_drive_file"
   | "research_company"
   | "benchmark_role"
   | "critique"
@@ -280,6 +281,40 @@ export interface UploadFilledDocxResult {
 export type UploadFilledDocxResponse = ApiResult<UploadFilledDocxResult>;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Action: create_drive_file
+// Create a brand-new file in the user's Drive — used by the onboarding wizard
+// to scaffold `jobhelp-config.json` (and similar small JSON / text scratch
+// files). When `parentFolderId` is omitted the file is created in the user's
+// Drive root via DriveApp.createFile; otherwise it is created inside the
+// referenced folder.
+//
+// Security: callers must keep `content` under 1 MB. The server rejects larger
+// bodies with a validationError. `fileName` must not contain any of the
+// Drive-illegal characters \ / : * ? " < > | .
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CreateDriveFileRequest {
+  action: "create_drive_file";
+  /** Display name for the new file (must not contain \ / : * ? " < > |). */
+  fileName: string;
+  /** File contents (UTF-8 string). Hard limit: 1 MB. */
+  content: string;
+  /** Drive folder id to write into. If omitted, writes to the user's Drive root. */
+  parentFolderId?: string;
+  /** MIME type for the new file. Defaults to "application/json". */
+  mimeType?: string;
+}
+
+export interface CreateDriveFileResult {
+  /** Drive file id of the newly created file. */
+  fileId: string;
+  /** Direct Drive URL of the newly created file. */
+  fileUrl: string;
+}
+
+export type CreateDriveFileResponse = ApiResult<CreateDriveFileResult>;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Action: ping (health check)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -497,6 +532,7 @@ export type ApiRequest =
   | SeedDefaultsRequest
   | DownloadTemplateRequest
   | UploadFilledDocxRequest
+  | CreateDriveFileRequest
   | ResearchCompanyRequest
   | BenchmarkRoleRequest
   | CritiqueRequest

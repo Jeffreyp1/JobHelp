@@ -17974,6 +17974,7 @@ function estimateCost(toggles, generateModel, v2 = {}) {
 
 // extension/src/types/storage-schema.ts
 var STORAGE_DEFAULTS = {
+  jobhelpConfigFileId: null,
   appsScriptUrl: null,
   anthropicApiKey: null,
   driveSourceFolderId: null,
@@ -17988,6 +17989,16 @@ var STORAGE_DEFAULTS = {
   lastJobInsights: null,
   v2Toggles: null
 };
+var LEGACY_SETTINGS_KEYS = [
+  "anthropicApiKey",
+  "appsScriptUrl",
+  "driveSourceFolderId",
+  "driveRulesFolderId",
+  "driveOutputFolderId",
+  "driveTemplateDocxId",
+  "sheetId",
+  "defaultGenerateModel"
+];
 
 // extension/src/lib/storage.ts
 function hasChromeStorage() {
@@ -18011,22 +18022,6 @@ async function set(key, value) {
   }
   const c = globalThis.chrome;
   await c.storage.local.set({ [key]: value });
-}
-async function getAll() {
-  if (!hasChromeStorage()) {
-    return { ...STORAGE_DEFAULTS };
-  }
-  const c = globalThis.chrome;
-  const keys = Object.keys(STORAGE_DEFAULTS);
-  const stored = await c.storage.local.get(keys);
-  const merged = { ...STORAGE_DEFAULTS };
-  for (const k of keys) {
-    const v2 = stored[k];
-    if (v2 !== void 0) {
-      merged[k] = v2;
-    }
-  }
-  return merged;
 }
 
 // extension/src/sidepanel/features/critique.ts
@@ -18651,7 +18646,15 @@ function renderGenerateTab(hooks) {
       researchSummary,
       benchmarkPatterns
     };
-    await hooks.onGenerate(req);
+    setBusy(false);
+    try {
+      await hooks.onGenerate(req);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[generate] onGenerate threw:", e);
+      setBusy(false);
+      statusEl.textContent = `Generate failed: ${msg}`;
+    }
   });
   function applyScraperOutput(output) {
     state.scraperOutput = output;
@@ -18918,22 +18921,27 @@ function renderGenerateTab(hooks) {
       }
       const v2 = await get("v2Toggles");
       if (v2) {
+        const safeModel = (m3) => {
+          if (ALL_MODELS.includes(m3)) return m3;
+          console.warn(`[generate] unknown restored model "${m3}", falling back to ${HAIKU}`);
+          return HAIKU;
+        };
         state.researchEnabled = v2.researchEnabled;
-        state.researchModel = v2.researchModel;
+        state.researchModel = safeModel(v2.researchModel);
         state.benchmarkEnabled = v2.benchmarkEnabled;
-        state.benchmarkModel = v2.benchmarkModel;
+        state.benchmarkModel = safeModel(v2.benchmarkModel);
         state.critiqueEnabled = v2.critiqueEnabled;
-        state.critiqueModel = v2.critiqueModel;
+        state.critiqueModel = safeModel(v2.critiqueModel);
         state.autoReviseEnabled = v2.autoReviseEnabled;
-        state.autoReviseModel = v2.autoReviseModel;
+        state.autoReviseModel = safeModel(v2.autoReviseModel);
         state.coverLetterEnabled = v2.coverLetterEnabled;
-        state.coverLetterModel = v2.coverLetterModel;
+        state.coverLetterModel = safeModel(v2.coverLetterModel);
         if (v2.coverLetterTone) {
           state.coverLetterTone = v2.coverLetterTone;
         }
-        state.verifyHooksModel = v2.verifyHooksModel;
+        state.verifyHooksModel = safeModel(v2.verifyHooksModel);
         state.multiVersionEnabled = v2.multiVersionEnabled;
-        state.multiVersionModel = v2.multiVersionModel;
+        state.multiVersionModel = safeModel(v2.multiVersionModel);
         state.multiVersionCount = v2.multiVersionCount;
         togglesBlock.querySelectorAll("[data-feature]").forEach((row) => {
           const key = row.getAttribute("data-feature");
@@ -19121,391 +19129,6 @@ function renderFileRow(f) {
   return li;
 }
 
-// extension/src/lib/onboardingState.ts
-var FIELD_LABELS = [
-  { label: "Apps Script URL", key: "appsScriptUrl" },
-  { label: "Anthropic API key", key: "anthropicApiKey" },
-  { label: "Drive source folder ID", key: "driveSourceFolderId" },
-  { label: "Drive rules folder ID", key: "driveRulesFolderId" },
-  { label: "Drive output folder ID", key: "driveOutputFolderId" },
-  { label: "Tracking sheet ID", key: "sheetId" }
-];
-var BACKEND_FIELDS = ["appsScriptUrl", "anthropicApiKey"];
-var FOLDER_FIELDS = [
-  "driveSourceFolderId",
-  "driveRulesFolderId",
-  "driveOutputFolderId",
-  "sheetId"
-];
-function hasAll(record, keys) {
-  return keys.every((k) => {
-    const v2 = record[k];
-    return typeof v2 === "string" && v2.trim().length > 0;
-  });
-}
-function computeState(data) {
-  const persisted = data["onboardingState"] ?? "noConfig";
-  const hasBackend = hasAll(data, BACKEND_FIELDS);
-  const hasFolders = hasAll(data, FOLDER_FIELDS);
-  if (!hasBackend) {
-    return "noConfig";
-  }
-  if (!hasFolders) {
-    return "needsFolders";
-  }
-  if (persisted === "ready") return "ready";
-  if (persisted === "seeding") return "seeding";
-  return "seeding";
-}
-var OnboardingState = class _OnboardingState {
-  _current;
-  constructor(current) {
-    this._current = current;
-  }
-  /** Create from the current chrome.storage.local contents. */
-  static async fromStorage() {
-    const data = await getAll();
-    const current = computeState(data);
-    return new _OnboardingState(current);
-  }
-  /** Alias for fromStorage — allows `create()` call style. */
-  static async create() {
-    return _OnboardingState.fromStorage();
-  }
-  /** Current state value. */
-  get state() {
-    return this._current;
-  }
-  /**
-   * Re-read chrome.storage and recompute state.
-   * Call after mutating storage to keep the instance in sync.
-   */
-  async refresh() {
-    const data = await getAll();
-    this._current = computeState(data);
-  }
-  /** Whether the user may trigger a generation. */
-  async canGenerate() {
-    await this.refresh();
-    return this._current === "ready";
-  }
-  /**
-   * Returns human-readable labels of fields that are not yet configured.
-   * Returns an empty array when state is `ready`.
-   */
-  async requiredFields() {
-    await this.refresh();
-    if (this._current === "ready") return [];
-    const data = await getAll();
-    const raw = data;
-    const missing = [];
-    for (const { label, key } of FIELD_LABELS) {
-      const v2 = raw[key];
-      if (!(typeof v2 === "string" && v2.trim().length > 0)) {
-        missing.push(label);
-      }
-    }
-    return missing;
-  }
-  /**
-   * Mark seed_defaults as successfully completed.
-   * Persists `onboardingState: 'ready'` to storage and refreshes this instance.
-   */
-  async markSeedComplete() {
-    await set("onboardingState", "ready");
-    await this.refresh();
-  }
-  /**
-   * Reset all user-configuration keys and return state to `noConfig`.
-   * Useful for the "Run onboarding again" button.
-   */
-  async reset() {
-    const keysToReset = [
-      "appsScriptUrl",
-      "anthropicApiKey",
-      "driveSourceFolderId",
-      "driveRulesFolderId",
-      "driveOutputFolderId",
-      "sheetId",
-      "onboardingState"
-    ];
-    const c = globalThis.chrome;
-    if (c && c.storage && c.storage.local) {
-      await c.storage.local.remove(keysToReset);
-    }
-    this._current = "noConfig";
-  }
-};
-
-// extension/src/sidepanel/tabs/settings.ts
-var HAIKU2 = "claude-haiku-4-5-20251001";
-var SONNET2 = "claude-sonnet-4-6";
-var OPUS2 = "claude-opus-4-7";
-function renderSettingsTab(hooks = {}) {
-  const root = document.createElement("section");
-  root.className = "tab-pane tab-pane--settings";
-  const heading = document.createElement("h2");
-  heading.className = "settings__title";
-  heading.textContent = "Settings";
-  root.appendChild(heading);
-  const banner = document.createElement("div");
-  banner.className = "onboarding-banner";
-  banner.setAttribute("aria-live", "polite");
-  root.appendChild(banner);
-  const seedBtn = document.createElement("button");
-  seedBtn.type = "button";
-  seedBtn.className = "btn btn-primary onboarding-seed-btn";
-  seedBtn.textContent = "Seed rule files";
-  seedBtn.style.display = "none";
-  seedBtn.addEventListener("click", () => {
-    void (async () => {
-      seedBtn.disabled = true;
-      seedBtn.textContent = "Seeding\u2026";
-      try {
-        await hooks.resetRulesToDefaults?.();
-        const state = await OnboardingState.fromStorage();
-        await state.markSeedComplete();
-        await refreshBanner();
-      } catch {
-        seedBtn.disabled = false;
-        seedBtn.textContent = "Seed rule files";
-      }
-    })();
-  });
-  root.appendChild(seedBtn);
-  async function refreshBanner() {
-    const state = await OnboardingState.fromStorage();
-    const s = state.state;
-    const labels = {
-      noConfig: "Setup incomplete \u2014 paste your Apps Script URL and Anthropic API key below.",
-      needsApiKey: "Setup incomplete \u2014 paste your Anthropic API key below.",
-      needsFolders: "API key saved \u2014 now set your Drive folder IDs and sheet ID below.",
-      seeding: 'Almost ready \u2014 click "Seed rule files" to populate your rules folder.',
-      ready: "Setup complete. JobHelp is ready."
-    };
-    banner.textContent = labels[s] ?? s;
-    banner.className = `onboarding-banner onboarding-banner--${s === "ready" ? "success" : "warning"}`;
-    seedBtn.style.display = s === "seeding" ? "block" : "none";
-    seedBtn.disabled = false;
-    seedBtn.textContent = "Seed rule files";
-  }
-  void refreshBanner();
-  const form = document.createElement("form");
-  form.className = "settings__form";
-  form.addEventListener("submit", (e) => e.preventDefault());
-  form.appendChild(
-    makeStorageRow({
-      key: "appsScriptUrl",
-      label: "Apps Script URL",
-      type: "url",
-      placeholder: "https://script.google.com/macros/s/.../exec",
-      help: "Your Apps Script web-app /exec URL."
-    })
-  );
-  form.appendChild(
-    makeStorageRow({
-      key: "anthropicApiKey",
-      label: "Anthropic API key",
-      type: "password",
-      placeholder: "sk-ant-...",
-      help: "Stored locally only. Never sent anywhere except Anthropic."
-    })
-  );
-  form.appendChild(
-    makeStorageRow({
-      key: "driveSourceFolderId",
-      label: "Drive: source folder ID",
-      type: "text",
-      placeholder: "Drive folder ID",
-      help: "Folder containing your source materials (history, draft bullets, etc.)."
-    })
-  );
-  form.appendChild(
-    makeStorageRow({
-      key: "driveRulesFolderId",
-      label: "Drive: rules folder ID",
-      type: "text",
-      placeholder: "Drive folder ID",
-      help: "Folder containing the rule files (auto-seeded on first run)."
-    })
-  );
-  form.appendChild(
-    makeStorageRow({
-      key: "driveOutputFolderId",
-      label: "Drive: output folder ID",
-      type: "text",
-      placeholder: "Drive folder ID",
-      help: "Where tailored resumes are written."
-    })
-  );
-  form.appendChild(
-    makeStorageRow({
-      key: "driveTemplateDocxId",
-      label: "Drive: template DOCX file ID",
-      type: "text",
-      placeholder: "Drive file ID (optional)",
-      help: 'Optional. File ID of your uploaded resume template .docx (containing docxtemplater placeholders like {name}, {#experiences}\u2026). When set, "Convert via Template (DOCX)" appears in the Generate tab.'
-    })
-  );
-  form.appendChild(
-    makeStorageRow({
-      key: "sheetId",
-      label: "Tracking sheet ID",
-      type: "text",
-      placeholder: "Spreadsheet ID",
-      help: "Each generation appends a row here."
-    })
-  );
-  form.appendChild(
-    makeModelSelectRow({
-      key: "defaultGenerateModel",
-      label: "Default generate model",
-      options: [
-        { value: HAIKU2, label: "Haiku 4.5 \u2014 fast & cheap (default)" },
-        { value: SONNET2, label: "Sonnet 4.6 \u2014 balanced" },
-        { value: OPUS2, label: "Opus 4.7 \u2014 top quality" }
-      ]
-    })
-  );
-  root.appendChild(form);
-  const actions = document.createElement("div");
-  actions.className = "settings__actions";
-  actions.appendChild(
-    makeButton("Open source folder", "btn-secondary", async () => {
-      const id = await get("driveSourceFolderId") ?? "";
-      if (!id) return alert("Set the source folder ID first.");
-      if (hooks.openSourceFolder) hooks.openSourceFolder(id);
-      else window.open(`https://drive.google.com/drive/folders/${id}`, "_blank");
-    })
-  );
-  actions.appendChild(
-    makeButton("Open rule files", "btn-secondary", async () => {
-      const id = await get("driveRulesFolderId") ?? "";
-      if (!id) return alert("Set the rules folder ID first.");
-      if (hooks.openRulesFolder) hooks.openRulesFolder(id);
-      else window.open(`https://drive.google.com/drive/folders/${id}`, "_blank");
-    })
-  );
-  actions.appendChild(
-    makeButton("Open output folder", "btn-secondary", async () => {
-      const id = await get("driveOutputFolderId") ?? "";
-      if (!id) return alert("Set the output folder ID first.");
-      window.open(`https://drive.google.com/drive/folders/${id}`, "_blank");
-    })
-  );
-  actions.appendChild(
-    makeButton("Open tracking sheet", "btn-secondary", async () => {
-      const id = await get("sheetId") ?? "";
-      if (!id) return alert("Set the tracking sheet ID first.");
-      window.open(`https://docs.google.com/spreadsheets/d/${id}/edit`, "_blank");
-    })
-  );
-  actions.appendChild(
-    makeButton("Reset rules to defaults", "btn-secondary", async () => {
-      if (!confirm("Re-seed rule files from GitHub? Local edits will be overwritten.")) return;
-      await hooks.resetRulesToDefaults?.();
-    })
-  );
-  actions.appendChild(
-    makeButton("Run onboarding wizard", "btn-secondary", async () => {
-      hooks.runOnboarding?.();
-      const state = await OnboardingState.fromStorage();
-      const missing = await state.requiredFields();
-      if (missing.length === 0) {
-        alert("All fields are already configured. JobHelp is ready!");
-        return;
-      }
-      alert(
-        `To complete setup, fill in the following fields:
-
-\u2022 ${missing.join("\n\u2022 ")}
-
-Scroll down to the form below.`
-      );
-      void refreshBanner();
-    })
-  );
-  actions.appendChild(
-    makeButton("Run onboarding again", "btn-secondary", async () => {
-      if (!confirm("Reset all settings and restart onboarding?")) return;
-      const state = await OnboardingState.fromStorage();
-      await state.reset();
-      hooks.runOnboarding?.();
-      void refreshBanner();
-    })
-  );
-  root.appendChild(actions);
-  return root;
-}
-function makeStorageRow(opts) {
-  const row = document.createElement("div");
-  row.className = "settings-row";
-  const lbl = document.createElement("label");
-  lbl.className = "settings-row__label";
-  lbl.textContent = opts.label;
-  const input = document.createElement("input");
-  input.className = "settings-row__input";
-  input.type = opts.type;
-  if (opts.placeholder) input.placeholder = opts.placeholder;
-  void (async () => {
-    try {
-      const v2 = await get(opts.key);
-      if (typeof v2 === "string") input.value = v2;
-    } catch {
-    }
-  })();
-  input.addEventListener("change", () => {
-    void set(opts.key, input.value);
-  });
-  row.appendChild(lbl);
-  row.appendChild(input);
-  if (opts.help) {
-    const help = document.createElement("div");
-    help.className = "settings-row__help";
-    help.textContent = opts.help;
-    row.appendChild(help);
-  }
-  return row;
-}
-function makeModelSelectRow(opts) {
-  const row = document.createElement("div");
-  row.className = "settings-row settings-row--select";
-  const lbl = document.createElement("label");
-  lbl.className = "settings-row__label";
-  lbl.textContent = opts.label;
-  const sel = document.createElement("select");
-  sel.className = "settings-row__select";
-  for (const o of opts.options) {
-    const optEl = document.createElement("option");
-    optEl.value = o.value;
-    optEl.textContent = o.label;
-    sel.appendChild(optEl);
-  }
-  void (async () => {
-    try {
-      const v2 = await get(opts.key);
-      if (typeof v2 === "string") sel.value = v2;
-    } catch {
-    }
-  })();
-  sel.addEventListener("change", () => {
-    void set(opts.key, sel.value);
-  });
-  row.appendChild(lbl);
-  row.appendChild(sel);
-  return row;
-}
-function makeButton(label, variant, onClick) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = `btn ${variant}`;
-  btn.textContent = label;
-  btn.addEventListener("click", () => {
-    void onClick();
-  });
-  return btn;
-}
-
 // extension/src/lib/apiClient.ts
 function networkError(message) {
   return {
@@ -19584,6 +19207,15 @@ var ApiClient = class {
   async uploadFilledDocx(req) {
     return this.post({ action: "upload_filled_docx", ...req });
   }
+  /**
+   * Create a brand-new file in the user's Drive. Used by the v2.1 onboarding
+   * wizard to scaffold `jobhelp-config.json` (defaults: application/json,
+   * Drive root). Pass `parentFolderId` to drop the file into a specific
+   * folder, or override `mimeType` for non-JSON scaffolds.
+   */
+  async createDriveFile(req) {
+    return this.post({ action: "create_drive_file", ...req });
+  }
   // ─── feature owner: E1 ───────────────────────────────────────────────────
   /**
    * Research a company using live web search and return a structured summary.
@@ -19639,6 +19271,752 @@ var ApiClient = class {
     return this.post({ action: "multi_version", ...req });
   }
 };
+
+// extension/src/types/jobhelp-config.ts
+var ConfigValidationError = class _ConfigValidationError extends Error {
+  /** Dotted path of the offending field (`"folders.source"`), or `null` if
+   *  the failure is not field-specific (malformed JSON / non-object root). */
+  field;
+  constructor(message, field = null) {
+    super(message);
+    this.name = "ConfigValidationError";
+    this.field = field;
+    Object.setPrototypeOf(this, _ConfigValidationError.prototype);
+  }
+};
+
+// extension/src/lib/configLoader.ts
+var cache = /* @__PURE__ */ new Map();
+function clearConfigCache() {
+  cache.clear();
+}
+function decodeBase64ToUtf8(b64) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder("utf-8").decode(bytes);
+}
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function requireString(obj, key, path) {
+  const v2 = obj[key];
+  if (typeof v2 !== "string") {
+    throw new ConfigValidationError(
+      `Config field "${path}" must be a string (got ${describeType(v2)}).`,
+      path
+    );
+  }
+  if (v2.length === 0) {
+    throw new ConfigValidationError(
+      `Config field "${path}" must not be empty.`,
+      path
+    );
+  }
+  return v2;
+}
+function requireBoolean(obj, key, path) {
+  const v2 = obj[key];
+  if (typeof v2 !== "boolean") {
+    throw new ConfigValidationError(
+      `Config field "${path}" must be a boolean (got ${describeType(v2)}).`,
+      path
+    );
+  }
+  return v2;
+}
+function requireObject(obj, key, path) {
+  const v2 = obj[key];
+  if (!isPlainObject(v2)) {
+    throw new ConfigValidationError(
+      `Config field "${path}" must be an object (got ${describeType(v2)}).`,
+      path
+    );
+  }
+  return v2;
+}
+function describeType(v2) {
+  if (v2 === null) return "null";
+  if (Array.isArray(v2)) return "array";
+  if (v2 === void 0) return "missing";
+  return typeof v2;
+}
+function validateConfig(parsed) {
+  if (!isPlainObject(parsed)) {
+    throw new ConfigValidationError(
+      `Config root must be a JSON object (got ${describeType(parsed)}).`,
+      null
+    );
+  }
+  const anthropicApiKey = requireString(parsed, "anthropicApiKey", "anthropicApiKey");
+  const appsScriptUrl = requireString(parsed, "appsScriptUrl", "appsScriptUrl");
+  const foldersRaw = requireObject(parsed, "folders", "folders");
+  const folders = {
+    source: requireString(foldersRaw, "source", "folders.source"),
+    rules: requireString(foldersRaw, "rules", "folders.rules"),
+    output: requireString(foldersRaw, "output", "folders.output")
+  };
+  const sheetId = requireString(parsed, "sheetId", "sheetId");
+  const templateDocxId = requireString(parsed, "templateDocxId", "templateDocxId");
+  const defaultsRaw = requireObject(parsed, "defaults", "defaults");
+  const defaults = {
+    model: requireString(defaultsRaw, "model", "defaults.model"),
+    togglePreset: requireString(defaultsRaw, "togglePreset", "defaults.togglePreset")
+  };
+  const preferencesRaw = requireObject(parsed, "preferences", "preferences");
+  const preferences = {
+    autoConvertOnGenerate: requireBoolean(
+      preferencesRaw,
+      "autoConvertOnGenerate",
+      "preferences.autoConvertOnGenerate"
+    ),
+    showCostInline: requireBoolean(
+      preferencesRaw,
+      "showCostInline",
+      "preferences.showCostInline"
+    )
+  };
+  return {
+    anthropicApiKey,
+    appsScriptUrl,
+    folders,
+    sheetId,
+    templateDocxId,
+    defaults,
+    preferences
+  };
+}
+async function loadConfigFromDrive(fileId, apiClient) {
+  const cached = cache.get(fileId);
+  if (cached !== void 0) {
+    return cached;
+  }
+  const response = await apiClient.downloadTemplate({ fileId });
+  if (!response.ok) {
+    throw new Error(
+      `Failed to download jobhelp-config.json (fileId=${fileId}): ${response.error.message}`
+    );
+  }
+  let jsonText;
+  try {
+    jsonText = decodeBase64ToUtf8(response.base64);
+  } catch (err) {
+    throw new ConfigValidationError(
+      `Could not base64-decode config file: ${err?.message ?? "unknown error"}`,
+      null
+    );
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (err) {
+    throw new ConfigValidationError(
+      `Config file is not valid JSON: ${err?.message ?? "unknown error"}`,
+      null
+    );
+  }
+  const config = validateConfig(parsed);
+  cache.set(fileId, config);
+  return config;
+}
+
+// extension/src/sidepanel/onboarding-wizard.ts
+var CONFIG_TEMPLATE = {
+  // JobHelp config — paste your secrets / IDs in below, then save in Drive.
+  // The Chrome extension reads this file on side-panel open. Never check
+  // this file into version control; it's meant to live in YOUR Drive only.
+  anthropicApiKey: "<paste your anthropic api key>",
+  appsScriptUrl: "<paste your apps script /exec url>",
+  folders: {
+    source: "<paste your source-materials folder id>",
+    rules: "<paste your rules folder id>",
+    output: "<paste your output folder id>"
+  },
+  sheetId: "<paste your tracking sheet id>",
+  templateDocxId: "<paste your resume-template docx file id>",
+  defaults: {
+    model: "claude-haiku-4-5-20251001",
+    togglePreset: "Quick"
+  },
+  preferences: {
+    autoConvertOnGenerate: false,
+    showCostInline: true
+  }
+};
+function buildConfigTemplateJson() {
+  return JSON.stringify(CONFIG_TEMPLATE, null, 2);
+}
+function renderOnboardingWizard(hooks = {}) {
+  let currentStep = 1;
+  let createdFileId = null;
+  let createdFileUrl = null;
+  let didComplete = false;
+  const overlay = document.createElement("div");
+  overlay.className = "wizard-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-label", "JobHelp onboarding");
+  overlay.style.display = "none";
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
+  const dialog = document.createElement("div");
+  dialog.className = "wizard-dialog";
+  overlay.appendChild(dialog);
+  const header = document.createElement("div");
+  header.className = "wizard-header";
+  const title = document.createElement("h2");
+  title.className = "wizard-title";
+  title.textContent = "Welcome to JobHelp";
+  header.appendChild(title);
+  const stepIndicator = document.createElement("div");
+  stepIndicator.className = "wizard-step-indicator";
+  stepIndicator.setAttribute("aria-live", "polite");
+  header.appendChild(stepIndicator);
+  dialog.appendChild(header);
+  const body = document.createElement("div");
+  body.className = "wizard-body";
+  dialog.appendChild(body);
+  const status = document.createElement("div");
+  status.className = "wizard-status";
+  status.setAttribute("aria-live", "polite");
+  status.setAttribute("data-wizard-status", "");
+  dialog.appendChild(status);
+  const footer = document.createElement("div");
+  footer.className = "wizard-footer";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "btn btn-secondary wizard-cancel";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.addEventListener("click", () => close());
+  footer.appendChild(cancelBtn);
+  dialog.appendChild(footer);
+  function renderStep() {
+    stepIndicator.textContent = `Step ${currentStep} of 4`;
+    body.replaceChildren();
+    status.textContent = "";
+    status.className = "wizard-status";
+    if (currentStep === 1) renderStep1();
+    else if (currentStep === 2) renderStep2();
+    else if (currentStep === 3) renderStep3();
+    else renderStep4();
+  }
+  function renderStep1() {
+    title.textContent = "Welcome to JobHelp";
+    const p = document.createElement("p");
+    p.className = "wizard-paragraph";
+    p.textContent = "JobHelp keeps all of its setup (API key, Drive folder IDs, sheet ID, default model, etc.) in a single JSON file in your own Google Drive. This wizard will create that file, ask you to fill it in, and then remember only the file's ID \u2014 so you can re-install the extension on any machine and re-link in one paste.";
+    body.appendChild(p);
+    const next = document.createElement("button");
+    next.type = "button";
+    next.className = "btn btn-primary wizard-next";
+    next.textContent = "Get started";
+    next.addEventListener("click", () => goTo(2));
+    body.appendChild(next);
+  }
+  function renderStep2() {
+    title.textContent = "Create JobHelp config file";
+    const p = document.createElement("p");
+    p.className = "wizard-paragraph";
+    p.textContent = "Click below to create a new file named jobhelp-config.json in your Drive. It will be pre-populated with placeholder values you'll fill in next.";
+    body.appendChild(p);
+    const createBtn = document.createElement("button");
+    createBtn.type = "button";
+    createBtn.className = "btn btn-primary wizard-create";
+    createBtn.textContent = "Create config";
+    const apiClient = hooks.apiClient;
+    const augmented = apiClient;
+    const canCreate = !!augmented && typeof augmented.createDriveFile === "function";
+    if (!canCreate) {
+      createBtn.disabled = true;
+      createBtn.title = "Drive-file creation is not available yet. Update the Apps Script backend (action: create_drive_file), or paste an existing file ID into Settings instead.";
+    }
+    createBtn.addEventListener("click", () => {
+      if (!canCreate) return;
+      void (async () => {
+        createBtn.disabled = true;
+        createBtn.textContent = "Creating\u2026";
+        try {
+          const fn = augmented.createDriveFile;
+          const resp = await fn({
+            fileName: "jobhelp-config.json",
+            content: buildConfigTemplateJson(),
+            mimeType: "application/json"
+          });
+          if (!resp.ok) {
+            setStatus("error", `Could not create file: ${resp.error.message}`);
+            createBtn.disabled = false;
+            createBtn.textContent = "Try again";
+            return;
+          }
+          createdFileId = resp.fileId;
+          createdFileUrl = resp.fileUrl;
+          setStatus("success", `Created config file (id: ${resp.fileId}).`);
+          goTo(3);
+        } catch (err) {
+          const msg = err?.message ?? "Unknown error";
+          setStatus("error", `Create failed: ${msg}`);
+          createBtn.disabled = false;
+          createBtn.textContent = "Try again";
+        }
+      })();
+    });
+    body.appendChild(createBtn);
+    const skipBtn = document.createElement("button");
+    skipBtn.type = "button";
+    skipBtn.className = "btn btn-secondary wizard-skip";
+    skipBtn.textContent = "I already have a config file";
+    skipBtn.addEventListener("click", () => goTo(4));
+    body.appendChild(skipBtn);
+  }
+  function renderStep3() {
+    title.textContent = "Open the file and fill in your values";
+    const p = document.createElement("p");
+    p.className = "wizard-paragraph";
+    p.textContent = "Open the file in Drive, replace every <paste \u2026> placeholder with your real Anthropic key / folder IDs / sheet ID, then click Continue below.";
+    body.appendChild(p);
+    if (createdFileUrl) {
+      const link = document.createElement("a");
+      link.className = "btn btn-primary wizard-open-link";
+      link.href = createdFileUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "Open in Drive \u2014 fill in the values";
+      body.appendChild(link);
+    } else {
+      const warn = document.createElement("div");
+      warn.className = "wizard-warning";
+      warn.textContent = "No file URL captured. You may need to find the file manually in Drive.";
+      body.appendChild(warn);
+    }
+    const cont = document.createElement("button");
+    cont.type = "button";
+    cont.className = "btn btn-secondary wizard-continue";
+    cont.textContent = "I'm done filling it in";
+    cont.addEventListener("click", () => goTo(4));
+    body.appendChild(cont);
+  }
+  function renderStep4() {
+    title.textContent = "Validate your config";
+    const p = document.createElement("p");
+    p.className = "wizard-paragraph";
+    p.textContent = "Paste (or confirm) the file ID below and click Validate. We'll load the file from Drive and check that every required field is filled in.";
+    body.appendChild(p);
+    const row = document.createElement("div");
+    row.className = "wizard-row";
+    const label = document.createElement("label");
+    label.className = "wizard-label";
+    label.textContent = "JobHelp config file ID";
+    label.setAttribute("for", "wizard-file-id");
+    row.appendChild(label);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = "wizard-file-id";
+    input.className = "wizard-input";
+    input.setAttribute("data-wizard-file-id", "");
+    input.placeholder = "1AbCdEf\u2026 (Drive file id)";
+    if (createdFileId) input.value = createdFileId;
+    row.appendChild(input);
+    body.appendChild(row);
+    const validateBtn = document.createElement("button");
+    validateBtn.type = "button";
+    validateBtn.className = "btn btn-primary wizard-validate";
+    validateBtn.textContent = "Validate";
+    validateBtn.addEventListener("click", () => {
+      void (async () => {
+        const fileId = input.value.trim();
+        if (!fileId) {
+          setStatus("error", "Paste a Drive file id first.");
+          return;
+        }
+        const client = await resolveApiClient(hooks);
+        if (!client) {
+          setStatus(
+            "error",
+            "Apps Script URL not configured. Add it to Settings first, then re-run onboarding."
+          );
+          return;
+        }
+        validateBtn.disabled = true;
+        validateBtn.textContent = "Checking\u2026";
+        try {
+          clearConfigCache();
+          const config = await loadConfigFromDrive(fileId, client);
+          await set("jobhelpConfigFileId", fileId);
+          setStatus("success", "Config validated! Closing setup\u2026");
+          didComplete = true;
+          hooks.onComplete?.(fileId, config);
+          setTimeout(() => close(), 600);
+        } catch (err) {
+          if (err instanceof ConfigValidationError) {
+            const where = err.field ? ` (field: ${err.field})` : "";
+            setStatus("error", `${err.message}${where}`);
+          } else {
+            const msg = err?.message ?? "Unknown error";
+            setStatus("error", `Validation failed: ${msg}`);
+          }
+          validateBtn.disabled = false;
+          validateBtn.textContent = "Validate";
+        }
+      })();
+    });
+    body.appendChild(validateBtn);
+  }
+  function setStatus(kind, msg) {
+    status.textContent = msg;
+    status.className = `wizard-status wizard-status--${kind}`;
+  }
+  function goTo(step) {
+    currentStep = step;
+    renderStep();
+  }
+  function open(step) {
+    didComplete = false;
+    currentStep = step ?? 1;
+    overlay.style.display = "flex";
+    renderStep();
+  }
+  function close() {
+    overlay.style.display = "none";
+    hooks.onClose?.();
+  }
+  return {
+    root: overlay,
+    open,
+    close,
+    completed: () => didComplete
+  };
+}
+async function resolveApiClient(hooks) {
+  if (hooks.apiClient) return hooks.apiClient;
+  try {
+    const url = await get("appsScriptUrl");
+    if (url) return new ApiClient(url);
+  } catch {
+  }
+  return null;
+}
+
+// extension/src/sidepanel/tabs/settings.ts
+function maskApiKey(key) {
+  if (!key) return "";
+  if (key.length <= 4) return "sk-ant-\u2026";
+  const last4 = key.slice(-4);
+  return `sk-ant-\u2026${last4}`;
+}
+function renderSettingsTab(hooks = {}) {
+  const root = document.createElement("section");
+  root.className = "tab-pane tab-pane--settings";
+  const heading = document.createElement("h2");
+  heading.className = "settings__title";
+  heading.textContent = "Settings";
+  root.appendChild(heading);
+  const intro = document.createElement("p");
+  intro.className = "settings__intro";
+  intro.textContent = "JobHelp now keeps your full setup (API key, Drive folder IDs, sheet ID, default model) in a single jobhelp-config.json file in your own Drive. Paste the Drive file ID below to link this extension to your config.";
+  root.appendChild(intro);
+  const fileIdRow = document.createElement("div");
+  fileIdRow.className = "settings-row";
+  const fileIdLabel = document.createElement("label");
+  fileIdLabel.className = "settings-row__label";
+  fileIdLabel.textContent = "JobHelp config file ID";
+  fileIdLabel.setAttribute("for", "settings-jobhelp-config-file-id");
+  fileIdRow.appendChild(fileIdLabel);
+  const fileIdInput = document.createElement("input");
+  fileIdInput.id = "settings-jobhelp-config-file-id";
+  fileIdInput.className = "settings-row__input";
+  fileIdInput.type = "text";
+  fileIdInput.placeholder = "1AbCdEf\u2026 (Drive file id)";
+  fileIdInput.setAttribute("data-settings-file-id", "");
+  fileIdRow.appendChild(fileIdInput);
+  const fileIdHelp = document.createElement("div");
+  fileIdHelp.className = "settings-row__help";
+  fileIdHelp.textContent = "Find this in the file's Drive URL: https://drive.google.com/file/d/{ID}/edit \u2014 paste the bit between /d/ and /edit.";
+  fileIdRow.appendChild(fileIdHelp);
+  root.appendChild(fileIdRow);
+  fileIdInput.addEventListener("change", () => {
+    void set("jobhelpConfigFileId", fileIdInput.value.trim() || null);
+  });
+  void (async () => {
+    try {
+      const stored = await get("jobhelpConfigFileId");
+      if (stored) fileIdInput.value = stored;
+    } catch {
+    }
+  })();
+  const status = document.createElement("div");
+  status.className = "settings__status";
+  status.setAttribute("aria-live", "polite");
+  status.setAttribute("data-settings-status", "");
+  root.appendChild(status);
+  function setStatus(kind, msg) {
+    status.textContent = msg;
+    status.className = `settings__status settings__status--${kind}`;
+  }
+  const diag = document.createElement("div");
+  diag.className = "settings__diagnostic";
+  diag.setAttribute("data-settings-diagnostic", "");
+  root.appendChild(diag);
+  function renderDiagnostic(config) {
+    diag.replaceChildren();
+    if (!config) {
+      const empty = document.createElement("div");
+      empty.className = "settings__diagnostic-empty";
+      empty.textContent = "No config loaded yet. Paste a file ID and click Reload.";
+      diag.appendChild(empty);
+      return;
+    }
+    const title = document.createElement("h3");
+    title.className = "settings__diagnostic-title";
+    title.textContent = "Loaded config";
+    diag.appendChild(title);
+    const rows = [
+      ["Anthropic API key", maskApiKey(config.anthropicApiKey)],
+      ["Apps Script URL", config.appsScriptUrl],
+      ["Source folder ID", config.folders.source],
+      ["Rules folder ID", config.folders.rules],
+      ["Output folder ID", config.folders.output],
+      ["Tracking sheet ID", config.sheetId],
+      ["Template DOCX ID", config.templateDocxId],
+      ["Default model", config.defaults.model],
+      ["Default preset", config.defaults.togglePreset],
+      [
+        "Auto-convert on generate",
+        config.preferences.autoConvertOnGenerate ? "yes" : "no"
+      ],
+      [
+        "Show cost inline",
+        config.preferences.showCostInline ? "yes" : "no"
+      ]
+    ];
+    const dl = document.createElement("dl");
+    dl.className = "settings__diagnostic-list";
+    for (const [k, v2] of rows) {
+      const dt = document.createElement("dt");
+      dt.className = "settings__diagnostic-key";
+      dt.textContent = k;
+      const dd = document.createElement("dd");
+      dd.className = "settings__diagnostic-value";
+      dd.textContent = v2 || "\u2014";
+      dl.appendChild(dt);
+      dl.appendChild(dd);
+    }
+    diag.appendChild(dl);
+  }
+  renderDiagnostic(null);
+  const actions = document.createElement("div");
+  actions.className = "settings__actions";
+  const reloadBtn = makeButton("Reload config", "btn-primary", async () => {
+    const fileId = fileIdInput.value.trim();
+    if (!fileId) {
+      setStatus("error", "Paste a JobHelp config file ID first.");
+      return;
+    }
+    reloadBtn.disabled = true;
+    const prevLabel = reloadBtn.textContent;
+    reloadBtn.textContent = "Loading\u2026";
+    try {
+      const client = await resolveApiClient2(hooks);
+      if (!client) {
+        setStatus(
+          "error",
+          "Apps Script URL not available \u2014 paste it inside your config file first."
+        );
+        return;
+      }
+      clearConfigCache();
+      const config = await loadConfigFromDrive(fileId, client);
+      await set("jobhelpConfigFileId", fileId);
+      setStatus("success", "Config loaded successfully.");
+      renderDiagnostic(config);
+      hooks.onConfigLoaded?.(config, fileId);
+    } catch (err) {
+      if (err instanceof ConfigValidationError) {
+        const where = err.field ? ` (field: ${err.field})` : "";
+        setStatus("error", `${err.message}${where}`);
+      } else {
+        const msg = err?.message ?? "Unknown error";
+        setStatus("error", `Reload failed: ${msg}`);
+      }
+    } finally {
+      reloadBtn.disabled = false;
+      reloadBtn.textContent = prevLabel ?? "Reload config";
+    }
+  });
+  actions.appendChild(reloadBtn);
+  actions.appendChild(
+    makeButton("Open config in Drive", "btn-secondary", async () => {
+      const fileId = fileIdInput.value.trim();
+      if (!fileId) {
+        setStatus("error", "Paste a JobHelp config file ID first.");
+        return;
+      }
+      window.open(`https://drive.google.com/file/d/${fileId}/edit`, "_blank");
+    })
+  );
+  const runOnboardingBtn = makeButton(
+    "Run onboarding",
+    "btn-secondary",
+    () => {
+      wizard.open(1);
+    }
+  );
+  actions.appendChild(runOnboardingBtn);
+  const migrateBtn = makeButton(
+    "Migrate from local settings",
+    "btn-secondary",
+    async () => {
+      await runMigration({
+        hooks,
+        setStatus,
+        onComplete: (newFileId, config) => {
+          fileIdInput.value = newFileId;
+          renderDiagnostic(config);
+          hooks.onConfigLoaded?.(config, newFileId);
+        }
+      });
+    }
+  );
+  migrateBtn.style.display = "none";
+  migrateBtn.setAttribute("data-settings-migrate", "");
+  actions.appendChild(migrateBtn);
+  root.appendChild(actions);
+  void (async () => {
+    try {
+      const populated = await anyLegacyPopulated();
+      migrateBtn.style.display = populated ? "" : "none";
+    } catch {
+    }
+  })();
+  const wizard = renderOnboardingWizard({
+    apiClient: hooks.apiClient,
+    onComplete: (fileId, config) => {
+      fileIdInput.value = fileId;
+      renderDiagnostic(config);
+      setStatus("success", "Setup complete \u2014 config is now linked.");
+      hooks.onConfigLoaded?.(config, fileId);
+    }
+  });
+  root.appendChild(wizard.root);
+  if (hooks.autoOpenWizard) {
+    setTimeout(() => wizard.open(1), 0);
+  }
+  return root;
+}
+async function resolveApiClient2(hooks) {
+  if (hooks.apiClient) return hooks.apiClient;
+  try {
+    const url = await get("appsScriptUrl");
+    if (url) return new ApiClient(url);
+  } catch {
+  }
+  return null;
+}
+async function anyLegacyPopulated() {
+  const c = globalThis.chrome;
+  if (!c?.storage?.local) return false;
+  try {
+    const result = await c.storage.local.get(
+      LEGACY_SETTINGS_KEYS
+    );
+    for (const key of LEGACY_SETTINGS_KEYS) {
+      const v2 = result[key];
+      if (typeof v2 === "string" && v2.trim().length > 0) return true;
+    }
+  } catch {
+  }
+  return false;
+}
+async function runMigration(args) {
+  const { hooks, setStatus, onComplete } = args;
+  setStatus("info", "Reading legacy settings\u2026");
+  const [
+    anthropicApiKey,
+    appsScriptUrl,
+    source,
+    rules,
+    output,
+    templateDocxId,
+    sheetId,
+    defaultModel
+  ] = await Promise.all([
+    get("anthropicApiKey"),
+    get("appsScriptUrl"),
+    get("driveSourceFolderId"),
+    get("driveRulesFolderId"),
+    get("driveOutputFolderId"),
+    get("driveTemplateDocxId"),
+    get("sheetId"),
+    get("defaultGenerateModel")
+  ]);
+  const config = {
+    anthropicApiKey: anthropicApiKey ?? "",
+    appsScriptUrl: appsScriptUrl ?? "",
+    folders: {
+      source: source ?? "",
+      rules: rules ?? "",
+      output: output ?? ""
+    },
+    sheetId: sheetId ?? "",
+    templateDocxId: templateDocxId ?? "",
+    defaults: {
+      model: defaultModel || "claude-haiku-4-5-20251001",
+      togglePreset: "Quick"
+    },
+    preferences: {
+      autoConvertOnGenerate: false,
+      showCostInline: true
+    }
+  };
+  const client = await resolveApiClient2(hooks);
+  if (!client) {
+    setStatus(
+      "error",
+      "No Apps Script URL available \u2014 cannot create the new config file."
+    );
+    return;
+  }
+  if (typeof client.createDriveFile !== "function") {
+    setStatus(
+      "error",
+      "The backend doesn't yet support creating Drive files (action: create_drive_file). Update Apps Script, then retry migration."
+    );
+    return;
+  }
+  setStatus("info", "Uploading new jobhelp-config.json to Drive\u2026");
+  try {
+    const resp = await client.createDriveFile({
+      fileName: "jobhelp-config.json",
+      content: JSON.stringify(config, null, 2),
+      mimeType: "application/json"
+    });
+    if (!resp.ok) {
+      setStatus("error", `Migration failed: ${resp.error.message}`);
+      return;
+    }
+    await set("jobhelpConfigFileId", resp.fileId);
+    setStatus(
+      "success",
+      `Migration complete. New config file id: ${resp.fileId}.`
+    );
+    onComplete(resp.fileId, config);
+  } catch (err) {
+    const msg = err?.message ?? "Unknown error";
+    setStatus("error", `Migration failed: ${msg}`);
+  }
+}
+function makeButton(label, variant, onClick) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = `btn ${variant}`;
+  btn.textContent = label;
+  btn.addEventListener("click", () => {
+    void onClick();
+  });
+  return btn;
+}
 
 // extension/src/lib/templateFiller.ts
 var import_pizzip = __toESM(require_js(), 1);
@@ -19918,6 +20296,13 @@ function parseResumeMarkdown2(md) {
 }
 
 // extension/src/sidepanel/index.ts
+var runtimeConfig = null;
+function getRuntimeConfig() {
+  return runtimeConfig;
+}
+function setRuntimeConfig(config) {
+  runtimeConfig = config;
+}
 function base64ToArrayBuffer(b64) {
   const bin = atob(b64);
   const buf = new ArrayBuffer(bin.length);
@@ -19950,7 +20335,7 @@ async function getApiClient() {
   if (!url) return null;
   return new ApiClient(url);
 }
-function buildControllers() {
+function buildControllers(opts = { autoOpenWizard: false }) {
   const generate = renderGenerateTab({
     onGenerate: (req) => {
       const c = getChrome();
@@ -20123,21 +20508,9 @@ function buildControllers() {
     }
   });
   const settingsRoot = renderSettingsTab({
-    resetRulesToDefaults: async () => {
-      const c = getChrome();
-      if (!c) return;
-      await c.runtime.sendMessage({
-        type: "seed_defaults_request"
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      });
-    },
-    runOnboarding: () => {
-      const c = getChrome();
-      if (!c) return;
-      c.runtime.sendMessage({
-        type: "restart_onboarding"
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      });
+    autoOpenWizard: opts.autoOpenWizard,
+    onConfigLoaded: (config) => {
+      setRuntimeConfig(config);
     }
   });
   return { generate, files, settingsRoot };
@@ -20153,50 +20526,89 @@ function init() {
   const tabContent = document.getElementById("tab-content");
   if (!tabContent) return;
   const navButtons = document.querySelectorAll("nav.tabs button[data-tab]");
-  const controllers = buildControllers();
-  const panes = {
-    generate: controllers.generate.root,
-    files: controllers.files.root,
-    settings: controllers.settingsRoot
-  };
-  const buttons = {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    generate: document.querySelector('nav.tabs button[data-tab="generate"]'),
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    files: document.querySelector('nav.tabs button[data-tab="files"]'),
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    settings: document.querySelector('nav.tabs button[data-tab="settings"]')
-  };
-  navButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const tab = btn.dataset.tab;
-      if (tab) setActiveTab(tab, panes, buttons, tabContent);
-    });
-  });
-  setActiveTab("generate", panes, buttons, tabContent);
-  const c = getChrome();
-  if (c?.runtime?.onMessage) {
-    c.runtime.onMessage.addListener((message) => {
-      handleMessage(message, controllers);
-    });
-  }
   void (async () => {
+    let fileId = null;
     try {
-      const cached = await get("lastJobInsights");
-      if (cached?.insights) {
-        controllers.generate.applyScraperOutput({
-          jd: "",
-          company: null,
-          role: null,
-          url: cached.url,
-          scrapeStrategy: "generic",
-          jobInsights: cached.insights,
-          scrapedAt: cached.timestamp
-        });
-      }
+      fileId = await get("jobhelpConfigFileId");
     } catch {
     }
+    const autoOpenWizard = !fileId;
+    const controllers = buildControllers({ autoOpenWizard });
+    const panes = {
+      generate: controllers.generate.root,
+      files: controllers.files.root,
+      settings: controllers.settingsRoot
+    };
+    const buttons = {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      generate: document.querySelector('nav.tabs button[data-tab="generate"]'),
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      files: document.querySelector('nav.tabs button[data-tab="files"]'),
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      settings: document.querySelector('nav.tabs button[data-tab="settings"]')
+    };
+    navButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tab = btn.dataset.tab;
+        if (tab) setActiveTab(tab, panes, buttons, tabContent);
+      });
+    });
+    setActiveTab(fileId ? "generate" : "settings", panes, buttons, tabContent);
+    const c = getChrome();
+    if (c?.runtime?.onMessage) {
+      c.runtime.onMessage.addListener((message) => {
+        handleMessage(message, controllers);
+      });
+    }
+    void (async () => {
+      try {
+        const cached = await get("lastJobInsights");
+        if (cached?.insights) {
+          controllers.generate.applyScraperOutput({
+            jd: "",
+            company: null,
+            role: null,
+            url: cached.url,
+            scrapeStrategy: "generic",
+            jobInsights: cached.insights,
+            scrapedAt: cached.timestamp
+          });
+        }
+      } catch {
+      }
+    })();
+    if (fileId) {
+      void hydrateRuntimeConfig(fileId, tabContent, panes, buttons);
+    }
   })();
+}
+async function hydrateRuntimeConfig(fileId, tabContent, panes, buttons) {
+  let appsScriptUrl = null;
+  try {
+    appsScriptUrl = await get("appsScriptUrl");
+  } catch {
+  }
+  if (!appsScriptUrl) {
+    return;
+  }
+  const client = new ApiClient(appsScriptUrl);
+  try {
+    const config = await loadConfigFromDrive(fileId, client);
+    setRuntimeConfig(config);
+  } catch (err) {
+    const msg = err?.message ?? "Unknown error";
+    showRuntimeConfigError(msg, tabContent, panes, buttons);
+  }
+}
+function showRuntimeConfigError(message, tabContent, panes, buttons) {
+  const banner = document.createElement("div");
+  banner.className = "runtime-config-error";
+  banner.setAttribute("role", "alert");
+  banner.setAttribute("data-runtime-config-error", "");
+  banner.textContent = `Couldn't load JobHelp config: ${message}. Check the file ID in Settings.`;
+  const parent = tabContent.parentElement ?? tabContent;
+  parent.insertBefore(banner, tabContent);
+  setActiveTab("settings", panes, buttons, tabContent);
 }
 function handleMessage(message, controllers) {
   switch (message.type) {
@@ -20241,6 +20653,9 @@ if (typeof document !== "undefined") {
     init();
   }
 }
+export {
+  getRuntimeConfig
+};
 /*! Bundled license information:
 
 pako/dist/pako.es5.min.js:

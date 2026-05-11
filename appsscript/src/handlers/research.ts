@@ -135,7 +135,10 @@ export function handleResearchCompany(
     return validationErr;
   }
 
-  const cacheKey = `research:${req.company}:${req.role ?? ''}`;
+  // Use JSON-encoded tuple so `:` and `"` in company/role can't collide.
+  // E.g. (company="Acme:foo", role="bar") was previously key-identical to
+  // (company="Acme", role="foo:bar"). T1/C8 probe.
+  const cacheKey = `research:${JSON.stringify([req.company, req.role ?? ''])}`;
 
   // 1) Cache check unless forceRefresh
   if (!forceRefresh) {

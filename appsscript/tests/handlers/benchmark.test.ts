@@ -171,7 +171,7 @@ describe('handleBenchmarkRole', () => {
       },
     };
     cacheStub = makeCacheService({
-      'benchmark:Acme:Senior Engineer': JSON.stringify(cached),
+      'benchmark:["Acme","Senior Engineer"]': JSON.stringify(cached),
     });
     vi.stubGlobal('CacheService', cacheStub);
 
@@ -196,13 +196,13 @@ describe('handleBenchmarkRole', () => {
     expect(claude.call).toHaveBeenCalledTimes(1);
     expect(cacheStub.getScriptCache().put).toHaveBeenCalledTimes(1);
     const putCall = (cacheStub.getScriptCache().put as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(putCall[0]).toBe('benchmark:Acme:Senior Engineer');
+    expect(putCall[0]).toBe('benchmark:["Acme","Senior Engineer"]');
     expect(putCall[2]).toBe(86400);
   });
 
   it('T3: forceRefresh=true bypasses cache and re-writes', () => {
     cacheStub = makeCacheService({
-      'benchmark:Acme:Senior Engineer': JSON.stringify({
+      'benchmark:["Acme","Senior Engineer"]': JSON.stringify({
         patterns: 'OLD',
         keywords: [],
         sources: [],

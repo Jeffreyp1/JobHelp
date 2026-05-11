@@ -278,7 +278,7 @@ export function handleCritique(
       return {
         ok: false,
         error: {
-          type: err.errorType === 'auth' ? 'auth' : err.errorType === 'validation' ? 'validation' : 'server',
+          type: err.errorType,
           message: err.message,
           retryable: err.retryable,
         },
