@@ -348,6 +348,10 @@ export interface CritiqueRequest {
   jobInsights: JobInsights | null;
   jobFolderId: string | null;
   model: string;
+  /** Optional sheet+row to update with the result column. If omitted, no sheet write. */
+  sheetId?: string;
+  /** Optional sheet+row to update with the result column. If omitted, no sheet write. */
+  rowUrl?: string;
 }
 export interface CritiqueResult {
   scores: CritiqueScore[];
@@ -408,6 +412,10 @@ export interface CoverLetterRequest {
   model: string;
   /** Optional voice preset. When undefined or "neutral", produces the default balanced register. */
   tone?: CoverLetterTone;
+  /** Optional sheet+row to update with the result column. If omitted, no sheet write. */
+  sheetId?: string;
+  /** Optional sheet+row to update with the result column. If omitted, no sheet write. */
+  rowUrl?: string;
 }
 export interface CoverLetterResult {
   coverLetterMd: string;
@@ -433,6 +441,10 @@ export interface VerifyClHooksRequest {
   action: "verify_cl_hooks";
   coverLetterMd: string;
   model: string;
+  /** Optional sheet+row to update with the result column. If omitted, no sheet write. */
+  sheetId?: string;
+  /** Optional sheet+row to update with the result column. If omitted, no sheet write. */
+  rowUrl?: string;
 }
 export interface VerifyClHooksResult {
   verifications: HookVerification[];
@@ -461,6 +473,10 @@ export interface MultiVersionRequest {
   count: number;
   /** Optional explicit framing labels; default ["Technical depth", "Leadership", "Business outcomes"] */
   framings?: string[];
+  /** Optional sheet+row to update with the result column. If omitted, no sheet write. */
+  sheetId?: string;
+  /** Optional sheet+row to update with the result column. If omitted, no sheet write. */
+  rowUrl?: string;
 }
 export interface MultiVersionResult {
   variants: MultiVersionVariant[];

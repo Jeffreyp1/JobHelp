@@ -1,6 +1,10 @@
 // Validators for prompts/shared/ rule files.
 // All 10 assertions must pass before rule files are considered complete.
 // Run: `npx vitest run prompts/shared/_validate.test.ts`
+//
+// Note: this file lives under prompts/shared/ and is not currently picked up
+// by the root vitest config (include globs cover extension/, appsscript/,
+// tests/). To run, pass the path explicitly as above.
 
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
@@ -15,6 +19,8 @@ const LOAD_BEARING_FILES = new Set([
   "06-bullet-construction.md",
   "08-bridge-language.md",
   "11-self-scan-checklist.md",
+  "13-output-shape.md",
+  "14-revision-discipline.md",
 ]);
 
 const T5_BANNED_WORDS = [
@@ -89,7 +95,7 @@ describe("prompts/shared/ rule file validators", () => {
     }
   });
 
-  it("T3: only the 4 specified files are load_bearing: true", () => {
+  it("T3: only the specified files are load_bearing: true", () => {
     const files = getMarkdownFiles();
     for (const f of files) {
       const fm = parseFrontmatter(readFile(f));
@@ -148,12 +154,12 @@ describe("prompts/shared/ rule file validators", () => {
     expect(c.includes("3 paragraphs")).toBe(true);
   });
 
-  it("T10: total token count of all 12 files is between 5000 and 10000 tokens", () => {
+  it("T10: total token count of all 15 files is between 5000 and 13000 tokens", () => {
     const files = getMarkdownFiles();
-    expect(files.length).toBe(12);
+    expect(files.length).toBe(15);
     let total = 0;
     for (const f of files) total += tokenEstimate(readFile(f));
     expect(total, `total tokens: ${total}`).toBeGreaterThanOrEqual(5000);
-    expect(total, `total tokens: ${total}`).toBeLessThanOrEqual(10000);
+    expect(total, `total tokens: ${total}`).toBeLessThanOrEqual(13000);
   });
 });

@@ -10,6 +10,12 @@ Your output MUST match this exact markdown shape. Deviations break the
 downstream template-fill pipeline. No prose, no preamble, no closing notes —
 only the resume markdown.
 
+> Note: the Experience role header uses an ASCII hyphen (`-`) before the
+> italic city/state segment, not an em-dash. Earlier drafts used `—` here,
+> but rule 05's 2-em-dash cap means that pattern would push every multi-role
+> resume over the cap. Hyphen is intentional and locks in cleaner ATS
+> output too. See `05-structural-rules.md:17`.
+
 ## Required structure
 
 ```
@@ -23,11 +29,11 @@ only the resume markdown.
 
 ## Experience
 
-**{Job Title}** {Company} | *— {City}, {ST}* | {Date Range}
+**{Job Title}** {Company} | *- {City}, {ST}* | {Date Range}
 - **{Lead}:** {rest of bullet — what you did, with metrics}
 - **{Lead}:** {rest of bullet}
 
-**{Job Title}** {Company} | *— {City}, {ST}* | {Date Range}
+**{Job Title}** {Company} | *- {City}, {ST}* | {Date Range}
 - **{Lead}:** {rest}
 
 ## Projects
@@ -49,7 +55,7 @@ only the resume markdown.
 
 - Section headings are EXACTLY `## Skills`, `## Experience`, `## Projects`, `## Education`. No alternates ("Work History", "Technical Skills", etc.).
 - Skill lines start with `**Category:**` (bold category, then colon, then plain items).
-- Each Experience role header line uses pattern `**Title** Company | *— City, ST* | DateRange` — the `*— City, ST*` segment is italic, prefixed by an em-dash.
+- Each Experience role header line uses pattern `**Title** Company | *- City, ST* | DateRange` — the `*- City, ST*` segment is italic, prefixed by an ASCII hyphen (not an em-dash; see rule 05's em-dash cap).
 - Each bullet under a role uses `- **Lead:** rest` — the lead word/phrase before the colon must be bolded.
 - Project header lines use `**Project Title** | *url-or-link*` — no other format.
 - Project bullets use `- text` (no bold lead required).

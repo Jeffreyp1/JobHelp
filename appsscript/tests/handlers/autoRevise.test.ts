@@ -513,15 +513,10 @@ describe('handleAutoRevise — adversarial rule-14 enforcement', () => {
   // EC-4: Trailing whitespace/newlines on the WHOLE response.
   // Original ends with "Python, TypeScript, Go" (no trailing newline).
   // Revised string ends with "\n\n\n" — appended trailing newlines.
-  // stripFences() at handlers/autoRevise.ts line ~168 calls .trim() on the
-  // Claude response, stripping any leading/trailing whitespace BEFORE the
-  // diff is computed. Result: trailing-newline drift on the overall response
-  // is silently tolerated and never surfaces as an unauthorized change.
-  // FLAG: small rule-14 leak — byte-identical "same line breaks" is not
-  // enforced for trailing whitespace on the full response. See stripFences
-  // (handlers/autoRevise.ts ~lines 167-174). Documented behaviour, not
-  // fixing.
-  it('EC-4: trailing newlines on the response are stripped by stripFences (documents handler behaviour — FLAG)', () => {
+  // stripFences() preserves interior whitespace, so trailing-newline drift
+  // survives into the diff and surfaces as unauthorized changes for any
+  // scope narrower than whole-resume. Rule 14 "same line breaks" enforced.
+  it('EC-4: trailing newlines on the response are preserved and flagged as unauthorized changes', () => {
     let revised = replaceLine(
       SAMPLE_MD,
       'bullet-id: B1',
@@ -533,30 +528,27 @@ describe('handleAutoRevise — adversarial rule-14 enforcement', () => {
       targetScope: { kind: 'bullet', bulletId: 'B1' },
     }));
     if (!result.ok) throw new Error('expected ok');
-    // Only the B1 in-scope edit; trailing newlines are trimmed before diffing.
-    expect(result.diff.length).toBe(1);
-    expect(result.unauthorizedChanges.length).toBe(0);
-    // stripFences().trim() means revisedMarkdown has NO trailing newline,
-    // even though Claude returned three. Round-trip lossy for trailing WS.
-    expect(result.revisedMarkdown.endsWith('\n')).toBe(false);
+    // B1 in-scope edit (1) + 3 added trailing-newline lines past EOF of
+    // the original (all out of scope for a bullet-scope revision).
+    expect(result.diff.length).toBe(4);
+    expect(result.unauthorizedChanges.length).toBe(3);
+    // stripFences no longer .trim()s — trailing newlines are preserved on
+    // the returned markdown so the UI sees exactly what Claude produced.
+    expect(result.revisedMarkdown.endsWith('\n')).toBe(true);
   });
 
-  // EC-5: A whitespace-only instruction is currently accepted by the
-  // validator because it only checks string.length > 0. Per intent of
-  // rule 14 (instruction must "explicitly authorise" lines), a
-  // whitespace-only instruction provides no authorisation and should
-  // arguably be rejected. Documenting current behaviour: it is ACCEPTED.
-  // FLAG: validateAutoRevise allows whitespace-only instructions; consider
-  // adding .trim() check in handlers/autoRevise.ts lines 55-58.
-  it('EC-5: whitespace-only instruction is accepted today (documents current behaviour — FLAG in report)', () => {
+  // EC-5: A whitespace-only instruction provides no authorisation per
+  // rule 14 ("instruction must explicitly authorise lines"), so the
+  // validator rejects it with a non-whitespace error.
+  it('EC-5: whitespace-only instruction → validation error (must be non-whitespace)', () => {
     const result = validateAutoRevise({
       currentMarkdown: 'x',
       instruction: '   \n\t  ',
       model: 'm',
       targetScope: { kind: 'whole-resume' },
     });
-    // Current behaviour: passes validation (no trim check).
-    expect(result).toBeNull();
+    expect(result?.error.type).toBe('validation');
+    expect(result?.error.message).toMatch(/non-whitespace/i);
   });
 
   // EC-6: targetScope object with NO 'kind' field at all.
@@ -732,12 +724,11 @@ describe('handleAutoRevise — adversarial rule-14 enforcement', () => {
   });
 
   // EC-13: Windows line endings (\r\n) in currentMarkdown.
-  // Handler splits on '\n', so '\r' becomes a trailing character on each line.
-  // If Claude returns LF-only, EVERY line differs by one trailing '\r' →
-  // massive diff and unauthorizedChanges. Documents the fragility:
-  // FLAG — handler should arguably normalise line endings before diffing
-  // (handlers/autoRevise.ts line 180, computeDiff). Today it does not.
-  it('EC-13: CRLF input vs LF response causes spurious diff on every line (documents fragility — FLAG in report)', () => {
+  // computeDiff LF-normalises both sides before diffing, so a CRLF input
+  // paired with an LF response produces exactly the same diff as if both
+  // had been LF: just the single in-scope B1 edit, no spurious phantom-\r
+  // changes, and no unauthorized changes.
+  it('EC-13: CRLF input vs LF response normalises to LF before diffing — no spurious unauthorized changes', () => {
     const crlfMd = SAMPLE_MD.split('\n').join('\r\n');
     // Claude returns only the B1 edit, in LF form
     const revised = replaceLine(
@@ -751,11 +742,9 @@ describe('handleAutoRevise — adversarial rule-14 enforcement', () => {
       targetScope: { kind: 'bullet', bulletId: 'B1' },
     }));
     if (!result.ok) throw new Error('expected ok');
-    // Every line differs because LHS has '\r' suffix that LHS does not.
-    expect(result.diff.length).toBeGreaterThan(5);
-    // The handler reports many unauthorized changes — proves line-ending
-    // normalisation is not performed.
-    expect(result.unauthorizedChanges.length).toBeGreaterThan(0);
+    // Only the single in-scope B1 edit — line-ending drift normalised away.
+    expect(result.diff.length).toBe(1);
+    expect(result.unauthorizedChanges.length).toBe(0);
   });
 
   // EC-14: Section scope where the section heading has different case in the

@@ -56,6 +56,13 @@ export function validateAutoRevise(
     console.warn('[autoRevise] validate fail: instruction missing/empty');
     return validationError('Missing or invalid required field: instruction');
   }
+  // Reject whitespace-only instructions: rule 14 requires the instruction to
+  // "explicitly authorise" lines, so " \n\t " carries no authorisation and
+  // must not be accepted. Uses vanilla \s (no Unicode whitespace handling).
+  if ((raw['instruction'] as string).trim().length === 0) {
+    console.warn('[autoRevise] validate fail: instruction is whitespace-only');
+    return validationError('instruction must be non-whitespace');
+  }
   if (typeof raw['model'] !== 'string' || (raw['model'] as string).length === 0) {
     console.warn('[autoRevise] validate fail: model missing/empty');
     return validationError('Missing or invalid required field: model');
@@ -165,27 +172,49 @@ function buildUserMessage(req: AutoReviseRequest): string {
 // ---------------------------------------------------------------------------
 
 function stripFences(text: string): string {
-  const trimmed = text.trim();
-  // If wrapped in a top-level fence, strip it
-  const fenceRe = /^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/;
-  const match = trimmed.match(fenceRe);
+  // Only strip top-level ```markdown / ```md / ``` fences, NOT meaningful
+  // interior whitespace. Rule 14 byte-identity includes line breaks, so a
+  // trailing newline drift on the response must survive into the diff.
+  // We tolerate optional surrounding whitespace OUTSIDE the fence (LLMs
+  // sometimes add a single leading/trailing newline around the fence
+  // delimiters themselves), but if the response is unfenced we return it
+  // exactly as-is.
+  const fenceRe = /^\s*```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/;
+  const match = text.match(fenceRe);
   if (match && match[1] !== undefined) return match[1];
-  return trimmed;
+  return text;
 }
 
 // ---------------------------------------------------------------------------
 // Diff computation
 // ---------------------------------------------------------------------------
 
+/** Normalise CRLF and bare CR to LF so the diff doesn't pick up line-ending
+ *  drift as spurious unauthorised changes. Rule 14 "byte-identical" is
+ *  enforced on LF-normalised content — line-ending differences are a
+ *  transport artefact (Windows clients, copy-paste through some browsers),
+ *  not a semantic edit. */
+function normaliseLineEndings(s: string): string {
+  return s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 function computeDiff(original: string, revised: string): AutoReviseDiff[] {
-  const o = original.split('\n');
-  const r = revised.split('\n');
+  // Rule-14 byte-identity check operates on LF-normalised content; see
+  // normaliseLineEndings() above for rationale.
+  const o = normaliseLineEndings(original).split('\n');
+  const r = normaliseLineEndings(revised).split('\n');
   const diff: AutoReviseDiff[] = [];
   const max = Math.max(o.length, r.length);
   for (let i = 0; i < max; i++) {
-    const before = i < o.length ? o[i] : '';
-    const after = i < r.length ? r[i] : '';
-    if (before !== after) {
+    const beforePresent = i < o.length;
+    const afterPresent = i < r.length;
+    const before = beforePresent ? o[i] : '';
+    const after = afterPresent ? r[i] : '';
+    // A line is a diff entry if (a) both sides exist and content differs,
+    // or (b) one side has a line at this index that the other lacks. The
+    // latter case catches trailing-newline drift (one side has '' present
+    // past the other's EOF) so rule-14 "same line breaks" is enforced.
+    if (beforePresent !== afterPresent || before !== after) {
       diff.push({ lineIndex: i, before, after });
     }
   }
@@ -367,7 +396,10 @@ export function handleAutoRevise(
   const revisedMarkdown = stripFences(claudeResponse.text);
 
   const diff = computeDiff(req.currentMarkdown, revisedMarkdown);
-  const originalLines = req.currentMarkdown.split('\n');
+  // Use the same LF-normalised view of the original as computeDiff so that
+  // scope-line indexes line up with diff entry lineIndex values regardless
+  // of input line endings. (The client-facing revisedMarkdown is left as-is.)
+  const originalLines = req.currentMarkdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   const unauthorizedChanges = partitionUnauthorized(diff, req.targetScope, originalLines);
 
   if (unauthorizedChanges.length > 0) {

@@ -452,4 +452,86 @@ describe('handleVerifyClHooks', () => {
     if (!result.ok) return;
     expect(result.verifications[0].status).toBe('uncertain');
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sheet column back-fill (B1 / B6 — updateSheetRow integration)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  it('sheetId + rowUrl provided → updateSheetRow called once with verifyHookUnverifiedCount', () => {
+    // Use two entities, both unverified → unverifiedCount=2
+    const deps = makeDeps(
+      makeClaudeMock(
+        makeExtractionResponse([
+          { entity: 'FakeOrg', entityType: 'company' },
+          { entity: 'FakeProduct', entityType: 'product' },
+        ]),
+        makeSearchResponse(UNVERIFIED_RESPONSE_JSON),
+      ),
+    );
+    const result = handleVerifyClHooks(
+      deps,
+      makeRequest({
+        sheetId: 'sheet-abc',
+        rowUrl: 'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(deps.drive.updateSheetRow).toHaveBeenCalledTimes(1);
+    expect(deps.drive.updateSheetRow).toHaveBeenCalledWith(
+      'sheet-abc',
+      'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      { verifyHookUnverifiedCount: result.unverifiedCount },
+    );
+  });
+
+  it('sheetId/rowUrl omitted → updateSheetRow NOT called', () => {
+    const deps = makeDeps();
+    handleVerifyClHooks(deps, makeRequest()); // no sheetId/rowUrl
+    expect(deps.drive.updateSheetRow).not.toHaveBeenCalled();
+  });
+
+  it('updateSheetRow throwing does NOT fail handler — returns ok:true (graceful degradation)', () => {
+    const deps = makeDeps(
+      makeClaudeMock(
+        makeExtractionResponse([{ entity: 'Acme Corp', entityType: 'company' }]),
+        makeSearchResponse(VERIFIED_RESPONSE_JSON),
+      ),
+    );
+    (deps.drive.updateSheetRow as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('sheet quota');
+    });
+    const result = handleVerifyClHooks(
+      deps,
+      makeRequest({
+        sheetId: 'sheet-abc',
+        rowUrl: 'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      }),
+    );
+    expect(result.ok).toBe(true);
+    expect(deps.drive.updateSheetRow).toHaveBeenCalledOnce();
+  });
+
+  it('empty-entities short-circuit also calls updateSheetRow with count=0 when sheet info given', () => {
+    const deps = makeDeps(
+      makeClaudeMock(makeExtractionResponse([])),
+    );
+    const result = handleVerifyClHooks(
+      deps,
+      makeRequest({
+        coverLetterMd: 'Dear Hiring Manager, please consider me. Sincerely.',
+        sheetId: 'sheet-abc',
+        rowUrl: 'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.unverifiedCount).toBe(0);
+    expect(deps.drive.updateSheetRow).toHaveBeenCalledTimes(1);
+    expect(deps.drive.updateSheetRow).toHaveBeenCalledWith(
+      'sheet-abc',
+      'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=0&range=A5',
+      { verifyHookUnverifiedCount: 0 },
+    );
+  });
 });

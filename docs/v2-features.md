@@ -59,7 +59,9 @@ Cost columns are intentionally omitted — see "Cost notes" below.
 
 **When to enable.** When you want a sanity check on the generated resume before sending it.
 
-**API.** [`CritiqueRequest` / `CritiqueResponse`](../appsscript/src/types/api-contract.ts) — input `{resumeMd, jd, jobInsights, jobFolderId, model}`, output `{scores[], totalScore, improvements[], critiqueDocUrl, cost}`.
+**API.** [`CritiqueRequest` / `CritiqueResponse`](../appsscript/src/types/api-contract.ts) — input `{resumeMd, jd, jobInsights, jobFolderId, model, sheetId?, rowUrl?}`, output `{scores[], totalScore, improvements[], critiqueDocUrl, cost}`.
+
+**Sheet integration (since v0.2.1).** Pass optional `sheetId` + `rowUrl` and the handler writes `totalScore` into the tracking sheet's `Critique Score` column. Sheet-write failure is non-fatal.
 
 **Caveats.**
 
@@ -72,21 +74,25 @@ Cost columns are intentionally omitted — see "Cost notes" below.
 
 **Scope shapes:**
 
-| `targetScope.kind` | Modifies | Reachable in UI today |
+| `targetScope.kind` | Modifies | Reachable in UI |
 |---|---|---|
-| `bullet` (`bulletId`) | One bullet line | No |
-| `section` (`sectionName`) | One section | No |
-| `role` (`companyName`) | One role entry | No |
+| `bullet` (`bulletId`) | One bullet line | Yes (since v0.2.1) |
+| `section` (`sectionName`) | One section | Yes (since v0.2.1) |
+| `role` (`companyName`) | One role entry | Yes (since v0.2.1) |
 | `whole-resume` | Entire resume | Yes |
 
 **When to enable.** When you want a one-shot, scope-bounded revision of the generated resume after reviewing it.
 
 **API.** [`AutoReviseRequest` / `AutoReviseResponse`](../appsscript/src/types/api-contract.ts) — input `{currentMarkdown, targetScope, instruction, model}`, output `{revisedMarkdown, diff[], unauthorizedChanges[], cost}`.
 
+**UI flow (since v0.2.1).** The resume editor exposes `Edit` / `Preview` tabs. In Preview mode each section / role / bullet renders with a small revise button. Clicking it dispatches a `resume:revise` `CustomEvent` carrying the scope + current markdown; the Generate tab prompts for an instruction, calls `auto_revise`, and renders the diff with Accept / Reject. Bullet IDs are CRC32-stable, so the same markdown re-renders with the same IDs across reloads.
+
+**Rule-14 correctness (v0.2.1).** Three byte-identity bugs were fixed: whitespace-only instructions are now rejected as validation errors; trailing-newline differences are no longer silently stripped by the fence-stripper; CRLF input is LF-normalized before diffing so a CRLF-vs-LF mismatch no longer produces spurious `unauthorizedChanges` on every line.
+
 **Caveats.**
 
-- The handler supports `bullet` / `section` / `role` scopes, but the side-panel resume editor does not currently emit `data-bullet-id` attributes, so only `whole-resume` is reachable from the UI today. To unlock per-bullet revision, the resume editor needs to render stable bullet IDs.
 - `unauthorizedChanges` is informational only — the handler does not reject the response. The UI should display the warning and let the user accept or reject.
+- `findRoleRange` / `findSectionRange` are first-match-only: if a resume contains two `### Engineer at Acme` headings, only the first is treated as in-scope.
 
 ## Cover letter
 
@@ -94,7 +100,11 @@ Cost columns are intentionally omitted — see "Cost notes" below.
 
 **When to enable.** When the posting requires (or strongly prefers) a cover letter.
 
-**API.** [`CoverLetterRequest` / `CoverLetterResponse`](../appsscript/src/types/api-contract.ts) — input `{resumeMd, jd, company, role, sourceFolderId, rulesFolderId, jobFolderId, model}`, output `{coverLetterMd, docUrl, mdFileUrl, cost}`.
+**API.** [`CoverLetterRequest` / `CoverLetterResponse`](../appsscript/src/types/api-contract.ts) — input `{resumeMd, jd, company, role, sourceFolderId, rulesFolderId, jobFolderId, model, tone?}`, output `{coverLetterMd, docUrl, mdFileUrl, cost}`.
+
+**Tone selector (since v0.2.1).** Optional `tone` field accepts `neutral` (default — backwards-compatible with v0.2.0 output) / `formal` / `casual` / `technical` / `persuasive`. Definitions live in [`prompts/shared/15-cl-tones.md`](../prompts/shared/15-cl-tones.md); when a non-neutral tone is requested the handler appends a `=== TONE: <tone> ===` block to the system prompt. Surfaced as a dropdown alongside the Cover Letter toggle row in the side panel.
+
+**Sheet integration (since v0.2.1).** Pass optional `sheetId` + `rowUrl` and the handler will write `coverLetterUrl` into the tracking sheet's `Cover Letter URL` column. Failure to write is non-fatal — the response still returns `ok: true`.
 
 **Caveats.**
 
@@ -112,7 +122,9 @@ Returns per-entity status `verified` / `unverified` / `uncertain`, plus the sour
 
 **When to enable.** Whenever a cover letter has been generated and you want to catch hallucinated names or programs before sending.
 
-**API.** [`VerifyClHooksRequest` / `VerifyClHooksResponse`](../appsscript/src/types/api-contract.ts) — input `{coverLetterMd, model}`, output `{verifications[], unverifiedCount, cost}`.
+**API.** [`VerifyClHooksRequest` / `VerifyClHooksResponse`](../appsscript/src/types/api-contract.ts) — input `{coverLetterMd, model, sheetId?, rowUrl?}`, output `{verifications[], unverifiedCount, cost}`.
+
+**Sheet integration (since v0.2.1).** Pass optional `sheetId` + `rowUrl` and the handler writes `unverifiedCount` into the tracking sheet's `Verify Unverified Count` column. Sheet-write failure is non-fatal.
 
 **Caveats.**
 

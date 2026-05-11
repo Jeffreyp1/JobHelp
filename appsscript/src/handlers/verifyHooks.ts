@@ -177,6 +177,21 @@ export function handleVerifyClHooks(
 
   // Short-circuit: no entities found
   if (entities.length === 0) {
+    // Optional sheet column update (non-fatal). When the caller provides
+    // both sheetId and rowUrl, back-fill the "Verify Unverified Count"
+    // column (v2 sheet column 21) with 0. Failures must NOT fail the
+    // handler.
+    if (req.sheetId && req.rowUrl) {
+      try {
+        deps.drive.updateSheetRow(req.sheetId, req.rowUrl, {
+          verifyHookUnverifiedCount: 0,
+        });
+      } catch (err) {
+        console.warn(
+          `[verifyHooks] sheet update failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
     console.log(`[verifyHooks] done entities=0 unverified=0 cost=$${totalCost.totalUsd}`);
     return {
       ok: true,
@@ -267,6 +282,22 @@ export function handleVerifyClHooks(
   }
 
   const unverifiedCount = verifications.filter(v => v.status === 'unverified').length;
+
+  // Optional sheet column update (non-fatal). When the caller provides
+  // both sheetId and rowUrl, back-fill the "Verify Unverified Count"
+  // column (v2 sheet column 21). Failures must NOT fail the handler — the
+  // verifications array is the load-bearing output.
+  if (req.sheetId && req.rowUrl) {
+    try {
+      deps.drive.updateSheetRow(req.sheetId, req.rowUrl, {
+        verifyHookUnverifiedCount: unverifiedCount,
+      });
+    } catch (err) {
+      console.warn(
+        `[verifyHooks] sheet update failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 
   console.log(
     `[verifyHooks] done entities=${verifications.length} unverified=${unverifiedCount} cost=$${totalCost.totalUsd}`,

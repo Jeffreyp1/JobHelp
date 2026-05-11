@@ -394,7 +394,7 @@ describe('renderGenerateTab — v2 orchestration', () => {
     });
   });
 
-  it('showGenerateResult with autoReviseEnabled → "Revise whole resume" button rendered', async () => {
+  it('showGenerateResult with autoReviseEnabled → resume editor exposes revise-whole-resume button', async () => {
     const onAutoRevise = vi.fn().mockResolvedValue(OK_AUTO_REVISE);
     const ctrl = await mount(buildHooks({ onAutoRevise }));
     setMetaInputs(ctrl, { jd: 'JD' });
@@ -402,17 +402,18 @@ describe('renderGenerateTab — v2 orchestration', () => {
     await flush();
 
     ctrl.showGenerateResult(
-      '# Resume MD',
+      '# Resume MD\n\n## Experience\n\n### Engineer at Acme (2024)\n\n- Built a thing',
       'https://docs.google.com/document/d/docABC/edit',
       'https://drive.google.com/drive/folders/folderXYZ',
     );
     await flush();
 
-    const reviseSlot = ctrl.root.querySelector('[data-revise-diff]');
-    expect(reviseSlot).not.toBeNull();
-    const reviseBtn = reviseSlot?.querySelector<HTMLButtonElement>('.revise-whole-resume');
+    // Per C2 stitch: the whole-resume button now lives inside the editor's
+    // Preview tab, dispatched via the 'resume:revise' CustomEvent. The
+    // legacy [data-revise-diff] button was removed.
+    const reviseBtn = ctrl.root.querySelector<HTMLButtonElement>('button.revise-whole-resume');
     expect(reviseBtn).not.toBeNull();
-    expect(reviseBtn?.textContent).toContain('Revise whole resume');
+    expect(reviseBtn?.textContent ?? '').toMatch(/revise.*whole.*resume/i);
   });
 
   it('toggling each v2 feature persists v2Toggles to storage', async () => {
@@ -455,6 +456,7 @@ describe('renderGenerateTab — v2 orchestration', () => {
       autoReviseModel: HAIKU,
       coverLetterEnabled: true,
       coverLetterModel: SONNET,
+      coverLetterTone: 'neutral',
       verifyHooksModel: SONNET,
       multiVersionEnabled: true,
       multiVersionModel: SONNET,

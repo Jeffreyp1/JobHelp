@@ -16234,6 +16234,23 @@ function renderToggleRow(props) {
     });
     row.appendChild(sel);
   }
+  if (props.tones && props.tones.length > 0) {
+    const tsel = document.createElement("select");
+    tsel.className = "tone-select toggle-row__tone";
+    tsel.setAttribute("data-role", "tone");
+    tsel.disabled = !!props.disabled;
+    for (const t of props.tones) {
+      const opt = document.createElement("option");
+      opt.value = t;
+      opt.textContent = t;
+      if (t === props.selectedTone) opt.selected = true;
+      tsel.appendChild(opt);
+    }
+    tsel.addEventListener("change", () => {
+      props.onToneChange?.(tsel.value);
+    });
+    row.appendChild(tsel);
+  }
   if (props.comingIn && props.disabled) {
     const badge = document.createElement("span");
     badge.className = "toggle-row__badge";
@@ -16262,6 +16279,7 @@ function formatCurrency(usd) {
 var ROWS = [
   { key: "generate", label: "Generate" },
   { key: "research", label: "Research" },
+  { key: "benchmark", label: "Benchmark" },
   { key: "critique", label: "Critique" },
   { key: "autoRevise", label: "Auto-revise" },
   { key: "multiVersion", label: "Multi-version" },
@@ -18135,6 +18153,7 @@ function renderGenerateTab(hooks) {
     autoReviseModel: HAIKU,
     coverLetterEnabled: false,
     coverLetterModel: HAIKU,
+    coverLetterTone: "neutral",
     verifyHooksModel: HAIKU,
     multiVersionEnabled: false,
     multiVersionModel: SONNET,
@@ -18205,10 +18224,12 @@ function renderGenerateTab(hooks) {
       onToggle: (v2) => {
         state.researchEnabled = v2;
         void persistTogglesState();
+        renderCostBlock();
       },
       onModelChange: (m2) => {
         state.researchModel = m2;
         void persistTogglesState();
+        renderCostBlock();
       }
     })
   );
@@ -18222,10 +18243,12 @@ function renderGenerateTab(hooks) {
       onToggle: (v2) => {
         state.benchmarkEnabled = v2;
         void persistTogglesState();
+        renderCostBlock();
       },
       onModelChange: (m2) => {
         state.benchmarkModel = m2;
         void persistTogglesState();
+        renderCostBlock();
       }
     })
   );
@@ -18239,10 +18262,12 @@ function renderGenerateTab(hooks) {
       onToggle: (v2) => {
         state.critiqueEnabled = v2;
         void persistTogglesState();
+        renderCostBlock();
       },
       onModelChange: (m2) => {
         state.critiqueModel = m2;
         void persistTogglesState();
+        renderCostBlock();
       }
     })
   );
@@ -18260,10 +18285,12 @@ function renderGenerateTab(hooks) {
       onToggle: (v2) => {
         state.autoReviseEnabled = v2;
         void persistTogglesState();
+        renderCostBlock();
       },
       onModelChange: (m2) => {
         state.autoReviseModel = m2;
         void persistTogglesState();
+        renderCostBlock();
       }
     })
   );
@@ -18283,14 +18310,17 @@ function renderGenerateTab(hooks) {
       onToggle: (v2) => {
         state.multiVersionEnabled = v2;
         void persistTogglesState();
+        renderCostBlock();
       },
       onModelChange: (m2) => {
         state.multiVersionModel = m2;
         void persistTogglesState();
+        renderCostBlock();
       },
       onCountChange: (n) => {
         state.multiVersionCount = n;
         void persistTogglesState();
+        renderCostBlock();
       }
     })
   );
@@ -18301,13 +18331,22 @@ function renderGenerateTab(hooks) {
       featureKey: "coverLetter",
       models: ALL_MODELS,
       selectedModel: state.coverLetterModel,
+      tones: ["neutral", "formal", "casual", "technical", "persuasive"],
+      selectedTone: state.coverLetterTone,
       onToggle: (v2) => {
         state.coverLetterEnabled = v2;
         void persistTogglesState();
+        renderCostBlock();
       },
       onModelChange: (m2) => {
         state.coverLetterModel = m2;
         void persistTogglesState();
+        renderCostBlock();
+      },
+      onToneChange: (t) => {
+        state.coverLetterTone = t;
+        void persistTogglesState();
+        renderCostBlock();
       }
     })
   );
@@ -18325,6 +18364,7 @@ function renderGenerateTab(hooks) {
       onModelChange: (m2) => {
         state.verifyHooksModel = m2;
         void persistTogglesState();
+        renderCostBlock();
       }
     })
   );
@@ -18346,6 +18386,7 @@ function renderGenerateTab(hooks) {
         autoReviseModel: state.autoReviseModel,
         coverLetterEnabled: state.coverLetterEnabled,
         coverLetterModel: state.coverLetterModel,
+        coverLetterTone: state.coverLetterTone,
         verifyHooksModel: state.verifyHooksModel,
         multiVersionEnabled: state.multiVersionEnabled,
         multiVersionModel: state.multiVersionModel,
@@ -18358,7 +18399,25 @@ function renderGenerateTab(hooks) {
   costContainer.className = "generate__cost";
   function renderCostBlock() {
     costContainer.replaceChildren(
-      renderCostEstimator(estimateCost(state.toggles, state.generateModel))
+      renderCostEstimator(
+        estimateCost(state.toggles, state.generateModel, {
+          researchEnabled: state.researchEnabled,
+          researchModel: state.researchModel,
+          benchmarkEnabled: state.benchmarkEnabled,
+          benchmarkModel: state.benchmarkModel,
+          critiqueEnabled: state.critiqueEnabled,
+          critiqueModel: state.critiqueModel,
+          autoReviseEnabled: state.autoReviseEnabled,
+          autoReviseModel: state.autoReviseModel,
+          coverLetterEnabled: state.coverLetterEnabled,
+          coverLetterModel: state.coverLetterModel,
+          verifyHooksEnabled: state.coverLetterEnabled,
+          verifyHooksModel: state.verifyHooksModel,
+          multiVersionEnabled: state.multiVersionEnabled,
+          multiVersionModel: state.multiVersionModel,
+          multiVersionCount: state.multiVersionCount
+        })
+      )
     );
   }
   renderCostBlock();
@@ -18616,8 +18675,14 @@ function renderGenerateTab(hooks) {
     const textarea = editor.querySelector(".resume-editor__textarea");
     currentMarkdownGetter = textarea ? () => textarea.value : () => md;
     resumeSlot.replaceChildren(editor);
+    editor.addEventListener("resume:revise", (ev) => {
+      const detail = ev.detail;
+      void runAutoReviseScoped(detail.scope, detail.currentMarkdown);
+    });
     requestAnimationFrame(() => {
-      resumeSlot.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (typeof resumeSlot.scrollIntoView === "function") {
+        resumeSlot.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     });
   }
   function showGenerateResult(md, docUrl, jobFolderUrl) {
@@ -18646,9 +18711,6 @@ function renderGenerateTab(hooks) {
     }
     if (state.coverLetterEnabled && hooks.onCoverLetter && jobFolderId) {
       tasks.push(runCoverLetter(resumeMd, jobFolderId));
-    }
-    if (state.autoReviseEnabled && hooks.onAutoRevise) {
-      renderAutoReviseButton(resumeMd);
     }
     await Promise.allSettled(tasks);
   }
@@ -18682,7 +18744,9 @@ function renderGenerateTab(hooks) {
         sourceFolderId: cfg.sourceFolderId,
         rulesFolderId: cfg.rulesFolderId,
         jobFolderId,
-        model: state.coverLetterModel
+        model: state.coverLetterModel,
+        // Omit "neutral" so the backend default applies (backwards-compat).
+        tone: state.coverLetterTone === "neutral" ? void 0 : state.coverLetterTone
       });
       renderCoverLetterResult(result);
     } catch (e) {
@@ -18751,21 +18815,11 @@ function renderGenerateTab(hooks) {
       <div class="verify-cost">Cost: $${result.cost.totalUsd.toFixed(4)}</div>
     `;
   }
-  function renderAutoReviseButton(resumeMd) {
-    reviseDiffSlot.replaceChildren();
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "btn btn-secondary revise-whole-resume";
-    btn.textContent = "Revise whole resume\u2026";
-    btn.addEventListener("click", () => void runAutoRevise(resumeMd));
-    reviseDiffSlot.appendChild(btn);
-  }
-  async function runAutoRevise(currentMd) {
+  async function runAutoReviseScoped(scope, currentMd) {
     if (!hooks.onAutoRevise) return;
     const instruction = typeof globalThis !== "undefined" && globalThis.prompt ? globalThis.prompt('Revision instruction (e.g. "tighten verbs, add metrics"):') : null;
     if (!instruction || !instruction.trim()) return;
     const md = currentMarkdownGetter ? currentMarkdownGetter() : currentMd;
-    const scope = { kind: "whole-resume" };
     reviseDiffSlot.textContent = "Revising\u2026";
     try {
       const result = await hooks.onAutoRevise({
@@ -18780,11 +18834,9 @@ function renderGenerateTab(hooks) {
         onRevisionAccepted: (revisedMd) => {
           showResume(revisedMd);
           reviseDiffSlot.replaceChildren();
-          renderAutoReviseButton(revisedMd);
         },
         onRevisionRejected: () => {
           reviseDiffSlot.replaceChildren();
-          renderAutoReviseButton(md);
         }
       });
     } catch (e) {
@@ -18843,7 +18895,9 @@ function renderGenerateTab(hooks) {
     resumeSlot.appendChild(container);
     activate(0);
     requestAnimationFrame(() => {
-      resumeSlot.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (typeof resumeSlot.scrollIntoView === "function") {
+        resumeSlot.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     });
   }
   function setBusy(busy, label) {
@@ -18874,6 +18928,9 @@ function renderGenerateTab(hooks) {
         state.autoReviseModel = v2.autoReviseModel;
         state.coverLetterEnabled = v2.coverLetterEnabled;
         state.coverLetterModel = v2.coverLetterModel;
+        if (v2.coverLetterTone) {
+          state.coverLetterTone = v2.coverLetterTone;
+        }
         state.verifyHooksModel = v2.verifyHooksModel;
         state.multiVersionEnabled = v2.multiVersionEnabled;
         state.multiVersionModel = v2.multiVersionModel;
@@ -18905,10 +18962,13 @@ function renderGenerateTab(hooks) {
               if (modelSel) modelSel.value = state.multiVersionModel;
               if (countSel) countSel.value = String(state.multiVersionCount);
               break;
-            case "coverLetter":
+            case "coverLetter": {
               if (cb) cb.checked = state.coverLetterEnabled;
               if (modelSel) modelSel.value = state.coverLetterModel;
+              const toneSel = row.querySelector("select.tone-select");
+              if (toneSel) toneSel.value = state.coverLetterTone;
               break;
+            }
             case "verifyHooks":
               if (modelSel) modelSel.value = state.verifyHooksModel;
               break;

@@ -32,6 +32,7 @@ export interface V2TogglesState {
   autoReviseModel: string;
   coverLetterEnabled: boolean;
   coverLetterModel: string;
+  coverLetterTone: string;
   verifyHooksModel: string;
   multiVersionEnabled: boolean;
   multiVersionModel: string;

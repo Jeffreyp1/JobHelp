@@ -31,6 +31,14 @@ export interface ToggleRowProps {
   counts?: number[];
   selectedCount?: number;
   onCountChange?: (count: number) => void;
+  /**
+   * Optional tone selector (e.g. cover-letter voice presets).
+   * If provided, renders a small `<select class="tone-select toggle-row__tone">`
+   * AFTER the model dropdown.
+   */
+  tones?: string[];
+  selectedTone?: string;
+  onToneChange?: (tone: string) => void;
   onToggle?: (enabled: boolean) => void;
   onModelChange?: (model: string) => void;
 }
@@ -108,6 +116,25 @@ export function renderToggleRow(props: ToggleRowProps): HTMLElement {
       props.onModelChange?.(sel.value);
     });
     row.appendChild(sel);
+  }
+
+  // Tone selector (only when tones provided) — rendered AFTER the model select.
+  if (props.tones && props.tones.length > 0) {
+    const tsel = document.createElement('select');
+    tsel.className = 'tone-select toggle-row__tone';
+    tsel.setAttribute('data-role', 'tone');
+    tsel.disabled = !!props.disabled;
+    for (const t of props.tones) {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      if (t === props.selectedTone) opt.selected = true;
+      tsel.appendChild(opt);
+    }
+    tsel.addEventListener('change', () => {
+      props.onToneChange?.(tsel.value);
+    });
+    row.appendChild(tsel);
   }
 
   // Coming-soon badge
