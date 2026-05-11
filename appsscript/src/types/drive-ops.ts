@@ -142,6 +142,25 @@ export interface DriveOps {
   ): { fileId: string; fileUrl: string };
 
   /**
+   * Create a brand-new file in the user's Drive. If `parentFolderId` is
+   * provided the file is created inside that folder; otherwise it is created
+   * at the Drive root via DriveApp.createFile.
+   *
+   * Unlike {@link createFileInFolder}, this method accepts an explicit
+   * `mimeType` (and defaults to "application/json"), so it can be used for
+   * the onboarding scaffold of `jobhelp-config.json` and other small text
+   * payloads where the MIME type matters.
+   *
+   * Throws if `parentFolderId` is provided but invalid.
+   */
+  createDriveFile(
+    fileName: string,
+    content: string,
+    mimeType: string,
+    parentFolderId?: string,
+  ): { fileId: string; fileUrl: string };
+
+  /**
    * Create a Google Doc with the given title and markdown content inside an
    * existing folder by ID. Returns the Doc URL.
    * Throws if the folderId is invalid.

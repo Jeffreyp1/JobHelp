@@ -2,9 +2,15 @@
 
 Chrome extension that tailors your resume to a job description and logs each application to Google Sheets. Frontend runs in Chrome; backend runs as your own Apps Script web app calling the Anthropic API. ~$0.012 per resume (Haiku 4.5 with prompt caching).
 
+## Quick start
+
+New to JobHelp? Follow the step-by-step guide: [docs/setup-for-new-users.md](docs/setup-for-new-users.md). It covers the Anthropic key, Apps Script deploy, Drive folder layout, extension install, and the v0.2.1 single-file config flow end-to-end.
+
+If you are upgrading from v0.2.0 or earlier, the extension auto-migrates your per-machine settings into a Drive config file on first launch — confirm the file ID in the Onboarding wizard and you are done.
+
 ## v2 features
 
-Seven optional pipeline toggles that run alongside the base `generate` flow — pre-generate context fetchers, post-generate refinement passes, and a multi-version fan-out. Each has its own model selector and runs only when toggled on in the side panel.
+Seven optional pipeline toggles that run alongside the base `generate` flow — pre-generate context fetchers, post-generate refinement passes, and a multi-version fan-out. Each has its own model selector and runs only when toggled on in the side panel. v0.2.1 ships a single-file config model: paste one Drive file ID instead of eight per-machine values — see [docs/setup-for-new-users.md](docs/setup-for-new-users.md).
 
 | Toggle | What it does |
 |---|---|

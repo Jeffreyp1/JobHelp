@@ -9,6 +9,8 @@ Seven optional augmentations to the base `generate` flow. Each is a separate App
 - Critique, cover-letter, auto-revise, and verify-CL-hooks run **after** generate; multi-version is **mutually exclusive** with the standard generate flow.
 - All handlers return `ApiResult<T>` and never throw across the HTTP boundary.
 
+**v0.2.1 config model.** Starting in v0.2.1 the extension reads its configuration from a single Drive-hosted `jobhelp-config.json` (shape: [`extension/src/types/jobhelp-config.ts`](../extension/src/types/jobhelp-config.ts); loader: [`extension/src/lib/configLoader.ts`](../extension/src/lib/configLoader.ts)). The previous model — eight separate `chrome.storage.local` values per machine (`anthropicApiKey`, `appsScriptUrl`, three folder IDs, sheet ID, template DOCX ID, default model) — is now legacy. On first run after upgrading, the extension migrates existing legacy settings into a starter config file in the user's Drive and asks the user to confirm the resulting file ID; the only per-machine value retained in `chrome.storage.local` is that single Drive file ID. Multi-machine continuity is therefore "paste one ID per machine" instead of eight. v2 handlers themselves are unaffected — they continue to receive folder IDs and the sheet ID through the existing request shapes; only the *source* of those values changed. See [docs/setup-for-new-users.md](setup-for-new-users.md) for the end-user flow.
+
 ## Feature summary
 
 | Feature | Action | Order | Web search | Cached | Output written to Drive |

@@ -138,6 +138,7 @@ function makeDriveMock(): Deps['drive'] {
     downloadFileAsBase64: vi.fn(),
     uploadDocxFromBase64: vi.fn(),
     createFileInFolder: vi.fn(),
+    createDriveFile: vi.fn(),
     createGoogleDoc: vi.fn(),
   } as Deps['drive'];
 }

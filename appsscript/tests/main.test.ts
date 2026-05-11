@@ -158,6 +158,12 @@ function makeDriveMock(overrides: Partial<DriveOps> = {}): DriveOps {
       fileId: 'md-file-id',
       fileUrl: 'https://drive.google.com/file/d/md-file-id/view',
     })),
+    createDriveFile: vi.fn(
+      (_fileName: string, _content: string, _mimeType: string, _parentFolderId?: string) => ({
+        fileId: 'created-file-id',
+        fileUrl: 'https://drive.google.com/file/d/created-file-id/view',
+      }),
+    ),
     createGoogleDoc: vi.fn((_folderId: string, _title: string, _content: string) => ({
       docId: 'doc-id',
       docUrl: 'https://docs.google.com/document/d/doc-id/edit',

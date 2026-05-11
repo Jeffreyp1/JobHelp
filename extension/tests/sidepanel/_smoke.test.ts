@@ -68,8 +68,12 @@ describe('side-panel UI smoke', () => {
   });
 
   it('settings tab renders form rows', () => {
+    // v2.1: the Settings tab is now a single file-ID input (Approach C —
+    // config lives in a Drive-hosted jobhelp-config.json, not 8 separate
+    // chrome.storage keys). The smoke test only checks the section renders;
+    // the detailed DOM-shape contracts live in settings.test.ts.
     const node = renderSettingsTab({});
     expect(node.querySelectorAll('.settings-row').length).toBeGreaterThan(0);
-    expect(node.querySelector('input[type="password"]')).not.toBeNull();
+    expect(node.querySelector('input.settings-row__input')).not.toBeNull();
   });
 });

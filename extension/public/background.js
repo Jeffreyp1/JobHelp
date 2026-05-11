@@ -1,5 +1,6 @@
 // extension/src/types/storage-schema.ts
 var STORAGE_DEFAULTS = {
+  jobhelpConfigFileId: null,
   appsScriptUrl: null,
   anthropicApiKey: null,
   driveSourceFolderId: null,
@@ -116,6 +117,15 @@ var ApiClient = class {
    */
   async uploadFilledDocx(req) {
     return this.post({ action: "upload_filled_docx", ...req });
+  }
+  /**
+   * Create a brand-new file in the user's Drive. Used by the v2.1 onboarding
+   * wizard to scaffold `jobhelp-config.json` (defaults: application/json,
+   * Drive root). Pass `parentFolderId` to drop the file into a specific
+   * folder, or override `mimeType` for non-JSON scaffolds.
+   */
+  async createDriveFile(req) {
+    return this.post({ action: "create_drive_file", ...req });
   }
   // ─── feature owner: E1 ───────────────────────────────────────────────────
   /**
