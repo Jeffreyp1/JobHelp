@@ -11,7 +11,8 @@ var STORAGE_DEFAULTS = {
   lastToggles: {},
   presets: [],
   onboardingState: "noConfig",
-  lastJobInsights: null
+  lastJobInsights: null,
+  v2Toggles: null
 };
 
 // extension/src/lib/storage.ts
@@ -115,6 +116,60 @@ var ApiClient = class {
    */
   async uploadFilledDocx(req) {
     return this.post({ action: "upload_filled_docx", ...req });
+  }
+  // ─── feature owner: E1 ───────────────────────────────────────────────────
+  /**
+   * Research a company using live web search and return a structured summary.
+   * Results are cached server-side for 24h keyed by company+role.
+   */
+  async researchCompany(req) {
+    return this.post({ action: "research_company", ...req });
+  }
+  /**
+   * Benchmark a role at a company using LinkedIn-style profile patterns.
+   * Results are cached server-side for 24h keyed by company+role.
+   */
+  async benchmarkRole(req) {
+    return this.post({ action: "benchmark_role", ...req });
+  }
+  // ─── feature owner: E2 ───────────────────────────────────────────────────
+  /**
+   * Run the 8-dimension critique framework on a generated resume.
+   * Optionally saves critique.md to the job folder in Drive.
+   */
+  async critique(req) {
+    return this.post({ action: "critique", ...req });
+  }
+  /**
+   * Revise a specific bullet, section, role, or the whole resume with
+   * surgical precision (rule 14-revision-discipline enforced server-side).
+   * Returns the revised markdown plus a line-level diff for user approval.
+   */
+  async autoRevise(req) {
+    return this.post({ action: "auto_revise", ...req });
+  }
+  // ─── feature owner: E3 ───────────────────────────────────────────────────
+  /**
+   * Generate a HOOK/EVIDENCE/CLOSING cover letter (250-300 words) from the
+   * candidate's resume + JD. Saves both .md and Google Doc to the job folder.
+   */
+  async coverLetter(req) {
+    return this.post({ action: "cover_letter", ...req });
+  }
+  /**
+   * Scan a cover letter for named entities and verify each via web search.
+   * Unverified entities are tagged inline with [⚠ UNVERIFIED].
+   */
+  async verifyClHooks(req) {
+    return this.post({ action: "verify_cl_hooks", ...req });
+  }
+  // ─── feature owner: E4 ───────────────────────────────────────────────────
+  /**
+   * Generate N resume variants in parallel (fan-out), each with a different
+   * framing directive. Returns all variants for user selection.
+   */
+  async multiVersion(req) {
+    return this.post({ action: "multi_version", ...req });
   }
 };
 

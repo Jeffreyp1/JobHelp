@@ -18,6 +18,19 @@ export interface ToggleRowProps {
   models?: string[];
   /** Currently selected model. Must be in `models` if provided. */
   selectedModel?: string;
+  /**
+   * Optional feature key — rendered as `data-feature="<key>"` on the row
+   * element so feature modules can locate their toggle via querySelector.
+   */
+  featureKey?: string;
+  /**
+   * Optional secondary numeric selector (e.g. variant count for multi-version).
+   * If provided, renders a small `<select class="count-select">` between the
+   * model dropdown and the badge.
+   */
+  counts?: number[];
+  selectedCount?: number;
+  onCountChange?: (count: number) => void;
   onToggle?: (enabled: boolean) => void;
   onModelChange?: (model: string) => void;
 }
@@ -36,6 +49,7 @@ export function renderToggleRow(props: ToggleRowProps): HTMLElement {
   const row = document.createElement('div');
   row.className = 'toggle-row';
   if (props.disabled) row.classList.add('toggle-row--disabled');
+  if (props.featureKey) row.setAttribute('data-feature', props.featureKey);
 
   // Checkbox + label as a clickable label-wrapped pair
   const labelEl = document.createElement('label');
@@ -58,10 +72,30 @@ export function renderToggleRow(props: ToggleRowProps): HTMLElement {
   labelEl.appendChild(text);
   row.appendChild(labelEl);
 
+  // Count selector (only when counts provided) — used by multi-version
+  if (props.counts && props.counts.length > 0) {
+    const csel = document.createElement('select');
+    csel.className = 'count-select toggle-row__count';
+    csel.disabled = !!props.disabled;
+    for (const n of props.counts) {
+      const opt = document.createElement('option');
+      opt.value = String(n);
+      opt.textContent = String(n);
+      if (n === props.selectedCount) opt.selected = true;
+      csel.appendChild(opt);
+    }
+    csel.addEventListener('change', () => {
+      const parsed = parseInt(csel.value, 10);
+      if (!isNaN(parsed)) props.onCountChange?.(parsed);
+    });
+    row.appendChild(csel);
+  }
+
   // Model dropdown (only when models provided)
   if (props.models && props.models.length > 0) {
     const sel = document.createElement('select');
-    sel.className = 'toggle-row__model';
+    sel.className = 'toggle-row__model model-select';
+    sel.setAttribute('data-role', 'model');
     sel.disabled = !!props.disabled;
     for (const m of props.models) {
       const opt = document.createElement('option');

@@ -21,6 +21,23 @@ export interface CachedJobInsights {
   timestamp: number;
 }
 
+export interface V2TogglesState {
+  researchEnabled: boolean;
+  researchModel: string;
+  benchmarkEnabled: boolean;
+  benchmarkModel: string;
+  critiqueEnabled: boolean;
+  critiqueModel: string;
+  autoReviseEnabled: boolean;
+  autoReviseModel: string;
+  coverLetterEnabled: boolean;
+  coverLetterModel: string;
+  verifyHooksModel: string;
+  multiVersionEnabled: boolean;
+  multiVersionModel: string;
+  multiVersionCount: number;
+}
+
 export interface StorageSchema {
   /** Apps Script web app /exec URL */
   appsScriptUrl: string | null;
@@ -50,6 +67,9 @@ export interface StorageSchema {
   onboardingState: OnboardingState;
   /** Last successful scrape — restores Job Insights card on re-open */
   lastJobInsights: CachedJobInsights | null;
+
+  /** Last-used v2 toggle state (per-feature enable + model + count). */
+  v2Toggles: V2TogglesState | null;
 }
 
 export const STORAGE_DEFAULTS: StorageSchema = {
@@ -65,6 +85,7 @@ export const STORAGE_DEFAULTS: StorageSchema = {
   presets: [],
   onboardingState: "noConfig",
   lastJobInsights: null,
+  v2Toggles: null,
 };
 
 /** Type-safe storage keys (use as parameters to chrome.storage.local.get) */

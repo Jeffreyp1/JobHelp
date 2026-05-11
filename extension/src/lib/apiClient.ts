@@ -23,6 +23,20 @@ import type {
   UploadFilledDocxResponse,
   PingResponse,
   ApiError,
+  ResearchCompanyRequest,
+  ResearchCompanyResponse,
+  BenchmarkRoleRequest,
+  BenchmarkRoleResponse,
+  CritiqueRequest,
+  CritiqueResponse,
+  AutoReviseRequest,
+  AutoReviseResponse,
+  CoverLetterRequest,
+  CoverLetterResponse,
+  VerifyClHooksRequest,
+  VerifyClHooksResponse,
+  MultiVersionRequest,
+  MultiVersionResponse,
 } from '../types/api-contract.js';
 
 /** Build a typed network-failure error response. */
@@ -118,5 +132,84 @@ export class ApiClient {
     req: Omit<UploadFilledDocxRequest, 'action'>,
   ): Promise<UploadFilledDocxResponse> {
     return this.post<UploadFilledDocxResponse>({ action: 'upload_filled_docx', ...req });
+  }
+
+  // ─── feature owner: E1 ───────────────────────────────────────────────────
+
+  /**
+   * Research a company using live web search and return a structured summary.
+   * Results are cached server-side for 24h keyed by company+role.
+   */
+  async researchCompany(
+    req: Omit<ResearchCompanyRequest, 'action'>,
+  ): Promise<ResearchCompanyResponse> {
+    return this.post<ResearchCompanyResponse>({ action: 'research_company', ...req });
+  }
+
+  /**
+   * Benchmark a role at a company using LinkedIn-style profile patterns.
+   * Results are cached server-side for 24h keyed by company+role.
+   */
+  async benchmarkRole(
+    req: Omit<BenchmarkRoleRequest, 'action'>,
+  ): Promise<BenchmarkRoleResponse> {
+    return this.post<BenchmarkRoleResponse>({ action: 'benchmark_role', ...req });
+  }
+
+  // ─── feature owner: E2 ───────────────────────────────────────────────────
+
+  /**
+   * Run the 8-dimension critique framework on a generated resume.
+   * Optionally saves critique.md to the job folder in Drive.
+   */
+  async critique(
+    req: Omit<CritiqueRequest, 'action'>,
+  ): Promise<CritiqueResponse> {
+    return this.post<CritiqueResponse>({ action: 'critique', ...req });
+  }
+
+  /**
+   * Revise a specific bullet, section, role, or the whole resume with
+   * surgical precision (rule 14-revision-discipline enforced server-side).
+   * Returns the revised markdown plus a line-level diff for user approval.
+   */
+  async autoRevise(
+    req: Omit<AutoReviseRequest, 'action'>,
+  ): Promise<AutoReviseResponse> {
+    return this.post<AutoReviseResponse>({ action: 'auto_revise', ...req });
+  }
+
+  // ─── feature owner: E3 ───────────────────────────────────────────────────
+
+  /**
+   * Generate a HOOK/EVIDENCE/CLOSING cover letter (250-300 words) from the
+   * candidate's resume + JD. Saves both .md and Google Doc to the job folder.
+   */
+  async coverLetter(
+    req: Omit<CoverLetterRequest, 'action'>,
+  ): Promise<CoverLetterResponse> {
+    return this.post<CoverLetterResponse>({ action: 'cover_letter', ...req });
+  }
+
+  /**
+   * Scan a cover letter for named entities and verify each via web search.
+   * Unverified entities are tagged inline with [⚠ UNVERIFIED].
+   */
+  async verifyClHooks(
+    req: Omit<VerifyClHooksRequest, 'action'>,
+  ): Promise<VerifyClHooksResponse> {
+    return this.post<VerifyClHooksResponse>({ action: 'verify_cl_hooks', ...req });
+  }
+
+  // ─── feature owner: E4 ───────────────────────────────────────────────────
+
+  /**
+   * Generate N resume variants in parallel (fan-out), each with a different
+   * framing directive. Returns all variants for user selection.
+   */
+  async multiVersion(
+    req: Omit<MultiVersionRequest, 'action'>,
+  ): Promise<MultiVersionResponse> {
+    return this.post<MultiVersionResponse>({ action: 'multi_version', ...req });
   }
 }

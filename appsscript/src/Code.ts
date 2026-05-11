@@ -28,11 +28,28 @@ import type {
   UploadFilledDocxRequest,
   UploadFilledDocxResult,
   KeywordCoverage,
+  ResearchCompanyRequest,
+  BenchmarkRoleRequest,
+  CritiqueRequest,
+  AutoReviseRequest,
+  CoverLetterRequest,
+  VerifyClHooksRequest,
+  MultiVersionRequest,
 } from './types/api-contract.js';
+
+// v2 handler imports
+import { handleResearchCompany, validateResearchCompany } from './handlers/research.js';
+import { handleBenchmarkRole, validateBenchmarkRole } from './handlers/benchmark.js';
+import { handleCritique, validateCritique } from './handlers/critique.js';
+import { handleAutoRevise, validateAutoRevise } from './handlers/autoRevise.js';
+import { handleCoverLetter, validateCoverLetter } from './handlers/coverLetter.js';
+import { handleVerifyClHooks, validateVerifyClHooks } from './handlers/verifyHooks.js';
+import { handleMultiVersion, validateMultiVersion } from './handlers/multiVersion.js';
 import type { DriveOps, FileEntry } from './types/drive-ops.js';
 import type { ClaudeClient, SystemBlock } from './types/claude-api.js';
 import { ClaudeApiError } from './types/claude-api.js';
 import { calculateCost } from './cost.js';
+import { buildUserMessage, buildJobInsightsSummary } from './message-builder.js';
 
 // Production dependencies — esbuild inlines these. In tests, doPost(e, deps)
 // receives mocked versions via the optional second arg.
@@ -98,6 +115,14 @@ const VALID_ACTIONS: ApiAction[] = [
   'seed_defaults',
   'download_template',
   'upload_filled_docx',
+  // v2 feature actions
+  'research_company',
+  'benchmark_role',
+  'critique',
+  'auto_revise',
+  'cover_letter',
+  'verify_cl_hooks',
+  'multi_version',
   'ping',
 ];
 
@@ -162,6 +187,50 @@ function route(body: unknown, deps: Deps): ApiResult<unknown> {
       if (validateErr) return validateErr;
       return handleUploadFilledDocx(deps, raw as unknown as UploadFilledDocxRequest);
     }
+
+    // ── v2 feature routes ──────────────────────────────────────────────────
+
+    case 'research_company': {
+      const validateErr = validateResearchCompany(raw);
+      if (validateErr) return validateErr;
+      return handleResearchCompany(deps, raw as unknown as ResearchCompanyRequest);
+    }
+
+    case 'benchmark_role': {
+      const validateErr = validateBenchmarkRole(raw);
+      if (validateErr) return validateErr;
+      return handleBenchmarkRole(deps, raw as unknown as BenchmarkRoleRequest);
+    }
+
+    case 'critique': {
+      const validateErr = validateCritique(raw);
+      if (validateErr) return validateErr;
+      return handleCritique(deps, raw as unknown as CritiqueRequest);
+    }
+
+    case 'auto_revise': {
+      const validateErr = validateAutoRevise(raw);
+      if (validateErr) return validateErr;
+      return handleAutoRevise(deps, raw as unknown as AutoReviseRequest);
+    }
+
+    case 'cover_letter': {
+      const validateErr = validateCoverLetter(raw);
+      if (validateErr) return validateErr;
+      return handleCoverLetter(deps, raw as unknown as CoverLetterRequest);
+    }
+
+    case 'verify_cl_hooks': {
+      const validateErr = validateVerifyClHooks(raw);
+      if (validateErr) return validateErr;
+      return handleVerifyClHooks(deps, raw as unknown as VerifyClHooksRequest);
+    }
+
+    case 'multi_version': {
+      const validateErr = validateMultiVersion(raw);
+      if (validateErr) return validateErr;
+      return handleMultiVersion(deps, raw as unknown as MultiVersionRequest);
+    }
   }
 }
 
@@ -207,6 +276,8 @@ function handleGenerate(deps: Deps, req: GenerateRequest): ApiResult<GenerateRes
     role: req.role,
     jobInsightsSummary,
     sourceMaterialsText: sourceMaterials.text,
+    researchSummary: req.researchSummary,
+    benchmarkPatterns: req.benchmarkPatterns,
   });
 
   // 5. Call Claude
@@ -531,57 +602,6 @@ function classifyError(err: unknown): ApiErrorResponse {
 // ---------------------------------------------------------------------------
 
 import type { JobInsights } from './types/job-insights.js';
-
-function buildJobInsightsSummary(insights: JobInsights): string {
-  const lines: string[] = [];
-  if (insights.jobType) lines.push(`Job type: ${insights.jobType}`);
-  if (insights.location) lines.push(`Location: ${insights.location}${insights.remote ? ` (${insights.remote})` : ''}`);
-  if (insights.salaryMin !== null) {
-    lines.push(`Salary: $${insights.salaryMin.toLocaleString()}–$${(insights.salaryMax ?? 0).toLocaleString()} ${insights.salaryCurrency ?? ''}`);
-  }
-  if (insights.yearsExperience !== null) lines.push(`Experience: ${insights.yearsExperience}+ years`);
-  if (insights.educationRequired) lines.push(`Education: ${insights.educationRequired}`);
-  if (insights.skillsRequired.length > 0) {
-    lines.push(`Required skills: ${insights.skillsRequired.map(s => s.canonical).join(', ')}`);
-  }
-  if (insights.skillsNiceToHave.length > 0) {
-    lines.push(`Nice-to-have skills: ${insights.skillsNiceToHave.map(s => s.canonical).join(', ')}`);
-  }
-  if (insights.visaSponsorship !== 'unmentioned') {
-    lines.push(`Visa sponsorship: ${insights.visaSponsorship}`);
-  }
-  return lines.join('\n');
-}
-
-interface UserMessageParts {
-  jd: string;
-  company: string | null;
-  role: string | null;
-  jobInsightsSummary: string;
-  sourceMaterialsText: string;
-}
-
-function buildUserMessage(parts: UserMessageParts): string {
-  const sections: string[] = [];
-
-  if (parts.company || parts.role) {
-    sections.push(`Position: ${[parts.role, parts.company].filter(Boolean).join(' at ')}`);
-  }
-
-  if (parts.jobInsightsSummary) {
-    sections.push(`=== Job Insights ===\n${parts.jobInsightsSummary}`);
-  }
-
-  sections.push(`=== Job Description ===\n${parts.jd}`);
-  sections.push(`=== Source Materials ===\n${parts.sourceMaterialsText}`);
-
-  sections.push(
-    'Using the rules above and the candidate\'s source materials, produce a tailored resume in Markdown. ' +
-    'Output ONLY the resume markdown with no preamble or explanation.'
-  );
-
-  return sections.join('\n\n');
-}
 
 function computeKeywordCoverage(
   jobInsights: JobInsights | null,

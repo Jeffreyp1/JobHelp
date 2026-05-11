@@ -24,7 +24,28 @@ import { estimateCost } from '../../lib/costCalculator.js';
 import { formatTokens } from '../../lib/tokenFormatter.js';
 import { get, set } from '../../lib/storage.js';
 import type { ScraperOutput } from '../../types/scraper-output.js';
-import type { ToggleConfig, GenerateRequest, FinalizeFormat } from '../../types/api-contract.js';
+import type {
+  ToggleConfig,
+  GenerateRequest,
+  FinalizeFormat,
+  ResearchCompanyRequest,
+  ResearchCompanyResponse,
+  BenchmarkRoleRequest,
+  BenchmarkRoleResponse,
+  CritiqueRequest,
+  CritiqueResponse,
+  AutoReviseRequest,
+  AutoReviseResponse,
+  CoverLetterRequest,
+  CoverLetterResponse,
+  VerifyClHooksRequest,
+  VerifyClHooksResponse,
+  MultiVersionRequest,
+  MultiVersionResponse,
+  ReviseTargetScope,
+} from '../../types/api-contract.js';
+import { renderCritiqueResult } from '../features/critique.js';
+import { renderRevisionDiff } from '../features/autoRevise.js';
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-4-6';
@@ -99,6 +120,15 @@ export interface GenerateTabHooks {
     markdown: string;
     jobFolderId: string;
   }) => Promise<{ ok: true; url: string; fileName: string; fileId?: string } | { ok: false; message: string }>;
+
+  // ─── v2 feature hooks (all optional — graceful degradation if unwired) ────
+  onResearchCompany?: (req: Omit<ResearchCompanyRequest, 'action'>) => Promise<ResearchCompanyResponse>;
+  onBenchmarkRole?: (req: Omit<BenchmarkRoleRequest, 'action'>) => Promise<BenchmarkRoleResponse>;
+  onCritique?: (req: Omit<CritiqueRequest, 'action'>) => Promise<CritiqueResponse>;
+  onAutoRevise?: (req: Omit<AutoReviseRequest, 'action'>) => Promise<AutoReviseResponse>;
+  onCoverLetter?: (req: Omit<CoverLetterRequest, 'action'>) => Promise<CoverLetterResponse>;
+  onVerifyClHooks?: (req: Omit<VerifyClHooksRequest, 'action'>) => Promise<VerifyClHooksResponse>;
+  onMultiVersion?: (req: Omit<MultiVersionRequest, 'action'>) => Promise<MultiVersionResponse>;
 }
 
 export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabController {
@@ -117,6 +147,25 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     // Populated after a successful generate; needed by finalize.
     docId: null as string | null,
     jobFolderId: null as string | null,
+
+    // ─── v2 feature toggle state ─────────────────────────────────────────
+    researchEnabled: false,
+    researchModel: HAIKU,
+    benchmarkEnabled: false,
+    benchmarkModel: HAIKU,
+    critiqueEnabled: false,
+    critiqueModel: HAIKU,
+    autoReviseEnabled: false,
+    autoReviseModel: HAIKU,
+    coverLetterEnabled: false,
+    coverLetterModel: HAIKU,
+    verifyHooksModel: HAIKU,
+    multiVersionEnabled: false,
+    multiVersionModel: SONNET,
+    multiVersionCount: 3,
+
+    // Latest cover-letter markdown (used by verify-hooks).
+    coverLetterMd: null as string | null,
   };
 
   // Reference to the resume editor's textarea so finalize can read the
@@ -185,27 +234,141 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     }),
   );
 
-  // Disabled toggles (placeholders).
-  const disabledToggles: Array<{ label: string; comingIn: 'v2' | 'v3' | 'v4' | 'v5' }> = [
-    { label: 'Research', comingIn: 'v3' },
-    { label: 'LinkedIn benchmarking', comingIn: 'v3' },
-    { label: 'Critique pass', comingIn: 'v2' },
-    { label: 'Auto-revise', comingIn: 'v2' },
-    { label: 'Multi-version', comingIn: 'v5' },
-    { label: 'Cover letter', comingIn: 'v4' },
-    { label: 'Verify CL hooks', comingIn: 'v4' },
-  ];
-  for (const t of disabledToggles) {
-    togglesBlock.appendChild(
-      renderToggleRow({
-        label: t.label,
-        enabled: false,
-        disabled: true,
-        comingIn: t.comingIn,
-      }),
-    );
-  }
+  // ─── Live v2 toggles ─────────────────────────────────────────────────
+  // Research
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: 'Research company',
+      enabled: state.researchEnabled,
+      featureKey: 'research',
+      models: ALL_MODELS,
+      selectedModel: state.researchModel,
+      onToggle: (v) => { state.researchEnabled = v; void persistTogglesState(); },
+      onModelChange: (m) => { state.researchModel = m; void persistTogglesState(); },
+    }),
+  );
+
+  // LinkedIn benchmarking
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: 'LinkedIn role benchmark',
+      enabled: state.benchmarkEnabled,
+      featureKey: 'benchmark',
+      models: ALL_MODELS,
+      selectedModel: state.benchmarkModel,
+      onToggle: (v) => { state.benchmarkEnabled = v; void persistTogglesState(); },
+      onModelChange: (m) => { state.benchmarkModel = m; void persistTogglesState(); },
+    }),
+  );
+
+  // Critique pass
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: 'Critique pass',
+      enabled: state.critiqueEnabled,
+      featureKey: 'critique',
+      models: ALL_MODELS,
+      selectedModel: state.critiqueModel,
+      onToggle: (v) => { state.critiqueEnabled = v; void persistTogglesState(); },
+      onModelChange: (m) => { state.critiqueModel = m; void persistTogglesState(); },
+    }),
+  );
+  const critiqueResultSlot = document.createElement('div');
+  critiqueResultSlot.setAttribute('data-critique-result', '');
+  critiqueResultSlot.className = 'feature-result feature-result--critique';
+  togglesBlock.appendChild(critiqueResultSlot);
+
+  // Auto-revise (whole-resume only for v2 wiring)
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: 'Auto-revise (whole resume)',
+      enabled: state.autoReviseEnabled,
+      featureKey: 'autoRevise',
+      models: ALL_MODELS,
+      selectedModel: state.autoReviseModel,
+      onToggle: (v) => { state.autoReviseEnabled = v; void persistTogglesState(); },
+      onModelChange: (m) => { state.autoReviseModel = m; void persistTogglesState(); },
+    }),
+  );
+  const reviseDiffSlot = document.createElement('div');
+  reviseDiffSlot.setAttribute('data-revise-diff', '');
+  reviseDiffSlot.className = 'feature-result feature-result--revise';
+  togglesBlock.appendChild(reviseDiffSlot);
+
+  // Multi-version (count + model)
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: 'Multi-version',
+      enabled: state.multiVersionEnabled,
+      featureKey: 'multiVersion',
+      models: ALL_MODELS,
+      selectedModel: state.multiVersionModel,
+      counts: [2, 3, 4, 5],
+      selectedCount: state.multiVersionCount,
+      onToggle: (v) => { state.multiVersionEnabled = v; void persistTogglesState(); },
+      onModelChange: (m) => { state.multiVersionModel = m; void persistTogglesState(); },
+      onCountChange: (n) => { state.multiVersionCount = n; void persistTogglesState(); },
+    }),
+  );
+
+  // Cover letter
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: 'Cover letter',
+      enabled: state.coverLetterEnabled,
+      featureKey: 'coverLetter',
+      models: ALL_MODELS,
+      selectedModel: state.coverLetterModel,
+      onToggle: (v) => { state.coverLetterEnabled = v; void persistTogglesState(); },
+      onModelChange: (m) => { state.coverLetterModel = m; void persistTogglesState(); },
+    }),
+  );
+  const clResultSlot = document.createElement('div');
+  clResultSlot.setAttribute('data-role', 'cl-result');
+  clResultSlot.className = 'feature-result feature-result--cl';
+  togglesBlock.appendChild(clResultSlot);
+
+  // Verify CL hooks (model-only, no toggle — triggered from CL result button)
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: 'Verify CL hooks (model only)',
+      enabled: true,
+      featureKey: 'verifyHooks',
+      models: ALL_MODELS,
+      selectedModel: state.verifyHooksModel,
+      onModelChange: (m) => { state.verifyHooksModel = m; void persistTogglesState(); },
+    }),
+  );
+  const verifyResultSlot = document.createElement('div');
+  verifyResultSlot.setAttribute('data-role', 'verify-result');
+  verifyResultSlot.className = 'feature-result feature-result--verify';
+  togglesBlock.appendChild(verifyResultSlot);
+
   root.appendChild(togglesBlock);
+
+  /** Persist current toggle/model selections to chrome.storage. */
+  async function persistTogglesState(): Promise<void> {
+    try {
+      await set('v2Toggles', {
+        researchEnabled: state.researchEnabled,
+        researchModel: state.researchModel,
+        benchmarkEnabled: state.benchmarkEnabled,
+        benchmarkModel: state.benchmarkModel,
+        critiqueEnabled: state.critiqueEnabled,
+        critiqueModel: state.critiqueModel,
+        autoReviseEnabled: state.autoReviseEnabled,
+        autoReviseModel: state.autoReviseModel,
+        coverLetterEnabled: state.coverLetterEnabled,
+        coverLetterModel: state.coverLetterModel,
+        verifyHooksModel: state.verifyHooksModel,
+        multiVersionEnabled: state.multiVersionEnabled,
+        multiVersionModel: state.multiVersionModel,
+        multiVersionCount: state.multiVersionCount,
+      });
+    } catch {
+      // storage unavailable — ignore
+    }
+  }
 
   // ─── 5. Cost estimator (re-renderable) ──────────────────────────
   const costContainer = document.createElement('div');
@@ -406,14 +569,88 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
 
   // ─── Generate click handler ─────────────────────────────────
   generateBtn.addEventListener('click', async () => {
-    // Clear any previous resume preview + finalize results before starting
+    // Clear all preview/result slots before starting.
     resumeSlot.replaceChildren();
+    critiqueResultSlot.replaceChildren();
+    reviseDiffSlot.replaceChildren();
+    clResultSlot.replaceChildren();
+    verifyResultSlot.replaceChildren();
     finalizeStatusEl.textContent = '';
     finalizeStatusEl.className = 'generate__finalize-status';
     state.docId = null;
     state.jobFolderId = null;
+    state.coverLetterMd = null;
 
     const cfg = await loadConfigFromStorage();
+
+    // ── Multi-version branch (mutually exclusive with standard generate) ──
+    if (state.multiVersionEnabled) {
+      if (!hooks.onMultiVersion) {
+        console.warn('[generate] multi-version enabled but onMultiVersion hook missing');
+        return;
+      }
+      setBusy(true, `Generating ${state.multiVersionCount} variants…`);
+      try {
+        const result = await hooks.onMultiVersion({
+          jd: state.jd,
+          company: state.company,
+          role: state.role,
+          jobInsights: state.scraperOutput?.jobInsights ?? null,
+          sourceFolderId: cfg.sourceFolderId,
+          rulesFolderId: cfg.rulesFolderId,
+          count: state.multiVersionCount,
+          model: state.multiVersionModel,
+        });
+        renderMultiVersionResult(result);
+      } catch (e) {
+        console.error('[generate] multi-version failed', e);
+        statusEl.textContent = `Multi-version failed: ${(e as Error).message}`;
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    // ── Standard flow: optional research+benchmark pre-fetch, then generate ──
+    let researchSummary: string | undefined;
+    let benchmarkPatterns: string | undefined;
+
+    if (state.researchEnabled && state.company && hooks.onResearchCompany) {
+      setBusy(true, 'Researching company…');
+      try {
+        const r = await hooks.onResearchCompany({
+          company: state.company,
+          role: state.role,
+          model: state.researchModel,
+        });
+        if (r.ok) {
+          researchSummary = r.summary;
+        } else {
+          console.warn('[generate] research failed:', r.error.message);
+        }
+      } catch (e) {
+        console.error('[generate] research threw:', e);
+      }
+    }
+
+    if (state.benchmarkEnabled && state.company && state.role && hooks.onBenchmarkRole) {
+      setBusy(true, 'Benchmarking role…');
+      try {
+        const b = await hooks.onBenchmarkRole({
+          company: state.company,
+          role: state.role,
+          model: state.benchmarkModel,
+        });
+        if (b.ok) {
+          benchmarkPatterns = b.patterns;
+        } else {
+          console.warn('[generate] benchmark failed:', b.error.message);
+        }
+      } catch (e) {
+        console.error('[generate] benchmark threw:', e);
+      }
+    }
+
     const req: Omit<GenerateRequest, 'action'> = {
       jd: state.jd,
       company: state.company,
@@ -426,6 +663,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       outputFolderId: cfg.outputFolderId,
       sheetId: cfg.sheetId,
       model: state.generateModel,
+      researchSummary,
+      benchmarkPatterns,
     };
     await hooks.onGenerate(req);
   });
@@ -490,6 +729,249 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     finalizeStatusEl.className = 'generate__finalize-status';
     finalizeSection.hidden = false;
     updateFinalizeButtons();
+
+    // ── Post-gen feature chain: critique + cover letter run in parallel ──
+    void runPostGenerateChain(md, jobFolderId);
+  }
+
+  /** Run critique + cover-letter in parallel after generate succeeds. */
+  async function runPostGenerateChain(resumeMd: string, jobFolderId: string | null): Promise<void> {
+    const tasks: Promise<unknown>[] = [];
+
+    if (state.critiqueEnabled && hooks.onCritique && jobFolderId) {
+      tasks.push(runCritique(resumeMd, jobFolderId));
+    }
+    if (state.coverLetterEnabled && hooks.onCoverLetter && jobFolderId) {
+      tasks.push(runCoverLetter(resumeMd, jobFolderId));
+    }
+    if (state.autoReviseEnabled && hooks.onAutoRevise) {
+      // For v2, auto-revise is triggered manually after generate via a button;
+      // we expose the button as soon as the resume editor renders.
+      renderAutoReviseButton(resumeMd);
+    }
+
+    await Promise.allSettled(tasks);
+  }
+
+  async function runCritique(resumeMd: string, jobFolderId: string): Promise<void> {
+    if (!hooks.onCritique) return;
+    critiqueResultSlot.textContent = 'Running critique…';
+    try {
+      const result = await hooks.onCritique({
+        resumeMd,
+        jd: state.jd,
+        jobInsights: state.scraperOutput?.jobInsights ?? null,
+        jobFolderId,
+        model: state.critiqueModel,
+      });
+      renderCritiqueResult(root, result);
+    } catch (e) {
+      console.error('[generate] critique threw:', e);
+      critiqueResultSlot.textContent = `Critique failed: ${(e as Error).message}`;
+    }
+  }
+
+  async function runCoverLetter(resumeMd: string, jobFolderId: string): Promise<void> {
+    if (!hooks.onCoverLetter) return;
+    const cfg = await loadConfigFromStorage();
+    clResultSlot.textContent = 'Generating cover letter…';
+    try {
+      const result = await hooks.onCoverLetter({
+        resumeMd,
+        jd: state.jd,
+        company: state.company,
+        role: state.role,
+        sourceFolderId: cfg.sourceFolderId,
+        rulesFolderId: cfg.rulesFolderId,
+        jobFolderId,
+        model: state.coverLetterModel,
+      });
+      renderCoverLetterResult(result);
+    } catch (e) {
+      console.error('[generate] cover letter threw:', e);
+      clResultSlot.textContent = `Cover letter failed: ${(e as Error).message}`;
+    }
+  }
+
+  function renderCoverLetterResult(result: CoverLetterResponse): void {
+    clResultSlot.replaceChildren();
+    if (!result.ok) {
+      clResultSlot.textContent = `Cover letter failed: ${result.error.message}`;
+      return;
+    }
+    state.coverLetterMd = result.coverLetterMd;
+
+    const wc = result.coverLetterMd.trim().split(/\s+/).length;
+    const links: string[] = [];
+    if (result.mdFileUrl) links.push(`<a href="${escapeAttr(result.mdFileUrl)}" target="_blank" rel="noopener">cover_letter.md ↗</a>`);
+    if (result.docUrl) links.push(`<a href="${escapeAttr(result.docUrl)}" target="_blank" rel="noopener">Google Doc ↗</a>`);
+
+    clResultSlot.innerHTML = `
+      <div class="cl-success">
+        <div class="cl-links">${links.join(' · ')}</div>
+        <div class="cl-meta">${wc} words (target 250-300)</div>
+        <button type="button" class="btn btn-secondary" data-action="verify-hooks">Verify Hooks</button>
+      </div>
+    `;
+
+    const verifyBtn = clResultSlot.querySelector<HTMLButtonElement>('[data-action="verify-hooks"]');
+    verifyBtn?.addEventListener('click', () => {
+      void runVerifyHooks(result.coverLetterMd);
+    });
+  }
+
+  async function runVerifyHooks(coverLetterMd: string): Promise<void> {
+    if (!hooks.onVerifyClHooks) {
+      verifyResultSlot.textContent = 'Verify-hooks hook not wired.';
+      return;
+    }
+    verifyResultSlot.textContent = 'Verifying named entities…';
+    try {
+      const result = await hooks.onVerifyClHooks({
+        coverLetterMd,
+        model: state.verifyHooksModel,
+      });
+      renderVerifyHooksResult(result);
+    } catch (e) {
+      console.error('[generate] verify-hooks threw:', e);
+      verifyResultSlot.textContent = `Verify-hooks failed: ${(e as Error).message}`;
+    }
+  }
+
+  function renderVerifyHooksResult(result: VerifyClHooksResponse): void {
+    verifyResultSlot.replaceChildren();
+    if (!result.ok) {
+      verifyResultSlot.textContent = `Verify-hooks failed: ${result.error.message}`;
+      return;
+    }
+    const icon: Record<string, string> = { verified: '✓', unverified: '⚠', uncertain: '?' };
+    const items = result.verifications.map(v => `
+      <li class="verify-item verify-item--${v.status}">
+        <span class="verify-icon">${icon[v.status] ?? '?'}</span>
+        <strong>${escapeHtml(v.entity)}</strong> <small>(${escapeHtml(v.entityType)})</small>
+        ${v.reason ? `<div class="verify-reason">${escapeHtml(v.reason)}</div>` : ''}
+      </li>
+    `).join('');
+    const banner = result.unverifiedCount > 0
+      ? `<div class="verify-banner verify-banner--warn">⚠ ${result.unverifiedCount} unverified entit${result.unverifiedCount === 1 ? 'y' : 'ies'}</div>`
+      : '<div class="verify-banner verify-banner--ok">All entities verified</div>';
+    verifyResultSlot.innerHTML = `
+      ${banner}
+      <ul class="verify-list">${items}</ul>
+      <div class="verify-cost">Cost: $${result.cost.totalUsd.toFixed(4)}</div>
+    `;
+  }
+
+  function renderAutoReviseButton(resumeMd: string): void {
+    reviseDiffSlot.replaceChildren();
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-secondary revise-whole-resume';
+    btn.textContent = 'Revise whole resume…';
+    btn.addEventListener('click', () => void runAutoRevise(resumeMd));
+    reviseDiffSlot.appendChild(btn);
+  }
+
+  async function runAutoRevise(currentMd: string): Promise<void> {
+    if (!hooks.onAutoRevise) return;
+    const instruction = typeof globalThis !== 'undefined' && globalThis.prompt
+      ? globalThis.prompt('Revision instruction (e.g. "tighten verbs, add metrics"):')
+      : null;
+    if (!instruction || !instruction.trim()) return;
+
+    const md = currentMarkdownGetter ? currentMarkdownGetter() : currentMd;
+    const scope: ReviseTargetScope = { kind: 'whole-resume' };
+
+    reviseDiffSlot.textContent = 'Revising…';
+    try {
+      const result = await hooks.onAutoRevise({
+        currentMarkdown: md,
+        targetScope: scope,
+        instruction: instruction.trim(),
+        model: state.autoReviseModel,
+      });
+      renderRevisionDiff(root, result, {
+        onReviseRequest: () => { /* one-shot */ },
+        onRevisionAccepted: (revisedMd: string) => {
+          showResume(revisedMd);
+          reviseDiffSlot.replaceChildren();
+          renderAutoReviseButton(revisedMd);
+        },
+        onRevisionRejected: () => {
+          reviseDiffSlot.replaceChildren();
+          renderAutoReviseButton(md);
+        },
+      });
+    } catch (e) {
+      console.error('[generate] auto-revise threw:', e);
+      reviseDiffSlot.textContent = `Auto-revise failed: ${(e as Error).message}`;
+    }
+  }
+
+  function renderMultiVersionResult(result: MultiVersionResponse): void {
+    resumeSlot.replaceChildren();
+    if (!result.ok) {
+      resumeSlot.textContent = `Multi-version failed: ${result.error.message}`;
+      return;
+    }
+    const variants = result.variants;
+    const totalUsd = result.cost.totalUsd;
+
+    const container = document.createElement('div');
+    container.className = 'mv-result';
+
+    const tabs = document.createElement('div');
+    tabs.className = 'mv-tabs';
+    const preview = document.createElement('pre');
+    preview.className = 'mv-preview';
+
+    let selectedIndex = 0;
+
+    function activate(i: number): void {
+      selectedIndex = i;
+      const v = variants[i];
+      if (!v) return;
+      preview.textContent = v.markdown;
+      tabs.querySelectorAll('button').forEach((b, j) => {
+        b.classList.toggle('mv-tab-active', j === i);
+      });
+    }
+
+    variants.forEach((v, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mv-tab btn';
+      btn.textContent = v.label;
+      btn.addEventListener('click', () => activate(i));
+      tabs.appendChild(btn);
+    });
+
+    const cost = document.createElement('p');
+    cost.className = 'mv-cost';
+    cost.textContent = `Total cost: $${totalUsd.toFixed(4)} (${variants.length} variants)`;
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn btn-primary mv-save';
+    saveBtn.textContent = 'Save this version';
+    saveBtn.addEventListener('click', () => {
+      const v = variants[selectedIndex];
+      if (!v) return;
+      // Display as the canonical resume so user can finalize / convert.
+      showResume(v.markdown);
+    });
+
+    container.appendChild(tabs);
+    container.appendChild(preview);
+    container.appendChild(cost);
+    container.appendChild(saveBtn);
+    resumeSlot.appendChild(container);
+
+    activate(0);
+
+    requestAnimationFrame(() => {
+      resumeSlot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }
 
   function setBusy(busy: boolean, label?: string): void {
@@ -509,6 +991,63 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       if (last) {
         state.toggles = last;
         renderCostBlock();
+      }
+      // Restore v2 toggle state. Re-render the toggles block so the saved
+      // selections are reflected in the DOM (otherwise the user sees defaults).
+      const v2 = await get('v2Toggles');
+      if (v2) {
+        state.researchEnabled = v2.researchEnabled;
+        state.researchModel = v2.researchModel;
+        state.benchmarkEnabled = v2.benchmarkEnabled;
+        state.benchmarkModel = v2.benchmarkModel;
+        state.critiqueEnabled = v2.critiqueEnabled;
+        state.critiqueModel = v2.critiqueModel;
+        state.autoReviseEnabled = v2.autoReviseEnabled;
+        state.autoReviseModel = v2.autoReviseModel;
+        state.coverLetterEnabled = v2.coverLetterEnabled;
+        state.coverLetterModel = v2.coverLetterModel;
+        state.verifyHooksModel = v2.verifyHooksModel;
+        state.multiVersionEnabled = v2.multiVersionEnabled;
+        state.multiVersionModel = v2.multiVersionModel;
+        state.multiVersionCount = v2.multiVersionCount;
+
+        // Reflect restored state into the live DOM (checkboxes + selects).
+        togglesBlock.querySelectorAll<HTMLElement>('[data-feature]').forEach((row) => {
+          const key = row.getAttribute('data-feature');
+          const cb = row.querySelector<HTMLInputElement>('input[type="checkbox"]');
+          const modelSel = row.querySelector<HTMLSelectElement>('select.model-select');
+          const countSel = row.querySelector<HTMLSelectElement>('select.count-select');
+          switch (key) {
+            case 'research':
+              if (cb) cb.checked = state.researchEnabled;
+              if (modelSel) modelSel.value = state.researchModel;
+              break;
+            case 'benchmark':
+              if (cb) cb.checked = state.benchmarkEnabled;
+              if (modelSel) modelSel.value = state.benchmarkModel;
+              break;
+            case 'critique':
+              if (cb) cb.checked = state.critiqueEnabled;
+              if (modelSel) modelSel.value = state.critiqueModel;
+              break;
+            case 'autoRevise':
+              if (cb) cb.checked = state.autoReviseEnabled;
+              if (modelSel) modelSel.value = state.autoReviseModel;
+              break;
+            case 'multiVersion':
+              if (cb) cb.checked = state.multiVersionEnabled;
+              if (modelSel) modelSel.value = state.multiVersionModel;
+              if (countSel) countSel.value = String(state.multiVersionCount);
+              break;
+            case 'coverLetter':
+              if (cb) cb.checked = state.coverLetterEnabled;
+              if (modelSel) modelSel.value = state.coverLetterModel;
+              break;
+            case 'verifyHooks':
+              if (modelSel) modelSel.value = state.verifyHooksModel;
+              break;
+          }
+        });
       }
     } catch {
       // Storage not available — ignore.
@@ -542,6 +1081,18 @@ async function loadConfigFromStorage(): Promise<PartialConfig> {
   } catch {
     return { sourceFolderId: '', rulesFolderId: '', outputFolderId: '', sheetId: '' };
   }
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function escapeAttr(s: string): string {
+  return escapeHtml(s);
 }
 
 /** Tiny helper for the meta-input rows. */

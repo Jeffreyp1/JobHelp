@@ -57,7 +57,43 @@ const HEADER_ROW = [
   'Recruiter',       // user-filled
   'Follow-up',       // user-filled
   'Notes',
+  // ---- v2 feature columns (left blank by appendSheetRow; filled by
+  // v2 handlers via updateSheetRow). New columns are always appended at the
+  // end so existing rows / sheets remain layout-compatible. ----
+  'Critique Score',          // 0-10 weighted score from `critique` handler
+  'Cover Letter URL',        // doc URL from `cover_letter` handler
+  'Verify Unverified Count', // unverified entity count from `verify_cl_hooks`
+  'Multi-Version Label',     // label of variant kept from `multi_version`
 ];
+
+/**
+ * Column index (1-based, GAS convention) of every SheetRow field in the
+ * tracking sheet. Kept in sync with HEADER_ROW above. Used by updateSheetRow
+ * to write specific cells without disturbing the rest of the row.
+ */
+const COLUMN_INDEX: Record<keyof SheetRow, number> = {
+  date: 1,
+  // status (col 2) is user-filled — not in SheetRow
+  company: 3,
+  role: 4,
+  location: 5,
+  salary: 6,
+  source: 7,
+  url: 8,
+  folderUrl: 9,
+  docUrl: 10,
+  finalDocxUrl: 11,
+  finalPdfUrl: 12,
+  keywordMatchRate: 13,
+  costUsd: 14,
+  modelUsed: 15,
+  // recruiter (col 16) + follow-up (col 17) are user-filled
+  notes: 18,
+  critiqueScore: 19,
+  coverLetterUrl: 20,
+  verifyHookUnverifiedCount: 21,
+  multiVersionLabel: 22,
+};
 
 /**
  * Format a Date as "May 9, 2026".
@@ -699,6 +735,67 @@ export const driveOps: DriveOps = {
   },
 
   // -------------------------------------------------------------------------
+  // createFileInFolder
+  // -------------------------------------------------------------------------
+  createFileInFolder(
+    folderId: string,
+    fileName: string,
+    content: string,
+  ): { fileId: string; fileUrl: string } {
+    const DriveApp = getDriveApp();
+    const folder = DriveApp.getFolderById(folderId); // throws if invalid
+    const file = folder.createFile(fileName, content, MD_MIME_TYPE);
+    return {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+    };
+  },
+
+  // -------------------------------------------------------------------------
+  // createGoogleDoc
+  // -------------------------------------------------------------------------
+  createGoogleDoc(
+    folderId: string,
+    title: string,
+    markdownContent: string,
+  ): { docId: string; docUrl: string } {
+    const DriveApp = getDriveApp();
+    const DocumentApp = getDocumentApp();
+
+    const doc = DocumentApp.create(title);
+    const body = doc.getBody();
+
+    renderMarkdownToBody(body, DocumentApp, markdownContent);
+
+    if (typeof doc.saveAndClose === 'function') {
+      doc.saveAndClose();
+    }
+
+    const docId: string = doc.getId();
+    const docUrl: string = doc.getUrl();
+
+    // Move the Google Doc from My Drive root into the target folder
+    const docFile = DriveApp.getFileById(docId);
+    const parents = docFile.getParents();
+    while (parents.hasNext()) {
+      const oldParent = parents.next();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (typeof (oldParent as any).removeFile === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (oldParent as any).removeFile(docFile);
+      }
+    }
+    const folder = DriveApp.getFolderById(folderId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (typeof (folder as any).addFile === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (folder as any).addFile(docFile);
+    }
+
+    return { docId, docUrl };
+  },
+
+  // -------------------------------------------------------------------------
   // appendSheetRow
   // -------------------------------------------------------------------------
   appendSheetRow(
@@ -741,6 +838,15 @@ export const driveOps: DriveOps = {
       '',                              // Recruiter — user-filled
       '',                              // Follow-up — user-filled
       row.notes ?? '',
+      // ---- v2 feature columns ----
+      // Left blank on initial append. v2 handlers back-fill them via
+      // updateSheetRow once they have data. We use '' (not undefined) so
+      // the sheet displays a blank cell rather than the literal string
+      // "undefined".
+      row.critiqueScore ?? '',
+      row.coverLetterUrl ?? '',
+      row.verifyHookUnverifiedCount ?? '',
+      row.multiVersionLabel ?? '',
     ];
 
     sheet.appendRow(dataRow);
@@ -753,5 +859,53 @@ export const driveOps: DriveOps = {
     const rowUrl = `${ssUrl}#gid=${gid}&range=A${rowIndex}`;
 
     return { rowIndex, rowUrl };
+  },
+
+  // -------------------------------------------------------------------------
+  // updateSheetRow
+  //
+  // Update specific cells in an existing tracking-sheet row, located by the
+  // rowUrl returned from appendSheetRow. Only columns whose key appears in
+  // `fields` are written; every other cell is untouched.
+  //
+  // Used by v2 handlers to back-fill their columns (critiqueScore,
+  // coverLetterUrl, verifyHookUnverifiedCount, multiVersionLabel) without
+  // re-appending a row. handleGenerate does not call this — it leaves the
+  // v2 columns blank on initial append, and the v2 handlers patch them later.
+  // -------------------------------------------------------------------------
+  updateSheetRow(
+    sheetId: string,
+    rowUrl: string,
+    fields: Partial<SheetRow>,
+  ): void {
+    // 1. Parse rowIndex out of the rowUrl. We accept the same anchor shape
+    //    that appendSheetRow produces: "...#gid=<gid>&range=A<row>".
+    //    If parsing fails (caller passed a garbage URL) we silently no-op —
+    //    v2 sheet updates are non-fatal, and the v2 handler is responsible
+    //    for logging if it cares.
+    const rowMatch = rowUrl.match(/[#&]range=[A-Z]+(\d+)/);
+    if (!rowMatch) return;
+    const rowIndex = Number(rowMatch[1]);
+    if (!Number.isFinite(rowIndex) || rowIndex < 1) return;
+
+    const SpreadsheetApp = getSpreadsheetApp();
+    const ss = SpreadsheetApp.openById(sheetId);
+
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet) return; // sheet was never created — nothing to update
+
+    // 2. Write each provided field into its column. We use getRange(row,col)
+    //    .setValue() so the rest of the row is preserved (vs. rewriting the
+    //    whole row). Unknown keys (e.g. fields the COLUMN_INDEX doesn't know
+    //    about) are silently ignored.
+    for (const key of Object.keys(fields) as (keyof SheetRow)[]) {
+      const col = COLUMN_INDEX[key];
+      if (!col) continue;
+      const raw = fields[key];
+      // Coerce null/undefined → '' so blank cells stay blank.
+      const value: unknown = raw === null || raw === undefined ? '' : raw;
+      const range = sheet.getRange(rowIndex, col);
+      range.setValue(value);
+    }
   },
 };

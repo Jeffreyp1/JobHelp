@@ -78,6 +78,22 @@ export interface DriveOps {
   ): { rowIndex: number; rowUrl: string };
 
   /**
+   * Update specific cells in an existing tracking-sheet row, located by the
+   * rowUrl returned from {@link appendSheetRow}. Only the columns present in
+   * `fields` are written; all other cells are left untouched.
+   *
+   * The rowUrl is expected to contain a `#gid=<n>&range=A<row>` anchor; if it
+   * cannot be parsed, the call is a no-op. Used by v2 handlers (critique,
+   * cover letter, verify hooks, multi-version) to back-fill their columns
+   * after the row has already been appended by `handleGenerate`.
+   */
+  updateSheetRow(
+    sheetId: string,
+    rowUrl: string,
+    fields: Partial<SheetRow>,
+  ): void;
+
+  /**
    * Replace the body of an existing Google Doc with new markdown content.
    * Uses the same simple markdown→Doc renderer as writeOutput.
    */
@@ -113,6 +129,28 @@ export interface DriveOps {
     fileName: string,
     base64: string,
   ): { fileId: string; url: string; fileName: string };
+
+  /**
+   * Write a plain-text/markdown file into an existing folder by ID.
+   * Returns the new file's ID and direct URL.
+   * Throws if the folderId is invalid.
+   */
+  createFileInFolder(
+    folderId: string,
+    fileName: string,
+    content: string,
+  ): { fileId: string; fileUrl: string };
+
+  /**
+   * Create a Google Doc with the given title and markdown content inside an
+   * existing folder by ID. Returns the Doc URL.
+   * Throws if the folderId is invalid.
+   */
+  createGoogleDoc(
+    folderId: string,
+    title: string,
+    markdownContent: string,
+  ): { docId: string; docUrl: string };
 }
 
 export interface SheetRow {
@@ -137,4 +175,14 @@ export interface SheetRow {
   costUsd: number;
   keywordMatchRate: number;
   notes?: string;
+  // ---- v2 feature columns (optional; left blank by handleGenerate, populated
+  // later by v2 handlers via updateSheetRow) ----
+  /** Critique total weighted score, 0-10 (filled by `critique` handler) */
+  critiqueScore?: number;
+  /** URL of the cover letter doc (filled by `cover_letter` handler) */
+  coverLetterUrl?: string;
+  /** Number of unverified entities (filled by `verify_cl_hooks` handler) */
+  verifyHookUnverifiedCount?: number;
+  /** Label of the chosen multi-version variant (filled by `multi_version` handler) */
+  multiVersionLabel?: string;
 }

@@ -1523,7 +1523,7 @@ var require_crc32 = __commonJS({
     "use strict";
     var utils = require_utils();
     var table = [0, 1996959894, 3993919788, 2567524794, 124634137, 1886057615, 3915621685, 2657392035, 249268274, 2044508324, 3772115230, 2547177864, 162941995, 2125561021, 3887607047, 2428444049, 498536548, 1789927666, 4089016648, 2227061214, 450548861, 1843258603, 4107580753, 2211677639, 325883990, 1684777152, 4251122042, 2321926636, 335633487, 1661365465, 4195302755, 2366115317, 997073096, 1281953886, 3579855332, 2724688242, 1006888145, 1258607687, 3524101629, 2768942443, 901097722, 1119000684, 3686517206, 2898065728, 853044451, 1172266101, 3705015759, 2882616665, 651767980, 1373503546, 3369554304, 3218104598, 565507253, 1454621731, 3485111705, 3099436303, 671266974, 1594198024, 3322730930, 2970347812, 795835527, 1483230225, 3244367275, 3060149565, 1994146192, 31158534, 2563907772, 4023717930, 1907459465, 112637215, 2680153253, 3904427059, 2013776290, 251722036, 2517215374, 3775830040, 2137656763, 141376813, 2439277719, 3865271297, 1802195444, 476864866, 2238001368, 4066508878, 1812370925, 453092731, 2181625025, 4111451223, 1706088902, 314042704, 2344532202, 4240017532, 1658658271, 366619977, 2362670323, 4224994405, 1303535960, 984961486, 2747007092, 3569037538, 1256170817, 1037604311, 2765210733, 3554079995, 1131014506, 879679996, 2909243462, 3663771856, 1141124467, 855842277, 2852801631, 3708648649, 1342533948, 654459306, 3188396048, 3373015174, 1466479909, 544179635, 3110523913, 3462522015, 1591671054, 702138776, 2966460450, 3352799412, 1504918807, 783551873, 3082640443, 3233442989, 3988292384, 2596254646, 62317068, 1957810842, 3939845945, 2647816111, 81470997, 1943803523, 3814918930, 2489596804, 225274430, 2053790376, 3826175755, 2466906013, 167816743, 2097651377, 4027552580, 2265490386, 503444072, 1762050814, 4150417245, 2154129355, 426522225, 1852507879, 4275313526, 2312317920, 282753626, 1742555852, 4189708143, 2394877945, 397917763, 1622183637, 3604390888, 2714866558, 953729732, 1340076626, 3518719985, 2797360999, 1068828381, 1219638859, 3624741850, 2936675148, 906185462, 1090812512, 3747672003, 2825379669, 829329135, 1181335161, 3412177804, 3160834842, 628085408, 1382605366, 3423369109, 3138078467, 570562233, 1426400815, 3317316542, 2998733608, 733239954, 1555261956, 3268935591, 3050360625, 752459403, 1541320221, 2607071920, 3965973030, 1969922972, 40735498, 2617837225, 3943577151, 1913087877, 83908371, 2512341634, 3803740692, 2075208622, 213261112, 2463272603, 3855990285, 2094854071, 198958881, 2262029012, 4057260610, 1759359992, 534414190, 2176718541, 4139329115, 1873836001, 414664567, 2282248934, 4279200368, 1711684554, 285281116, 2405801727, 4167216745, 1634467795, 376229701, 2685067896, 3608007406, 1308918612, 956543938, 2808555105, 3495958263, 1231636301, 1047427035, 2932959818, 3654703836, 1088359270, 936918e3, 2847714899, 3736837829, 1202900863, 817233897, 3183342108, 3401237130, 1404277552, 615818150, 3134207493, 3453421203, 1423857449, 601450431, 3009837614, 3294710456, 1567103746, 711928724, 3020668471, 3272380065, 1510334235, 755167117];
-    module.exports = function crc32(input, crc) {
+    module.exports = function crc322(input, crc) {
       if (typeof input === "undefined" || !input.length) {
         return 0;
       }
@@ -2116,7 +2116,7 @@ var require_object = __commonJS({
        * @deprecated
        * This method will be removed in a future version without replacement.
        */
-      crc32: function crc32(input, crc) {
+      crc32: function crc322(input, crc) {
         return _crc(input, crc);
       },
       /**
@@ -16183,6 +16183,7 @@ function renderToggleRow(props) {
   const row = document.createElement("div");
   row.className = "toggle-row";
   if (props.disabled) row.classList.add("toggle-row--disabled");
+  if (props.featureKey) row.setAttribute("data-feature", props.featureKey);
   const labelEl = document.createElement("label");
   labelEl.className = "toggle-row__label";
   const cb = document.createElement("input");
@@ -16199,9 +16200,27 @@ function renderToggleRow(props) {
   labelEl.appendChild(cb);
   labelEl.appendChild(text);
   row.appendChild(labelEl);
+  if (props.counts && props.counts.length > 0) {
+    const csel = document.createElement("select");
+    csel.className = "count-select toggle-row__count";
+    csel.disabled = !!props.disabled;
+    for (const n of props.counts) {
+      const opt = document.createElement("option");
+      opt.value = String(n);
+      opt.textContent = String(n);
+      if (n === props.selectedCount) opt.selected = true;
+      csel.appendChild(opt);
+    }
+    csel.addEventListener("change", () => {
+      const parsed = parseInt(csel.value, 10);
+      if (!isNaN(parsed)) props.onCountChange?.(parsed);
+    });
+    row.appendChild(csel);
+  }
   if (props.models && props.models.length > 0) {
     const sel = document.createElement("select");
-    sel.className = "toggle-row__model";
+    sel.className = "toggle-row__model model-select";
+    sel.setAttribute("data-role", "model");
     sel.disabled = !!props.disabled;
     for (const m2 of props.models) {
       const opt = document.createElement("option");
@@ -17524,6 +17543,211 @@ var Vt = x.lex;
 function stripDangerousTags(html) {
   return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, "").replace(/<\s*on\w+\s*=/gi, "<data-stripped=").replace(/javascript:/gi, "");
 }
+var CRC32_TABLE = (() => {
+  const table = new Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) {
+      c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+    }
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
+function crc32(str) {
+  let crc = 4294967295;
+  for (let i = 0; i < str.length; i++) {
+    crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ str.charCodeAt(i)) & 255];
+  }
+  return (crc ^ 4294967295) >>> 0;
+}
+function bulletIdFor(bulletText, sectionIndex) {
+  const trimmed = bulletText.trim();
+  const hex = crc32(`${sectionIndex}:${trimmed}`).toString(16).padStart(8, "0");
+  return `b-${hex}`;
+}
+function extractCompanyName(heading) {
+  const stripped = heading.replace(/^\s*#+\s*/, "").replace(/\s*\(\s*[^)]*\d{4}[^)]*\)\s*$/, "").trim();
+  let m2 = stripped.match(/^.+?\s+at\s+(.+?)(?:\s*[|—-]\s*.*)?$/i);
+  if (m2 && m2[1]) return m2[1].trim();
+  m2 = stripped.match(/^.+?\s+[—–]\s+(.+?)(?:\s*[|]\s*.*)?$/);
+  if (m2 && m2[1]) return m2[1].trim();
+  m2 = stripped.match(/^\*\*[^*]+\*\*\s+(.+?)(?:\s*[|]\s*.*)?$/);
+  if (m2 && m2[1]) return m2[1].trim();
+  const firstSeg = stripped.split("|")[0] ?? stripped;
+  return firstSeg.replace(/\*\*/g, "").trim();
+}
+function parseResumeMarkdown(md) {
+  const lines = md.split("\n");
+  const root = [];
+  let currentSection = null;
+  let currentRole = null;
+  let sectionIndex = -1;
+  const addToCurrent = (node) => {
+    if (currentRole) currentRole.children.push(node);
+    else if (currentSection) currentSection.children.push(node);
+    else root.push(node);
+  };
+  for (const rawLine of lines) {
+    const line = rawLine;
+    const trimmed = line.trim();
+    const h2 = line.match(/^##\s+(.+?)\s*$/);
+    if (h2) {
+      sectionIndex += 1;
+      currentSection = {
+        kind: "section",
+        sectionName: h2[1].trim(),
+        children: []
+      };
+      currentRole = null;
+      root.push(currentSection);
+      continue;
+    }
+    const h3 = line.match(/^###\s+(.+?)\s*$/);
+    if (h3) {
+      const raw = h3[1].trim();
+      currentRole = {
+        kind: "role",
+        rawHeading: raw,
+        companyName: extractCompanyName(raw),
+        children: []
+      };
+      if (currentSection) currentSection.children.push(currentRole);
+      else root.push(currentRole);
+      continue;
+    }
+    const bullet = line.match(/^[\s]*[-*]\s+(.*)$/);
+    if (bullet) {
+      const text = bullet[1].trim();
+      addToCurrent({
+        kind: "bullet",
+        text,
+        bulletId: bulletIdFor(text, Math.max(0, sectionIndex))
+      });
+      continue;
+    }
+    if (trimmed.length > 0) {
+      addToCurrent({ kind: "text", text: trimmed });
+    }
+  }
+  return root;
+}
+function escapeText(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function inlineHtml(s) {
+  return escapeText(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|\s)\*([^*]+)\*/g, "$1<em>$2</em>");
+}
+function makeReviseButton(label, cls, attrs) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = `revise-btn ${cls}`;
+  btn.textContent = label;
+  for (const [k, v2] of Object.entries(attrs)) {
+    btn.setAttribute(k, v2);
+  }
+  return btn;
+}
+function renderBullet(b2) {
+  const li = document.createElement("li");
+  li.className = "resume-bullet";
+  li.setAttribute("data-bullet-id", b2.bulletId);
+  const span = document.createElement("span");
+  span.className = "resume-bullet__text";
+  span.innerHTML = inlineHtml(b2.text);
+  li.appendChild(span);
+  li.appendChild(
+    makeReviseButton("Revise", "revise-bullet", { "data-bullet-id": b2.bulletId })
+  );
+  return li;
+}
+function renderRole(r) {
+  const art = document.createElement("article");
+  art.className = "resume-role";
+  art.setAttribute("data-role-company", r.companyName);
+  const head = document.createElement("div");
+  head.className = "resume-role__head";
+  const h = document.createElement("h4");
+  h.className = "resume-role__heading";
+  h.innerHTML = inlineHtml(r.rawHeading);
+  head.appendChild(h);
+  head.appendChild(
+    makeReviseButton("Revise role", "revise-role", { "data-role-company": r.companyName })
+  );
+  art.appendChild(head);
+  let currentList = null;
+  for (const child of r.children) {
+    if (child.kind === "bullet") {
+      if (!currentList) {
+        currentList = document.createElement("ul");
+        currentList.className = "resume-bullets";
+        art.appendChild(currentList);
+      }
+      currentList.appendChild(renderBullet(child));
+    } else if (child.kind === "text") {
+      currentList = null;
+      const p = document.createElement("p");
+      p.className = "resume-text";
+      p.innerHTML = inlineHtml(child.text);
+      art.appendChild(p);
+    }
+  }
+  return art;
+}
+function renderSection(s) {
+  const sec = document.createElement("section");
+  sec.className = "resume-section";
+  sec.setAttribute("data-section-name", s.sectionName);
+  const head = document.createElement("div");
+  head.className = "resume-section__head";
+  const h = document.createElement("h3");
+  h.className = "resume-section__heading";
+  h.textContent = s.sectionName;
+  head.appendChild(h);
+  head.appendChild(
+    makeReviseButton("Revise section", "revise-section", { "data-section-name": s.sectionName })
+  );
+  sec.appendChild(head);
+  let currentList = null;
+  for (const child of s.children) {
+    if (child.kind === "role") {
+      currentList = null;
+      sec.appendChild(renderRole(child));
+    } else if (child.kind === "bullet") {
+      if (!currentList) {
+        currentList = document.createElement("ul");
+        currentList.className = "resume-bullets";
+        sec.appendChild(currentList);
+      }
+      currentList.appendChild(renderBullet(child));
+    } else if (child.kind === "text") {
+      currentList = null;
+      const p = document.createElement("p");
+      p.className = "resume-text";
+      p.innerHTML = inlineHtml(child.text);
+      sec.appendChild(p);
+    }
+  }
+  return sec;
+}
+function renderParsedInto(container, nodes) {
+  container.replaceChildren();
+  for (const node of nodes) {
+    if (node.kind === "section") container.appendChild(renderSection(node));
+    else if (node.kind === "role") container.appendChild(renderRole(node));
+    else if (node.kind === "bullet") {
+      const ul = document.createElement("ul");
+      ul.className = "resume-bullets";
+      ul.appendChild(renderBullet(node));
+      container.appendChild(ul);
+    } else {
+      const p = document.createElement("p");
+      p.className = "resume-text";
+      p.innerHTML = inlineHtml(node.text);
+      container.appendChild(p);
+    }
+  }
+}
 function renderResumeEditor(props) {
   const wrap = document.createElement("section");
   wrap.className = "resume-editor";
@@ -17532,10 +17756,29 @@ function renderResumeEditor(props) {
   heading.className = "resume-editor__title";
   heading.textContent = "Generated resume";
   wrap.appendChild(heading);
-  const split = document.createElement("div");
-  split.className = "resume-editor__split";
+  const tabs = document.createElement("div");
+  tabs.className = "resume-editor__tabs";
+  tabs.setAttribute("role", "tablist");
+  const editTab = document.createElement("button");
+  editTab.type = "button";
+  editTab.className = "resume-editor__tab resume-editor__tab--edit is-active";
+  editTab.setAttribute("role", "tab");
+  editTab.setAttribute("aria-selected", "true");
+  editTab.dataset.mode = "edit";
+  editTab.textContent = "Edit";
+  const previewTab = document.createElement("button");
+  previewTab.type = "button";
+  previewTab.className = "resume-editor__tab resume-editor__tab--preview";
+  previewTab.setAttribute("role", "tab");
+  previewTab.setAttribute("aria-selected", "false");
+  previewTab.dataset.mode = "preview";
+  previewTab.textContent = "Preview";
+  tabs.appendChild(editTab);
+  tabs.appendChild(previewTab);
+  wrap.appendChild(tabs);
   const editorPane = document.createElement("div");
   editorPane.className = "resume-editor__pane resume-editor__pane--editor";
+  editorPane.setAttribute("role", "tabpanel");
   const editorLabel = document.createElement("div");
   editorLabel.className = "resume-editor__pane-label";
   editorLabel.textContent = "Markdown";
@@ -17548,6 +17791,8 @@ function renderResumeEditor(props) {
   editorPane.appendChild(textarea);
   const previewPane = document.createElement("div");
   previewPane.className = "resume-editor__pane resume-editor__pane--preview";
+  previewPane.setAttribute("role", "tabpanel");
+  previewPane.hidden = true;
   const previewLabel = document.createElement("div");
   previewLabel.className = "resume-editor__pane-label";
   previewLabel.textContent = "Preview";
@@ -17555,9 +17800,12 @@ function renderResumeEditor(props) {
   preview.className = "resume-editor__preview";
   previewPane.appendChild(previewLabel);
   previewPane.appendChild(preview);
-  split.appendChild(editorPane);
-  split.appendChild(previewPane);
-  wrap.appendChild(split);
+  const legacyPreview = document.createElement("div");
+  legacyPreview.className = "resume-editor__preview-legacy";
+  legacyPreview.hidden = true;
+  previewPane.appendChild(legacyPreview);
+  wrap.appendChild(editorPane);
+  wrap.appendChild(previewPane);
   const actions = document.createElement("div");
   actions.className = "resume-editor__actions";
   const saveBtn = document.createElement("button");
@@ -17568,18 +17816,69 @@ function renderResumeEditor(props) {
     props.onSave(textarea.value);
   });
   actions.appendChild(saveBtn);
+  const wholeBtn = makeReviseButton("Revise whole resume", "revise-whole-resume", {});
+  wholeBtn.classList.remove("revise-btn");
+  wholeBtn.classList.add("btn", "btn-secondary", "revise-whole-resume");
+  actions.appendChild(wholeBtn);
   wrap.appendChild(actions);
+  const setMode = (mode) => {
+    const isEdit = mode === "edit";
+    editorPane.hidden = !isEdit;
+    previewPane.hidden = isEdit;
+    editTab.classList.toggle("is-active", isEdit);
+    previewTab.classList.toggle("is-active", !isEdit);
+    editTab.setAttribute("aria-selected", String(isEdit));
+    previewTab.setAttribute("aria-selected", String(!isEdit));
+    if (!isEdit) updatePreview();
+  };
   const updatePreview = () => {
     const md = textarea.value;
     try {
+      const parsed = parseResumeMarkdown(md);
+      renderParsedInto(preview, parsed);
       const html = g.parse(md, { async: false });
-      preview.innerHTML = stripDangerousTags(html);
+      legacyPreview.innerHTML = stripDangerousTags(html);
+      legacyPreview.hidden = preview.childElementCount > 0;
     } catch {
-      preview.textContent = md;
+      preview.replaceChildren();
+      legacyPreview.textContent = md;
+      legacyPreview.hidden = false;
     }
   };
+  editTab.addEventListener("click", () => setMode("edit"));
+  previewTab.addEventListener("click", () => setMode("preview"));
   textarea.addEventListener("input", updatePreview);
   updatePreview();
+  wrap.addEventListener("click", (ev) => {
+    const target = ev.target;
+    if (!target) return;
+    const btn = target.closest("button.revise-bullet, button.revise-section, button.revise-role, button.revise-whole-resume");
+    if (!btn) return;
+    let scope = null;
+    if (btn.classList.contains("revise-bullet")) {
+      const bulletId = btn.getAttribute("data-bullet-id") ?? btn.closest("[data-bullet-id]")?.dataset.bulletId ?? "";
+      if (bulletId) scope = { kind: "bullet", bulletId };
+    } else if (btn.classList.contains("revise-section")) {
+      const sectionName = btn.getAttribute("data-section-name") ?? btn.closest("[data-section-name]")?.dataset.sectionName ?? "";
+      if (sectionName) scope = { kind: "section", sectionName };
+    } else if (btn.classList.contains("revise-role")) {
+      const companyName = btn.getAttribute("data-role-company") ?? btn.closest("[data-role-company]")?.dataset.roleCompany ?? "";
+      if (companyName) scope = { kind: "role", companyName };
+    } else if (btn.classList.contains("revise-whole-resume")) {
+      scope = { kind: "whole-resume" };
+    }
+    if (!scope) return;
+    const detail = {
+      scope,
+      currentMarkdown: textarea.value
+    };
+    wrap.dispatchEvent(
+      new CustomEvent("resume:revise", {
+        detail,
+        bubbles: true
+      })
+    );
+  });
   return wrap;
 }
 
@@ -17592,11 +17891,20 @@ var PRICING_PER_M = {
 var DEFAULT_PRICING = PRICING_PER_M["claude-haiku-4-5-20251001"];
 var PROFILES = {
   generate: { cacheRead: 1e4, freshInput: 1e3, output: 1500 },
-  research: { cacheRead: 1e4, freshInput: 6e3, output: 6e3 },
-  critique: { cacheRead: 1e4, freshInput: 2500, output: 2e3 },
+  research: { cacheRead: 0, freshInput: 1500, output: 400 },
+  benchmark: { cacheRead: 0, freshInput: 1500, output: 400 },
+  critique: { cacheRead: 1e4, freshInput: 4e3, output: 1500 },
   autoRevise: { cacheRead: 1e4, freshInput: 2e3, output: 1500 },
-  coverLetter: { cacheRead: 1e4, freshInput: 1500, output: 2500 },
-  verifyHooks: { cacheRead: 1e4, freshInput: 1500, output: 1e3 }
+  coverLetter: { cacheRead: 1e4, freshInput: 3e3, output: 1024 },
+  // verifyHooks here is the EXTRACTION step only; per-entity costs are added
+  // separately in estimateCost (default 5 entities × 500 in + 300 out).
+  verifyHooks: { cacheRead: 0, freshInput: 1e3, output: 500 }
+};
+var VERIFY_HOOKS_ENTITY_COUNT = 5;
+var VERIFY_HOOKS_PER_ENTITY = {
+  cacheRead: 0,
+  freshInput: 500,
+  output: 300
 };
 function costFor(modelId, profile) {
   const pricing = PRICING_PER_M[modelId] ?? DEFAULT_PRICING;
@@ -17605,22 +17913,38 @@ function costFor(modelId, profile) {
 function round4(n) {
   return Math.round(n * 1e4) / 1e4;
 }
-function estimateCost(toggles, generateModel) {
+function estimateCost(toggles, generateModel, v2 = {}) {
   const generate = costFor(generateModel, PROFILES.generate);
-  const research = toggles.research?.enabled ? costFor(toggles.research.model, PROFILES.research) : 0;
-  const critique = toggles.critique?.enabled ? costFor(toggles.critique.model, PROFILES.critique) : 0;
-  const autoRevise = toggles.autoRevise?.enabled ? costFor(toggles.autoRevise.model, PROFILES.autoRevise) : 0;
-  const coverLetter = toggles.coverLetter?.enabled ? costFor(toggles.coverLetter.model, PROFILES.coverLetter) : 0;
-  const verifyHooks = toggles.verifyHooks?.enabled ? costFor(toggles.verifyHooks.model, PROFILES.verifyHooks) : 0;
-  let multiVersion = 0;
-  if (toggles.multiVersion?.enabled) {
-    const cnt = Math.max(0, toggles.multiVersion.count ?? 0);
-    multiVersion = costFor(toggles.multiVersion.model, PROFILES.generate) * cnt;
-  }
-  const total = generate + research + critique + autoRevise + coverLetter + verifyHooks + multiVersion;
+  const researchOn = v2.researchEnabled ?? toggles.research?.enabled ?? false;
+  const researchModel = v2.researchModel ?? toggles.research?.model ?? generateModel;
+  const research = researchOn ? costFor(researchModel, PROFILES.research) : 0;
+  const benchmarkOn = v2.benchmarkEnabled ?? false;
+  const benchmarkModel = v2.benchmarkModel ?? generateModel;
+  const benchmark = benchmarkOn ? costFor(benchmarkModel, PROFILES.benchmark) : 0;
+  const critiqueOn = v2.critiqueEnabled ?? toggles.critique?.enabled ?? false;
+  const critiqueModel = v2.critiqueModel ?? toggles.critique?.model ?? generateModel;
+  const critique = critiqueOn ? costFor(critiqueModel, PROFILES.critique) : 0;
+  const autoReviseOn = v2.autoReviseEnabled ?? toggles.autoRevise?.enabled ?? false;
+  const autoReviseModel = v2.autoReviseModel ?? toggles.autoRevise?.model ?? generateModel;
+  const autoRevise = autoReviseOn ? costFor(autoReviseModel, PROFILES.autoRevise) : 0;
+  const coverLetterOn = v2.coverLetterEnabled ?? toggles.coverLetter?.enabled ?? false;
+  const coverLetterModel = v2.coverLetterModel ?? toggles.coverLetter?.model ?? generateModel;
+  const coverLetter = coverLetterOn ? costFor(coverLetterModel, PROFILES.coverLetter) : 0;
+  const verifyHooksOn = v2.verifyHooksEnabled ?? toggles.verifyHooks?.enabled ?? false;
+  const verifyHooksModel = v2.verifyHooksModel ?? toggles.verifyHooks?.model ?? generateModel;
+  const verifyHooks = verifyHooksOn ? costFor(verifyHooksModel, PROFILES.verifyHooks) + VERIFY_HOOKS_ENTITY_COUNT * costFor(verifyHooksModel, VERIFY_HOOKS_PER_ENTITY) : 0;
+  const multiVersionOn = v2.multiVersionEnabled ?? toggles.multiVersion?.enabled ?? false;
+  const multiVersionModel = v2.multiVersionModel ?? toggles.multiVersion?.model ?? generateModel;
+  const multiVersionCount = Math.max(
+    0,
+    v2.multiVersionCount ?? toggles.multiVersion?.count ?? 0
+  );
+  const multiVersion = multiVersionOn ? costFor(multiVersionModel, PROFILES.generate) * multiVersionCount : 0;
+  const total = generate + research + benchmark + critique + autoRevise + coverLetter + verifyHooks + multiVersion;
   return {
     generate: round4(generate),
     research: round4(research),
+    benchmark: round4(benchmark),
     critique: round4(critique),
     autoRevise: round4(autoRevise),
     multiVersion: round4(multiVersion),
@@ -17643,7 +17967,8 @@ var STORAGE_DEFAULTS = {
   lastToggles: {},
   presets: [],
   onboardingState: "noConfig",
-  lastJobInsights: null
+  lastJobInsights: null,
+  v2Toggles: null
 };
 
 // extension/src/lib/storage.ts
@@ -17686,6 +18011,85 @@ async function getAll() {
   return merged;
 }
 
+// extension/src/sidepanel/features/critique.ts
+function renderCritiqueResult(panelRoot, result) {
+  const target = panelRoot.querySelector("[data-critique-result]");
+  if (!target) return;
+  if (!result.ok) {
+    target.innerHTML = `<div class="critique-error">Critique failed: ${escapeHtml(result.error.message)}</div>`;
+    return;
+  }
+  const rows = result.scores.map(
+    (s) => `<tr><td>${escapeHtml(s.dimension)}</td><td>${s.score}</td><td>${s.weight}</td><td>${escapeHtml(s.notes)}</td></tr>`
+  ).join("");
+  const tiered = [1, 2, 3].map((tier) => {
+    const items = result.improvements.filter((i) => i.tier === tier);
+    if (items.length === 0) return "";
+    const lis = items.map((i) => `<li>${escapeHtml(i.text)} <small>(\u0394 ${i.expectedDelta.toFixed(2)})</small></li>`).join("");
+    return `<h4>Tier ${tier}</h4><ul>${lis}</ul>`;
+  }).join("");
+  const docLink = result.critiqueDocUrl ? `<p><a href="${escapeHtml(result.critiqueDocUrl)}" target="_blank" rel="noopener">View saved critique.md</a></p>` : "";
+  target.innerHTML = [
+    `<h3>Critique</h3>`,
+    `<p><strong>Total weighted score:</strong> ${result.totalScore.toFixed(2)} / 10</p>`,
+    `<table class="critique-scores"><thead><tr><th>Dimension</th><th>Score</th><th>Weight</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`,
+    `<div class="critique-improvements">${tiered}</div>`,
+    docLink
+  ].join("");
+}
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// extension/src/sidepanel/features/autoRevise.ts
+function renderRevisionDiff(panelRoot, result, hooks) {
+  const target = panelRoot.querySelector("[data-revise-diff]");
+  if (!target) return;
+  if (!result.ok) {
+    target.innerHTML = `<div class="revise-error">Revision failed: ${escapeHtml2(result.error.message)}</div>`;
+    return;
+  }
+  const warning = result.unauthorizedChanges.length > 0 ? `<div class="revise-warning"><strong>Warning:</strong> ${result.unauthorizedChanges.length} change(s) outside your requested scope. Review before accepting.</div>` : "";
+  const diffRows = result.diff.map(
+    (d2) => `
+        <tr class="diff-row">
+          <td class="diff-line">${d2.lineIndex}</td>
+          <td class="diff-before">${escapeHtml2(d2.before)}</td>
+          <td class="diff-after">${escapeHtml2(d2.after)}</td>
+        </tr>
+      `
+  ).join("");
+  target.innerHTML = `
+    ${warning}
+    <table class="revise-diff">
+      <thead><tr><th>Line</th><th>Before</th><th>After</th></tr></thead>
+      <tbody>${diffRows}</tbody>
+    </table>
+    <div class="revise-actions">
+      <button data-action="accept" class="revise-accept">Accept</button>
+      <button data-action="reject" class="revise-reject">Reject</button>
+    </div>
+  `;
+  const accept = target.querySelector('button[data-action="accept"]');
+  const reject = target.querySelector('button[data-action="reject"]');
+  if (accept) {
+    accept.addEventListener("click", () => {
+      hooks.onRevisionAccepted(result.revisedMarkdown);
+      target.innerHTML = "";
+    });
+  }
+  if (reject) {
+    reject.addEventListener("click", () => {
+      hooks.onRevisionRejected();
+      target.innerHTML = "";
+    });
+  }
+  target.removeAttribute("hidden");
+}
+function escapeHtml2(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 // extension/src/sidepanel/tabs/generate.ts
 var HAIKU = "claude-haiku-4-5-20251001";
 var SONNET = "claude-sonnet-4-6";
@@ -17719,7 +18123,24 @@ function renderGenerateTab(hooks) {
     toggles: {},
     // Populated after a successful generate; needed by finalize.
     docId: null,
-    jobFolderId: null
+    jobFolderId: null,
+    // ─── v2 feature toggle state ─────────────────────────────────────────
+    researchEnabled: false,
+    researchModel: HAIKU,
+    benchmarkEnabled: false,
+    benchmarkModel: HAIKU,
+    critiqueEnabled: false,
+    critiqueModel: HAIKU,
+    autoReviseEnabled: false,
+    autoReviseModel: HAIKU,
+    coverLetterEnabled: false,
+    coverLetterModel: HAIKU,
+    verifyHooksModel: HAIKU,
+    multiVersionEnabled: false,
+    multiVersionModel: SONNET,
+    multiVersionCount: 3,
+    // Latest cover-letter markdown (used by verify-hooks).
+    coverLetterMd: null
   };
   let currentMarkdownGetter = null;
   const insightsContainer = document.createElement("div");
@@ -17774,26 +18195,165 @@ function renderGenerateTab(hooks) {
       }
     })
   );
-  const disabledToggles = [
-    { label: "Research", comingIn: "v3" },
-    { label: "LinkedIn benchmarking", comingIn: "v3" },
-    { label: "Critique pass", comingIn: "v2" },
-    { label: "Auto-revise", comingIn: "v2" },
-    { label: "Multi-version", comingIn: "v5" },
-    { label: "Cover letter", comingIn: "v4" },
-    { label: "Verify CL hooks", comingIn: "v4" }
-  ];
-  for (const t of disabledToggles) {
-    togglesBlock.appendChild(
-      renderToggleRow({
-        label: t.label,
-        enabled: false,
-        disabled: true,
-        comingIn: t.comingIn
-      })
-    );
-  }
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: "Research company",
+      enabled: state.researchEnabled,
+      featureKey: "research",
+      models: ALL_MODELS,
+      selectedModel: state.researchModel,
+      onToggle: (v2) => {
+        state.researchEnabled = v2;
+        void persistTogglesState();
+      },
+      onModelChange: (m2) => {
+        state.researchModel = m2;
+        void persistTogglesState();
+      }
+    })
+  );
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: "LinkedIn role benchmark",
+      enabled: state.benchmarkEnabled,
+      featureKey: "benchmark",
+      models: ALL_MODELS,
+      selectedModel: state.benchmarkModel,
+      onToggle: (v2) => {
+        state.benchmarkEnabled = v2;
+        void persistTogglesState();
+      },
+      onModelChange: (m2) => {
+        state.benchmarkModel = m2;
+        void persistTogglesState();
+      }
+    })
+  );
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: "Critique pass",
+      enabled: state.critiqueEnabled,
+      featureKey: "critique",
+      models: ALL_MODELS,
+      selectedModel: state.critiqueModel,
+      onToggle: (v2) => {
+        state.critiqueEnabled = v2;
+        void persistTogglesState();
+      },
+      onModelChange: (m2) => {
+        state.critiqueModel = m2;
+        void persistTogglesState();
+      }
+    })
+  );
+  const critiqueResultSlot = document.createElement("div");
+  critiqueResultSlot.setAttribute("data-critique-result", "");
+  critiqueResultSlot.className = "feature-result feature-result--critique";
+  togglesBlock.appendChild(critiqueResultSlot);
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: "Auto-revise (whole resume)",
+      enabled: state.autoReviseEnabled,
+      featureKey: "autoRevise",
+      models: ALL_MODELS,
+      selectedModel: state.autoReviseModel,
+      onToggle: (v2) => {
+        state.autoReviseEnabled = v2;
+        void persistTogglesState();
+      },
+      onModelChange: (m2) => {
+        state.autoReviseModel = m2;
+        void persistTogglesState();
+      }
+    })
+  );
+  const reviseDiffSlot = document.createElement("div");
+  reviseDiffSlot.setAttribute("data-revise-diff", "");
+  reviseDiffSlot.className = "feature-result feature-result--revise";
+  togglesBlock.appendChild(reviseDiffSlot);
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: "Multi-version",
+      enabled: state.multiVersionEnabled,
+      featureKey: "multiVersion",
+      models: ALL_MODELS,
+      selectedModel: state.multiVersionModel,
+      counts: [2, 3, 4, 5],
+      selectedCount: state.multiVersionCount,
+      onToggle: (v2) => {
+        state.multiVersionEnabled = v2;
+        void persistTogglesState();
+      },
+      onModelChange: (m2) => {
+        state.multiVersionModel = m2;
+        void persistTogglesState();
+      },
+      onCountChange: (n) => {
+        state.multiVersionCount = n;
+        void persistTogglesState();
+      }
+    })
+  );
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: "Cover letter",
+      enabled: state.coverLetterEnabled,
+      featureKey: "coverLetter",
+      models: ALL_MODELS,
+      selectedModel: state.coverLetterModel,
+      onToggle: (v2) => {
+        state.coverLetterEnabled = v2;
+        void persistTogglesState();
+      },
+      onModelChange: (m2) => {
+        state.coverLetterModel = m2;
+        void persistTogglesState();
+      }
+    })
+  );
+  const clResultSlot = document.createElement("div");
+  clResultSlot.setAttribute("data-role", "cl-result");
+  clResultSlot.className = "feature-result feature-result--cl";
+  togglesBlock.appendChild(clResultSlot);
+  togglesBlock.appendChild(
+    renderToggleRow({
+      label: "Verify CL hooks (model only)",
+      enabled: true,
+      featureKey: "verifyHooks",
+      models: ALL_MODELS,
+      selectedModel: state.verifyHooksModel,
+      onModelChange: (m2) => {
+        state.verifyHooksModel = m2;
+        void persistTogglesState();
+      }
+    })
+  );
+  const verifyResultSlot = document.createElement("div");
+  verifyResultSlot.setAttribute("data-role", "verify-result");
+  verifyResultSlot.className = "feature-result feature-result--verify";
+  togglesBlock.appendChild(verifyResultSlot);
   root.appendChild(togglesBlock);
+  async function persistTogglesState() {
+    try {
+      await set("v2Toggles", {
+        researchEnabled: state.researchEnabled,
+        researchModel: state.researchModel,
+        benchmarkEnabled: state.benchmarkEnabled,
+        benchmarkModel: state.benchmarkModel,
+        critiqueEnabled: state.critiqueEnabled,
+        critiqueModel: state.critiqueModel,
+        autoReviseEnabled: state.autoReviseEnabled,
+        autoReviseModel: state.autoReviseModel,
+        coverLetterEnabled: state.coverLetterEnabled,
+        coverLetterModel: state.coverLetterModel,
+        verifyHooksModel: state.verifyHooksModel,
+        multiVersionEnabled: state.multiVersionEnabled,
+        multiVersionModel: state.multiVersionModel,
+        multiVersionCount: state.multiVersionCount
+      });
+    } catch {
+    }
+  }
   const costContainer = document.createElement("div");
   costContainer.className = "generate__cost";
   function renderCostBlock() {
@@ -17945,11 +18505,78 @@ function renderGenerateTab(hooks) {
   templateBtn.addEventListener("click", () => void handleTemplateClick());
   generateBtn.addEventListener("click", async () => {
     resumeSlot.replaceChildren();
+    critiqueResultSlot.replaceChildren();
+    reviseDiffSlot.replaceChildren();
+    clResultSlot.replaceChildren();
+    verifyResultSlot.replaceChildren();
     finalizeStatusEl.textContent = "";
     finalizeStatusEl.className = "generate__finalize-status";
     state.docId = null;
     state.jobFolderId = null;
+    state.coverLetterMd = null;
     const cfg = await loadConfigFromStorage();
+    if (state.multiVersionEnabled) {
+      if (!hooks.onMultiVersion) {
+        console.warn("[generate] multi-version enabled but onMultiVersion hook missing");
+        return;
+      }
+      setBusy(true, `Generating ${state.multiVersionCount} variants\u2026`);
+      try {
+        const result = await hooks.onMultiVersion({
+          jd: state.jd,
+          company: state.company,
+          role: state.role,
+          jobInsights: state.scraperOutput?.jobInsights ?? null,
+          sourceFolderId: cfg.sourceFolderId,
+          rulesFolderId: cfg.rulesFolderId,
+          count: state.multiVersionCount,
+          model: state.multiVersionModel
+        });
+        renderMultiVersionResult(result);
+      } catch (e) {
+        console.error("[generate] multi-version failed", e);
+        statusEl.textContent = `Multi-version failed: ${e.message}`;
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    let researchSummary;
+    let benchmarkPatterns;
+    if (state.researchEnabled && state.company && hooks.onResearchCompany) {
+      setBusy(true, "Researching company\u2026");
+      try {
+        const r = await hooks.onResearchCompany({
+          company: state.company,
+          role: state.role,
+          model: state.researchModel
+        });
+        if (r.ok) {
+          researchSummary = r.summary;
+        } else {
+          console.warn("[generate] research failed:", r.error.message);
+        }
+      } catch (e) {
+        console.error("[generate] research threw:", e);
+      }
+    }
+    if (state.benchmarkEnabled && state.company && state.role && hooks.onBenchmarkRole) {
+      setBusy(true, "Benchmarking role\u2026");
+      try {
+        const b2 = await hooks.onBenchmarkRole({
+          company: state.company,
+          role: state.role,
+          model: state.benchmarkModel
+        });
+        if (b2.ok) {
+          benchmarkPatterns = b2.patterns;
+        } else {
+          console.warn("[generate] benchmark failed:", b2.error.message);
+        }
+      } catch (e) {
+        console.error("[generate] benchmark threw:", e);
+      }
+    }
     const req = {
       jd: state.jd,
       company: state.company,
@@ -17961,7 +18588,9 @@ function renderGenerateTab(hooks) {
       rulesFolderId: cfg.rulesFolderId,
       outputFolderId: cfg.outputFolderId,
       sheetId: cfg.sheetId,
-      model: state.generateModel
+      model: state.generateModel,
+      researchSummary,
+      benchmarkPatterns
     };
     await hooks.onGenerate(req);
   });
@@ -18008,6 +18637,214 @@ function renderGenerateTab(hooks) {
     finalizeStatusEl.className = "generate__finalize-status";
     finalizeSection.hidden = false;
     updateFinalizeButtons();
+    void runPostGenerateChain(md, jobFolderId);
+  }
+  async function runPostGenerateChain(resumeMd, jobFolderId) {
+    const tasks = [];
+    if (state.critiqueEnabled && hooks.onCritique && jobFolderId) {
+      tasks.push(runCritique(resumeMd, jobFolderId));
+    }
+    if (state.coverLetterEnabled && hooks.onCoverLetter && jobFolderId) {
+      tasks.push(runCoverLetter(resumeMd, jobFolderId));
+    }
+    if (state.autoReviseEnabled && hooks.onAutoRevise) {
+      renderAutoReviseButton(resumeMd);
+    }
+    await Promise.allSettled(tasks);
+  }
+  async function runCritique(resumeMd, jobFolderId) {
+    if (!hooks.onCritique) return;
+    critiqueResultSlot.textContent = "Running critique\u2026";
+    try {
+      const result = await hooks.onCritique({
+        resumeMd,
+        jd: state.jd,
+        jobInsights: state.scraperOutput?.jobInsights ?? null,
+        jobFolderId,
+        model: state.critiqueModel
+      });
+      renderCritiqueResult(root, result);
+    } catch (e) {
+      console.error("[generate] critique threw:", e);
+      critiqueResultSlot.textContent = `Critique failed: ${e.message}`;
+    }
+  }
+  async function runCoverLetter(resumeMd, jobFolderId) {
+    if (!hooks.onCoverLetter) return;
+    const cfg = await loadConfigFromStorage();
+    clResultSlot.textContent = "Generating cover letter\u2026";
+    try {
+      const result = await hooks.onCoverLetter({
+        resumeMd,
+        jd: state.jd,
+        company: state.company,
+        role: state.role,
+        sourceFolderId: cfg.sourceFolderId,
+        rulesFolderId: cfg.rulesFolderId,
+        jobFolderId,
+        model: state.coverLetterModel
+      });
+      renderCoverLetterResult(result);
+    } catch (e) {
+      console.error("[generate] cover letter threw:", e);
+      clResultSlot.textContent = `Cover letter failed: ${e.message}`;
+    }
+  }
+  function renderCoverLetterResult(result) {
+    clResultSlot.replaceChildren();
+    if (!result.ok) {
+      clResultSlot.textContent = `Cover letter failed: ${result.error.message}`;
+      return;
+    }
+    state.coverLetterMd = result.coverLetterMd;
+    const wc = result.coverLetterMd.trim().split(/\s+/).length;
+    const links = [];
+    if (result.mdFileUrl) links.push(`<a href="${escapeAttr(result.mdFileUrl)}" target="_blank" rel="noopener">cover_letter.md \u2197</a>`);
+    if (result.docUrl) links.push(`<a href="${escapeAttr(result.docUrl)}" target="_blank" rel="noopener">Google Doc \u2197</a>`);
+    clResultSlot.innerHTML = `
+      <div class="cl-success">
+        <div class="cl-links">${links.join(" \xB7 ")}</div>
+        <div class="cl-meta">${wc} words (target 250-300)</div>
+        <button type="button" class="btn btn-secondary" data-action="verify-hooks">Verify Hooks</button>
+      </div>
+    `;
+    const verifyBtn = clResultSlot.querySelector('[data-action="verify-hooks"]');
+    verifyBtn?.addEventListener("click", () => {
+      void runVerifyHooks(result.coverLetterMd);
+    });
+  }
+  async function runVerifyHooks(coverLetterMd) {
+    if (!hooks.onVerifyClHooks) {
+      verifyResultSlot.textContent = "Verify-hooks hook not wired.";
+      return;
+    }
+    verifyResultSlot.textContent = "Verifying named entities\u2026";
+    try {
+      const result = await hooks.onVerifyClHooks({
+        coverLetterMd,
+        model: state.verifyHooksModel
+      });
+      renderVerifyHooksResult(result);
+    } catch (e) {
+      console.error("[generate] verify-hooks threw:", e);
+      verifyResultSlot.textContent = `Verify-hooks failed: ${e.message}`;
+    }
+  }
+  function renderVerifyHooksResult(result) {
+    verifyResultSlot.replaceChildren();
+    if (!result.ok) {
+      verifyResultSlot.textContent = `Verify-hooks failed: ${result.error.message}`;
+      return;
+    }
+    const icon = { verified: "\u2713", unverified: "\u26A0", uncertain: "?" };
+    const items = result.verifications.map((v2) => `
+      <li class="verify-item verify-item--${v2.status}">
+        <span class="verify-icon">${icon[v2.status] ?? "?"}</span>
+        <strong>${escapeHtml3(v2.entity)}</strong> <small>(${escapeHtml3(v2.entityType)})</small>
+        ${v2.reason ? `<div class="verify-reason">${escapeHtml3(v2.reason)}</div>` : ""}
+      </li>
+    `).join("");
+    const banner = result.unverifiedCount > 0 ? `<div class="verify-banner verify-banner--warn">\u26A0 ${result.unverifiedCount} unverified entit${result.unverifiedCount === 1 ? "y" : "ies"}</div>` : '<div class="verify-banner verify-banner--ok">All entities verified</div>';
+    verifyResultSlot.innerHTML = `
+      ${banner}
+      <ul class="verify-list">${items}</ul>
+      <div class="verify-cost">Cost: $${result.cost.totalUsd.toFixed(4)}</div>
+    `;
+  }
+  function renderAutoReviseButton(resumeMd) {
+    reviseDiffSlot.replaceChildren();
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-secondary revise-whole-resume";
+    btn.textContent = "Revise whole resume\u2026";
+    btn.addEventListener("click", () => void runAutoRevise(resumeMd));
+    reviseDiffSlot.appendChild(btn);
+  }
+  async function runAutoRevise(currentMd) {
+    if (!hooks.onAutoRevise) return;
+    const instruction = typeof globalThis !== "undefined" && globalThis.prompt ? globalThis.prompt('Revision instruction (e.g. "tighten verbs, add metrics"):') : null;
+    if (!instruction || !instruction.trim()) return;
+    const md = currentMarkdownGetter ? currentMarkdownGetter() : currentMd;
+    const scope = { kind: "whole-resume" };
+    reviseDiffSlot.textContent = "Revising\u2026";
+    try {
+      const result = await hooks.onAutoRevise({
+        currentMarkdown: md,
+        targetScope: scope,
+        instruction: instruction.trim(),
+        model: state.autoReviseModel
+      });
+      renderRevisionDiff(root, result, {
+        onReviseRequest: () => {
+        },
+        onRevisionAccepted: (revisedMd) => {
+          showResume(revisedMd);
+          reviseDiffSlot.replaceChildren();
+          renderAutoReviseButton(revisedMd);
+        },
+        onRevisionRejected: () => {
+          reviseDiffSlot.replaceChildren();
+          renderAutoReviseButton(md);
+        }
+      });
+    } catch (e) {
+      console.error("[generate] auto-revise threw:", e);
+      reviseDiffSlot.textContent = `Auto-revise failed: ${e.message}`;
+    }
+  }
+  function renderMultiVersionResult(result) {
+    resumeSlot.replaceChildren();
+    if (!result.ok) {
+      resumeSlot.textContent = `Multi-version failed: ${result.error.message}`;
+      return;
+    }
+    const variants = result.variants;
+    const totalUsd = result.cost.totalUsd;
+    const container = document.createElement("div");
+    container.className = "mv-result";
+    const tabs = document.createElement("div");
+    tabs.className = "mv-tabs";
+    const preview = document.createElement("pre");
+    preview.className = "mv-preview";
+    let selectedIndex = 0;
+    function activate(i) {
+      selectedIndex = i;
+      const v2 = variants[i];
+      if (!v2) return;
+      preview.textContent = v2.markdown;
+      tabs.querySelectorAll("button").forEach((b2, j2) => {
+        b2.classList.toggle("mv-tab-active", j2 === i);
+      });
+    }
+    variants.forEach((v2, i) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mv-tab btn";
+      btn.textContent = v2.label;
+      btn.addEventListener("click", () => activate(i));
+      tabs.appendChild(btn);
+    });
+    const cost = document.createElement("p");
+    cost.className = "mv-cost";
+    cost.textContent = `Total cost: $${totalUsd.toFixed(4)} (${variants.length} variants)`;
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btn btn-primary mv-save";
+    saveBtn.textContent = "Save this version";
+    saveBtn.addEventListener("click", () => {
+      const v2 = variants[selectedIndex];
+      if (!v2) return;
+      showResume(v2.markdown);
+    });
+    container.appendChild(tabs);
+    container.appendChild(preview);
+    container.appendChild(cost);
+    container.appendChild(saveBtn);
+    resumeSlot.appendChild(container);
+    activate(0);
+    requestAnimationFrame(() => {
+      resumeSlot.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
   function setBusy(busy, label) {
     generateBtn.disabled = busy;
@@ -18024,6 +18861,59 @@ function renderGenerateTab(hooks) {
       if (last) {
         state.toggles = last;
         renderCostBlock();
+      }
+      const v2 = await get("v2Toggles");
+      if (v2) {
+        state.researchEnabled = v2.researchEnabled;
+        state.researchModel = v2.researchModel;
+        state.benchmarkEnabled = v2.benchmarkEnabled;
+        state.benchmarkModel = v2.benchmarkModel;
+        state.critiqueEnabled = v2.critiqueEnabled;
+        state.critiqueModel = v2.critiqueModel;
+        state.autoReviseEnabled = v2.autoReviseEnabled;
+        state.autoReviseModel = v2.autoReviseModel;
+        state.coverLetterEnabled = v2.coverLetterEnabled;
+        state.coverLetterModel = v2.coverLetterModel;
+        state.verifyHooksModel = v2.verifyHooksModel;
+        state.multiVersionEnabled = v2.multiVersionEnabled;
+        state.multiVersionModel = v2.multiVersionModel;
+        state.multiVersionCount = v2.multiVersionCount;
+        togglesBlock.querySelectorAll("[data-feature]").forEach((row) => {
+          const key = row.getAttribute("data-feature");
+          const cb = row.querySelector('input[type="checkbox"]');
+          const modelSel = row.querySelector("select.model-select");
+          const countSel = row.querySelector("select.count-select");
+          switch (key) {
+            case "research":
+              if (cb) cb.checked = state.researchEnabled;
+              if (modelSel) modelSel.value = state.researchModel;
+              break;
+            case "benchmark":
+              if (cb) cb.checked = state.benchmarkEnabled;
+              if (modelSel) modelSel.value = state.benchmarkModel;
+              break;
+            case "critique":
+              if (cb) cb.checked = state.critiqueEnabled;
+              if (modelSel) modelSel.value = state.critiqueModel;
+              break;
+            case "autoRevise":
+              if (cb) cb.checked = state.autoReviseEnabled;
+              if (modelSel) modelSel.value = state.autoReviseModel;
+              break;
+            case "multiVersion":
+              if (cb) cb.checked = state.multiVersionEnabled;
+              if (modelSel) modelSel.value = state.multiVersionModel;
+              if (countSel) countSel.value = String(state.multiVersionCount);
+              break;
+            case "coverLetter":
+              if (cb) cb.checked = state.coverLetterEnabled;
+              if (modelSel) modelSel.value = state.coverLetterModel;
+              break;
+            case "verifyHooks":
+              if (modelSel) modelSel.value = state.verifyHooksModel;
+              break;
+          }
+        });
       }
     } catch {
     }
@@ -18047,6 +18937,12 @@ async function loadConfigFromStorage() {
   } catch {
     return { sourceFolderId: "", rulesFolderId: "", outputFolderId: "", sheetId: "" };
   }
+}
+function escapeHtml3(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function escapeAttr(s) {
+  return escapeHtml3(s);
 }
 function makeFieldRow(label, type, initial, onChange) {
   const row = document.createElement("div");
@@ -18628,6 +19524,60 @@ var ApiClient = class {
   async uploadFilledDocx(req) {
     return this.post({ action: "upload_filled_docx", ...req });
   }
+  // ─── feature owner: E1 ───────────────────────────────────────────────────
+  /**
+   * Research a company using live web search and return a structured summary.
+   * Results are cached server-side for 24h keyed by company+role.
+   */
+  async researchCompany(req) {
+    return this.post({ action: "research_company", ...req });
+  }
+  /**
+   * Benchmark a role at a company using LinkedIn-style profile patterns.
+   * Results are cached server-side for 24h keyed by company+role.
+   */
+  async benchmarkRole(req) {
+    return this.post({ action: "benchmark_role", ...req });
+  }
+  // ─── feature owner: E2 ───────────────────────────────────────────────────
+  /**
+   * Run the 8-dimension critique framework on a generated resume.
+   * Optionally saves critique.md to the job folder in Drive.
+   */
+  async critique(req) {
+    return this.post({ action: "critique", ...req });
+  }
+  /**
+   * Revise a specific bullet, section, role, or the whole resume with
+   * surgical precision (rule 14-revision-discipline enforced server-side).
+   * Returns the revised markdown plus a line-level diff for user approval.
+   */
+  async autoRevise(req) {
+    return this.post({ action: "auto_revise", ...req });
+  }
+  // ─── feature owner: E3 ───────────────────────────────────────────────────
+  /**
+   * Generate a HOOK/EVIDENCE/CLOSING cover letter (250-300 words) from the
+   * candidate's resume + JD. Saves both .md and Google Doc to the job folder.
+   */
+  async coverLetter(req) {
+    return this.post({ action: "cover_letter", ...req });
+  }
+  /**
+   * Scan a cover letter for named entities and verify each via web search.
+   * Unverified entities are tagged inline with [⚠ UNVERIFIED].
+   */
+  async verifyClHooks(req) {
+    return this.post({ action: "verify_cl_hooks", ...req });
+  }
+  // ─── feature owner: E4 ───────────────────────────────────────────────────
+  /**
+   * Generate N resume variants in parallel (fan-out), each with a different
+   * framing directive. Returns all variants for user selection.
+   */
+  async multiVersion(req) {
+    return this.post({ action: "multi_version", ...req });
+  }
 };
 
 // extension/src/lib/templateFiller.ts
@@ -18884,7 +19834,7 @@ function parseEducationLines(lines) {
   }
   return entries;
 }
-function parseResumeMarkdown(md) {
+function parseResumeMarkdown2(md) {
   const { headerLines, sections } = splitSections(md);
   const { name, contact } = parseHeader(headerLines);
   const lookup = (...keys) => {
@@ -18929,6 +19879,16 @@ function getChrome() {
   const c = globalThis.chrome;
   if (c?.runtime?.sendMessage) return c;
   return null;
+}
+async function getApiClient() {
+  let url = null;
+  try {
+    url = await get("appsScriptUrl");
+  } catch {
+    return null;
+  }
+  if (!url) return null;
+  return new ApiClient(url);
 }
 function buildControllers() {
   const generate = renderGenerateTab({
@@ -18997,7 +19957,7 @@ function buildControllers() {
       let filled;
       try {
         const buf = base64ToArrayBuffer(dl.base64);
-        const data = parseResumeMarkdown(markdown);
+        const data = parseResumeMarkdown2(markdown);
         filled = await fillResumeTemplate(buf, data);
       } catch (err) {
         return { ok: false, message: err.message };
@@ -19011,6 +19971,77 @@ function buildControllers() {
       });
       if (!up.ok) return { ok: false, message: up.error.message };
       return { ok: true, url: up.url, fileName: up.fileName, fileId: up.fileId };
+    },
+    // ─── v2 feature hooks (direct ApiClient calls; bypass background) ──────
+    onResearchCompany: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: "validation", message: "Apps Script URL not configured.", retryable: false }
+        };
+      }
+      return client.researchCompany(req);
+    },
+    onBenchmarkRole: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: "validation", message: "Apps Script URL not configured.", retryable: false }
+        };
+      }
+      return client.benchmarkRole(req);
+    },
+    onCritique: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: "validation", message: "Apps Script URL not configured.", retryable: false }
+        };
+      }
+      return client.critique(req);
+    },
+    onAutoRevise: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: "validation", message: "Apps Script URL not configured.", retryable: false }
+        };
+      }
+      return client.autoRevise(req);
+    },
+    onCoverLetter: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: "validation", message: "Apps Script URL not configured.", retryable: false }
+        };
+      }
+      return client.coverLetter(req);
+    },
+    onVerifyClHooks: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: "validation", message: "Apps Script URL not configured.", retryable: false }
+        };
+      }
+      return client.verifyClHooks(req);
+    },
+    onMultiVersion: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: "validation", message: "Apps Script URL not configured.", retryable: false }
+        };
+      }
+      return client.multiVersion(req);
     }
   });
   const files = renderFilesTab({

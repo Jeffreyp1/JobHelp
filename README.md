@@ -2,6 +2,22 @@
 
 Chrome extension that tailors your resume to a job description and logs each application to Google Sheets. Frontend runs in Chrome; backend runs as your own Apps Script web app calling the Anthropic API. ~$0.012 per resume (Haiku 4.5 with prompt caching).
 
+## v2 features
+
+Seven optional pipeline toggles that run alongside the base `generate` flow — pre-generate context fetchers, post-generate refinement passes, and a multi-version fan-out. Each has its own model selector and runs only when toggled on in the side panel.
+
+| Toggle | What it does |
+|---|---|
+| Research company | Web-search-backed company facts injected into the generate prompt |
+| LinkedIn role benchmark | Public-profile patterns for the target role, injected into the prompt |
+| Critique pass | 8-dimension scoring + tiered improvements on the generated resume |
+| Auto-revise | Surgical, scope-bounded revision (currently whole-resume in the UI) |
+| Cover letter | 3-paragraph industry cover letter saved to the job folder |
+| Verify CL hooks | Web-search verification of named entities in a cover letter |
+| Multi-version | N variants (2-5) with different framings; replaces standard generate |
+
+Details, API shapes, and caveats: [docs/v2-features.md](docs/v2-features.md). Release history: [CHANGELOG.md](CHANGELOG.md).
+
 ## Install and build the extension
 
 ```bash
@@ -175,24 +191,25 @@ if (data.ok) {
 
 ## Customize the generation rules
 
-The 12 markdown files in `prompts/shared/` are the single source of truth for generation behavior. They live in your Drive `rules/` folder after seeding — edit them there.
+The markdown files in `prompts/shared/` are the single source of truth for generation behavior. They live in your Drive `rules/` folder after seeding — edit them there.
 
 ```bash
 ls prompts/shared/
-# 01-priority-hierarchy.md   05-structural-rules.md     09-section-structure.md
-# 02-anti-fabrication.md     06-bullet-construction.md  10-cover-letter-industry.md
-# 03-banned-words.md         07-reframing-strategies.md 11-self-scan-checklist.md
-# 04-banned-phrases.md       08-bridge-language.md      12-template-reproduction.md
-#                                                       13-output-shape.md
+# 01-priority-hierarchy.md   06-bullet-construction.md  11-self-scan-checklist.md
+# 02-anti-fabrication.md     07-reframing-strategies.md 12-template-reproduction.md
+# 03-banned-words.md         08-bridge-language.md      13-output-shape.md
+# 04-banned-phrases.md       09-section-structure.md    14-revision-discipline.md
+# 05-structural-rules.md     10-cover-letter-industry.md
 ```
 
-Four files are **load-bearing** — they enforce truthfulness and ATS safety:
+Five files are **load-bearing** — they enforce truthfulness, ATS safety, and v2-feature contracts:
 
 ```text
-02-anti-fabrication.md     Never invent skills, metrics, or employers.
-06-bullet-construction.md  Bullet format: verb + metric + context.
-08-bridge-language.md      Frame transferable skills without fabricating.
-11-self-scan-checklist.md  ATS safety + AI-fingerprint removal.
+02-anti-fabrication.md      Never invent skills, metrics, or employers.
+06-bullet-construction.md   Bullet format: verb + metric + context.
+08-bridge-language.md       Frame transferable skills without fabricating.
+11-self-scan-checklist.md   ATS safety + AI-fingerprint removal.
+14-revision-discipline.md   Auto-revise: byte-identical outside the requested scope.
 ```
 
 Edits apply on the next generation (after the 10-minute Drive cache). To restore defaults: **Settings → Reset rules to defaults**.
@@ -241,6 +258,33 @@ if (location.hostname.endsWith("myats.example.com")) {
 ```
 
 Add a fixture at `tests/fixtures/<site>.html` and a test that pins the expected output.
+
+## Code layout
+
+```text
+appsscript/src/
+  Code.ts                 Web-app entry; routes ApiAction → handlers
+  claude.ts               Anthropic Messages API client (forwards optional tools[])
+  drive.ts                Drive helpers (readSourceFiles, createFileInFolder, createGoogleDoc, ...)
+  message-builder.ts      Composes the canonical user-message shape; shared by generate + multi-version
+  handlers/               One file per v2 action — research, benchmark, critique, autoRevise,
+                          coverLetter, verifyHooks, multiVersion
+  types/                  api-contract.ts (mirrored from extension/src/types/), claude-api.ts, ...
+
+extension/src/
+  background.ts           Service worker — owns generate / finalize / list_files / write_file /
+                          seed_defaults / download_template / upload_filled_docx
+  sidepanel/
+    index.ts              Side-panel bootstrap
+    tabs/generate.ts      Generate-tab orchestration; wires every v2 toggle
+    components/           Reusable UI (toggleRow, jobInsights, costEstimator, resumeEditor, ...)
+    features/             One file per v2 feature — UI rendering for results/diffs
+  lib/
+    apiClient.ts          HTTP client; v2 actions are called directly from the side panel
+    docxRenderer.ts       Client-side markdown → DOCX
+    templateFiller.ts     Fills a user-supplied DOCX template
+  scraper.ts              JD scrapers
+```
 
 ## Run the tests
 
