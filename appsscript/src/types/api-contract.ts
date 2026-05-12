@@ -7,6 +7,12 @@
  */
 
 import type { JobInsights } from "./job-insights.js";
+import type {
+  JobProfile,
+  DiscoveryConfig,
+  RankedJob,
+  JobPipelineStatus,
+} from "./job-discovery.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Common
@@ -28,6 +34,9 @@ export type ApiAction =
   | "cover_letter"
   | "verify_cl_hooks"
   | "multi_version"
+  | "extract_profile"
+  | "discover_and_rank"
+  | "update_job_status"
   | "ping";
 
 export interface ToggleSetting {
@@ -537,6 +546,80 @@ export interface MultiVersionResult {
 export type MultiVersionResponse = ApiResult<MultiVersionResult>;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Action: extract_profile
+// Distil the user's source materials into a JobProfile (titles, skills, search
+// queries, filters, a ~200-word summary). Cached client-side; regenerate when
+// the source materials change.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ExtractProfileRequest {
+  action: "extract_profile";
+  /** Drive folder id holding the user's source materials. */
+  sourceFolderId: string;
+  /** Anthropic model for the distillation call. */
+  model: string;
+}
+
+export interface ExtractProfileResult {
+  profile: JobProfile;
+  cost: CostBreakdown;
+}
+
+export type ExtractProfileResponse = ApiResult<ExtractProfileResult>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Action: discover_and_rank
+// Poll the configured job sources, normalise + dedup, rank against the profile
+// (keyword-overlap pre-filter → optional Claude fit-score → recency boost),
+// write the ranked list into the Job Pipeline sheet, and return it.
+// Does NOT tailor resumes — the digest UI calls `generate` on demand per job.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DiscoverAndRankRequest {
+  action: "discover_and_rank";
+  profile: JobProfile;
+  config: DiscoveryConfig;
+  /** Drop postings older than this many days (0 = no limit). */
+  maxDaysOld: number;
+  /** Return at most this many ranked jobs. */
+  topN: number;
+  /** If set, run the Stage-B Claude fit-score on the top survivors using this model. */
+  fitScoreModel?: string;
+  /** Spreadsheet id of the Job Pipeline sheet to upsert into. */
+  sheetId: string;
+}
+
+export interface DiscoverAndRankResult {
+  /** Total postings fetched across all sources before dedup/filter. */
+  discoveredCount: number;
+  /** Postings that survived the keyword pre-filter. */
+  rankedCount: number;
+  /** The top-N ranked jobs (also written to the sheet). */
+  jobs: RankedJob[];
+  /** URL of the Job Pipeline sheet. */
+  sheetUrl: string;
+  cost: CostBreakdown;
+}
+
+export type DiscoverAndRankResponse = ApiResult<DiscoverAndRankResult>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Action: update_job_status
+// Change a Job Pipeline row's status (and optionally its tailored-resume link).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface UpdateJobStatusRequest {
+  action: "update_job_status";
+  sheetId: string;
+  jobId: string;
+  status: JobPipelineStatus;
+  /** Optionally also set the tailored-resume Drive URL on the row. */
+  tailoredDocUrl?: string;
+}
+
+export type UpdateJobStatusResponse = ApiResult<{ updatedAt: number }>;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Union types for routing
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -556,4 +639,7 @@ export type ApiRequest =
   | CoverLetterRequest
   | VerifyClHooksRequest
   | MultiVersionRequest
+  | ExtractProfileRequest
+  | DiscoverAndRankRequest
+  | UpdateJobStatusRequest
   | PingRequest;

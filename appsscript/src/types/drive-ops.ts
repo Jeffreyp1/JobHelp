@@ -3,6 +3,8 @@
  * All DriveApp/SpreadsheetApp/UrlFetchApp calls go through these functions.
  */
 
+import type { JobPipelineRow, JobPipelineStatus } from "./job-discovery.js";
+
 export interface FileEntry {
   name: string;
   fileId: string;
@@ -170,6 +172,40 @@ export interface DriveOps {
     title: string,
     markdownContent: string,
   ): { docId: string; docUrl: string };
+
+  // ── Job Pipeline sheet ops (Phase 1 auto-apply) ──────────────────────────
+  // Optional so existing typed DriveOps mocks don't have to provide them.
+  // The production driveOps implements them; handlers null-check before use.
+
+  /**
+   * Ensure the Job Pipeline sheet (a tab named "Job Pipeline" in the given
+   * spreadsheet) exists with the expected header row. Returns its URL.
+   */
+  ensureJobPipelineSheet?(sheetId: string): { sheetUrl: string };
+
+  /**
+   * Upsert rows into the Job Pipeline sheet, keyed by `jobId` — existing rows
+   * are updated in place (preserving status/notes the user may have set),
+   * new ones appended. Returns how many were inserted vs updated.
+   */
+  upsertJobPipelineRows?(
+    sheetId: string,
+    rows: JobPipelineRow[],
+  ): { inserted: number; updated: number; sheetUrl: string };
+
+  /**
+   * Set the `status` (and optionally `tailoredDocUrl`) on the Job Pipeline row
+   * with the given `jobId`. Throws if no such row.
+   */
+  updateJobPipelineStatus?(
+    sheetId: string,
+    jobId: string,
+    status: JobPipelineStatus,
+    tailoredDocUrl?: string,
+  ): { updatedAt: number };
+
+  /** Read all rows from the Job Pipeline sheet. */
+  readJobPipelineRows?(sheetId: string): JobPipelineRow[];
 }
 
 export interface SheetRow {
