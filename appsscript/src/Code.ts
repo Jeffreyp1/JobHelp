@@ -137,6 +137,10 @@ const VALID_ACTIONS: ApiAction[] = [
   'cover_letter',
   'verify_cl_hooks',
   'multi_version',
+  // Phase 1 job-pipeline actions
+  'extract_profile',
+  'discover_and_rank',
+  'update_job_status',
   'ping',
 ];
 
@@ -251,6 +255,12 @@ function route(body: unknown, deps: Deps): ApiResult<unknown> {
       if (validateErr) return validateErr;
       return handleMultiVersion(deps, raw as unknown as MultiVersionRequest);
     }
+
+    // ── Phase 1 job-pipeline routes (handlers wired by the J4 agent) ────────
+    case 'extract_profile':
+    case 'discover_and_rank':
+    case 'update_job_status':
+      return validationError(`Action "${action}" is not yet implemented`);
   }
 }
 
