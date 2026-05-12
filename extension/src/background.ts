@@ -28,6 +28,7 @@ import type {
 } from './types/message-bus.js';
 import { get, set } from './lib/storage.js';
 import { ApiClient } from './lib/apiClient.js';
+import { log } from './lib/structuredLog.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -46,12 +47,33 @@ function shouldSkipUrl(url: string): boolean {
   return SKIP_SCHEMES.some((prefix) => url.startsWith(prefix));
 }
 
-/** Best-effort sendMessage — swallows "no receiver" errors when panel is closed. */
+/**
+ * `chrome.runtime.sendMessage` rejects with this (or a close variant) when no
+ * receiver is registered — i.e. the side panel is simply closed. That's the
+ * one error class it's legitimate to swallow silently.
+ */
+const NO_RECEIVER_RE = /receiving end does not exist|could not establish connection|message port closed/i;
+
+/**
+ * Best-effort sendMessage to the side panel.
+ *
+ * "Side panel not open" (no receiver) is swallowed silently — that's expected.
+ * Every OTHER failure (malformed message, MV3 service-worker teardown mid-send,
+ * etc.) is logged via the structured logger so a dropped generate/scrape result
+ * leaves a trace instead of vanishing (audit H1).
+ */
 async function safeSend(message: Message): Promise<void> {
   try {
     await getChrome().runtime.sendMessage(message);
-  } catch {
-    // Side panel may not be open — ignore
+  } catch (err) {
+    const reason = (err as Error)?.message ?? String(err);
+    if (NO_RECEIVER_RE.test(reason)) {
+      return; // Side panel not open — expected, nothing to do.
+    }
+    log('warn', 'background: sendMessage to side panel failed', {
+      messageType: (message as { type?: string })?.type,
+      error: reason,
+    });
   }
 }
 
@@ -69,8 +91,16 @@ export async function handleTabActivated(info: { tabId: number }): Promise<void>
   let tab: chrome.tabs.Tab;
   try {
     tab = await c.tabs.get(info.tabId);
-  } catch {
-    return; // Tab may have been closed already
+  } catch (err) {
+    // "No tab with id" is the common (benign) case — the tab was closed
+    // between the event firing and us handling it. Anything else (a
+    // permissions revocation, an extension-reload race) is worth a trace so
+    // auto-scrape silently breaking is at least diagnosable (audit H3).
+    const reason = (err as Error)?.message ?? String(err);
+    if (!/no tab with id|invalid tab id/i.test(reason)) {
+      log('warn', 'background: tabs.get failed', { tabId: info.tabId, error: reason });
+    }
+    return;
   }
 
   const url = tab.url ?? '';
@@ -105,7 +135,16 @@ export async function handleTabActivated(info: { tabId: number }): Promise<void>
       scrapedAt: Date.now(),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const scraperOutput: ScraperOutput = (results as any)?.[0]?.result ?? fallback;
+    const rawResult = (results as any)?.[0]?.result;
+    const scraperOutput: ScraperOutput = rawResult ?? fallback;
+    if (!rawResult) {
+      // The injected scraper returned nothing (entry point missing, page CSP
+      // blocked the bundle, etc.) — we fall back to a 'failed' ScraperOutput,
+      // but log it so this isn't an invisible degradation (audit-adjacent).
+      log('warn', 'background: scraper entry point returned no result', { url });
+    } else if (scraperOutput.scrapeStrategy === 'failed') {
+      log('info', 'background: scrape produced no JD', { url });
+    }
 
     // Persist for side-panel restoration on re-open
     if (scraperOutput.scrapeStrategy !== 'failed' && scraperOutput.jd) {
@@ -128,6 +167,12 @@ export async function handleTabActivated(info: { tabId: number }): Promise<void>
     await safeSend(message);
   } catch (err) {
     const reason = (err as Error)?.message ?? 'Unknown scrape error';
+    // The scrape_failure message goes through safeSend, which silently drops
+    // it if the panel is closed. Log here so there is always a record of the
+    // failure even when the user reopens the panel later and sees stale state
+    // (audit H2 — full fix is persisting last-N failures to storage.session,
+    // which needs a storage-schema change; flagged).
+    log('warn', 'background: scrape pipeline failed', { url, error: reason });
     const failure: ScrapeFailureMessage = {
       type: 'scrape_failure',
       reason,
@@ -254,9 +299,28 @@ if (isExtensionContext()) {
         case 'settings_update':
           void (async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            for (const [key, value] of Object.entries((message as any).payload)) {
+            const entries = Object.entries((message as any).payload ?? {});
+            // Write every key independently so one failing `set` doesn't
+            // silently abandon the rest (audit M20). The panel doesn't await
+            // this message, so we surface any failures via the logger.
+            const results = await Promise.allSettled(
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              await set(key as Parameters<typeof set>[0], value as never);
+              entries.map(([key, value]) =>
+                set(key as Parameters<typeof set>[0], value as never),
+              ),
+            );
+            const failed = results
+              .map((r, i) => ({ r, key: entries[i][0] }))
+              .filter((x) => x.r.status === 'rejected');
+            if (failed.length > 0) {
+              log('error', 'background: settings_update failed to persist some keys', {
+                keys: failed.map((f) => f.key),
+                errors: failed.map((f) =>
+                  (f.r as PromiseRejectedResult).reason instanceof Error
+                    ? (f.r as PromiseRejectedResult).reason.message
+                    : String((f.r as PromiseRejectedResult).reason),
+                ),
+              });
             }
           })();
           return false;
@@ -278,7 +342,9 @@ if (isExtensionContext()) {
               const resp = await client.listFiles({ folderId, folderType });
               sendResponse(resp);
             } catch (err) {
-              sendResponse({ ok: false, error: { type: 'server', message: (err as Error).message, retryable: true } });
+              const msg = (err as Error)?.message ?? String(err);
+              log('warn', 'background: list_files_request handler failed', { error: msg });
+              sendResponse({ ok: false, error: { type: 'server', message: msg, retryable: true } });
             }
           })();
           return true; // async response
@@ -298,7 +364,9 @@ if (isExtensionContext()) {
               const resp = await client.seedDefaults(payload);
               sendResponse(resp);
             } catch (err) {
-              sendResponse({ ok: false, error: { type: 'server', message: (err as Error).message, retryable: true } });
+              const msg = (err as Error)?.message ?? String(err);
+              log('warn', 'background: seed_defaults_request handler failed', { error: msg });
+              sendResponse({ ok: false, error: { type: 'server', message: msg, retryable: true } });
             }
           })();
           return true;

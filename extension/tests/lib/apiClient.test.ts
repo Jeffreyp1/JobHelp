@@ -21,13 +21,27 @@ const URL = 'https://script.google.com/macros/s/FAKE_ID/exec';
 
 /** Helper: stub fetch to return a JSON body with HTTP 200 (or a non-ok status). */
 function mockFetch(body: unknown, httpOk = true, status = httpOk ? 200 : 500) {
+  const serialized = typeof body === 'string' ? body : JSON.stringify(body);
   const response = {
     ok: httpOk,
     status,
     statusText: httpOk ? 'OK' : 'Internal Server Error',
     json: vi.fn().mockResolvedValue(body),
+    text: vi.fn().mockResolvedValue(serialized),
   } as unknown as Response;
 
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+}
+
+/** Helper: stub fetch to return a 200 with a body that ISN'T valid JSON. */
+function mockNonJsonOk(rawBody: string) {
+  const response = {
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON at position 0')),
+    text: vi.fn().mockResolvedValue(rawBody),
+  } as unknown as Response;
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
 }
 
@@ -503,6 +517,45 @@ describe('ApiClient.finalize', () => {
     if (result.ok) {
       expect(result.files.length).toBe(1);
       expect(result.files[0].format).toBe('pdf');
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// non-JSON / malformed 200 responses (audit H5 + M10)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('ApiClient — non-JSON / malformed 200 body', () => {
+  it('N1: HTTP 200 with an HTML body → ok:false server error with a body snippet, never hangs', async () => {
+    mockNonJsonOk('<!DOCTYPE html><html><body>Sign in to continue</body></html>');
+    const client = new ApiClient(URL);
+    const result = await client.ping();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.type).toBe('server');
+      expect(result.error.message).toMatch(/not valid JSON/i);
+      expect(result.error.message).toContain('DOCTYPE');
+    }
+  });
+
+  it('N2: HTTP 200 with valid JSON but missing the ok flag → ok:false malformed-response error', async () => {
+    mockFetch({ version: '1.0.0', serverTime: 1 }); // no `ok` discriminator
+    const client = new ApiClient(URL);
+    const result = await client.ping();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.type).toBe('server');
+      expect(result.error.message).toMatch(/missing ok flag/i);
+    }
+  });
+
+  it('N3: HTTP 200 with a JSON array body → ok:false malformed-response error', async () => {
+    mockFetch([1, 2, 3]);
+    const client = new ApiClient(URL);
+    const result = await client.listFiles({ folderId: 'f', folderType: 'source' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.message).toMatch(/missing ok flag/i);
     }
   });
 });

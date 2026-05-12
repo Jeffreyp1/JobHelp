@@ -22,6 +22,7 @@ import {
   type ClaudeUsage,
   type ClaudeErrorType,
 } from "./types/claude-api.js";
+import { log } from "./lib/structuredLog.js";
 
 export { ClaudeApiError } from "./types/claude-api.js";
 
@@ -141,6 +142,14 @@ export function callClaude(req: ClaudeRequest): ClaudeResponse {
   const body = response.getContentText();
 
   if (status < 200 || status >= 300) {
+    // Surface the failure before we rethrow as a typed error. The body may
+    // contain Anthropic's structured error; structuredLog truncates it if huge
+    // and would redact anything key-shaped.
+    log("warn", "Claude API returned a non-2xx status", {
+      status,
+      model: req.model,
+      bodySnippet: body.slice(0, 500),
+    });
     throwApiError(status, body);
   }
 
@@ -148,6 +157,12 @@ export function callClaude(req: ClaudeRequest): ClaudeResponse {
   try {
     parsed = JSON.parse(body) as AnthropicMessageBody;
   } catch (e) {
+    log("error", "Claude returned 2xx but body was not JSON", {
+      status,
+      model: req.model,
+      error: (e as Error).message,
+      bodySnippet: body.slice(0, 500),
+    });
     throw new ClaudeApiError(
       "other",
       status,

@@ -30,6 +30,7 @@ import type {
 } from '../types/api-contract.js';
 import { ClaudeApiError } from '../types/claude-api.js';
 import { calculateCost } from '../cost.js';
+import { log } from '../lib/structuredLog.js';
 
 // ---------------------------------------------------------------------------
 // Tone profiles (see prompts/shared/15-cl-tones.md)
@@ -102,7 +103,7 @@ export function validateCoverLetter(
 
   for (const field of requiredStringFields) {
     if (!raw[field] || typeof raw[field] !== 'string') {
-      console.warn(`[coverLetter] validation failed: missing or invalid field "${field}"`);
+      log('warn', 'coverLetter validation failed: missing or invalid field', { field });
       return {
         ok: false,
         error: {
@@ -120,7 +121,7 @@ export function validateCoverLetter(
       typeof raw['tone'] !== 'string' ||
       !VALID_TONES.includes(raw['tone'] as CoverLetterTone)
     ) {
-      console.warn(`[coverLetter] validation failed: invalid tone "${String(raw['tone'])}"`);
+      log('warn', 'coverLetter validation failed: invalid tone', { tone: String(raw['tone']) });
       return {
         ok: false,
         error: {
@@ -134,7 +135,22 @@ export function validateCoverLetter(
     }
   }
 
-  // company and role are optional (string | null) — no validation needed
+  // H21 (silent-failure-audit): company / role are optional (string | null)
+  // but were not type-checked — a `company: 123` slips through and later
+  // string-concatenates into the user message. Validate them too.
+  for (const field of ['company', 'role'] as const) {
+    if (raw[field] !== undefined && raw[field] !== null && typeof raw[field] !== 'string') {
+      log('warn', 'coverLetter validation failed: optional field has wrong type', { field });
+      return {
+        ok: false,
+        error: {
+          type: 'validation',
+          message: `Field "${field}", when provided, must be a string or null`,
+          retryable: false,
+        },
+      };
+    }
+  }
   return null;
 }
 
@@ -159,9 +175,7 @@ export function handleCoverLetter(
   deps: Deps,
   req: CoverLetterRequest,
 ): ApiResult<CoverLetterResult> {
-  console.log(
-    `[coverLetter] start company=${req.company ?? 'null'} role=${req.role ?? 'null'}`,
-  );
+  log('info', 'coverLetter start', { company: req.company ?? null, role: req.role ?? null });
 
   // 1. Read source materials
   let sourceMaterials: ReturnType<typeof deps.drive.readSourceFiles>;
@@ -169,7 +183,7 @@ export function handleCoverLetter(
     sourceMaterials = deps.drive.readSourceFiles(req.sourceFolderId);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[coverLetter] drive.readSourceFiles failed: ${message}`);
+    log('warn', 'coverLetter: drive.readSourceFiles failed', { error: message });
     return {
       ok: false,
       error: {
@@ -186,7 +200,7 @@ export function handleCoverLetter(
     ruleFiles = deps.drive.readRuleFiles(req.rulesFolderId);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[coverLetter] drive.readRuleFiles failed: ${message}`);
+    log('warn', 'coverLetter: drive.readRuleFiles failed', { error: message });
     return {
       ok: false,
       error: {
@@ -202,10 +216,7 @@ export function handleCoverLetter(
     f.name.includes('10-cover-letter-industry'),
   );
   if (!hasCLRule) {
-    console.warn(
-      '[coverLetter] WARNING: 10-cover-letter-industry.md not found in rules folder. ' +
-      'CL structure guidance will be absent from system prompt.',
-    );
+    log('warn', 'coverLetter: 10-cover-letter-industry.md not found in rules folder — CL structure guidance absent from system prompt');
   }
 
   // 4. Compose system prompt; optionally append a tone directive
@@ -216,7 +227,7 @@ export function handleCoverLetter(
       : baseSystemPrompt;
 
   if (req.tone && req.tone !== 'neutral') {
-    console.log(`[coverLetter] tone directive applied: ${req.tone}`);
+    log('debug', 'coverLetter: tone directive applied', { tone: req.tone });
   }
 
   // 5. Build user message
@@ -249,7 +260,7 @@ export function handleCoverLetter(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[coverLetter] Claude call failed: ${message}`);
+    log('error', 'coverLetter: Claude call failed', { error: message });
     if (err instanceof ClaudeApiError) {
       return {
         ok: false,
@@ -283,7 +294,7 @@ export function handleCoverLetter(
     mdFileUrl = mdResult.fileUrl;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[coverLetter] drive.createFileInFolder failed: ${message}`);
+    log('warn', 'coverLetter: drive.createFileInFolder failed', { error: message });
     return {
       ok: false,
       error: {
@@ -295,7 +306,13 @@ export function handleCoverLetter(
   }
 
   // 8. Create Google Doc (failure is non-fatal — log and continue)
+  // M1 (silent-failure-audit): when this fails the response still has
+  // ok:true with docUrl='' and the UI can't tell "user disabled Docs" from
+  // "Doc creation failed". Adding a docUrlError field would change the shared
+  // CoverLetterResult type (flagged separately) — for now we make the failure
+  // loudly visible in the execution log.
   let docUrl = '';
+  let docCreationFailed = false;
   try {
     const docResult = deps.drive.createGoogleDoc(
       req.jobFolderId,
@@ -304,9 +321,11 @@ export function handleCoverLetter(
     );
     docUrl = docResult.docUrl;
   } catch (err) {
-    console.warn(
-      `[coverLetter] createGoogleDoc failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-    );
+    docCreationFailed = true;
+    log('warn', 'coverLetter: createGoogleDoc failed (non-fatal) — returning ok with empty docUrl', {
+      error: err instanceof Error ? err.message : String(err),
+      jobFolderId: req.jobFolderId,
+    });
     // docUrl stays ''
   }
 
@@ -319,18 +338,31 @@ export function handleCoverLetter(
         coverLetterUrl: docUrl,
       });
     } catch (err) {
-      console.warn(
-        `[coverLetter] sheet update failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-      );
+      // M3 (silent-failure-audit): the "Cover Letter URL" column stays blank
+      // with no signal — surface it in the log.
+      log('warn', 'coverLetter: sheet column back-fill failed (non-fatal)', {
+        error: err instanceof Error ? err.message : String(err),
+        rowUrl: req.rowUrl,
+      });
     }
+  } else if (req.sheetId && req.rowUrl && docCreationFailed) {
+    // M3: the back-fill was skipped purely because Doc creation failed —
+    // call that out so a permanently-blank column is explained.
+    log('warn', 'coverLetter: skipping sheet column back-fill because Doc creation failed (column will be blank)', {
+      rowUrl: req.rowUrl,
+    });
   }
 
   // 9. Compute cost
   const cost = calculateCost(claudeResponse.usage, claudeResponse.model);
 
-  console.log(
-    `[coverLetter] done wordCount=${wordCount(coverLetterMd)} cost=$${cost.totalUsd}`,
-  );
+  log('info', 'coverLetter done', {
+    company: req.company ?? null,
+    role: req.role ?? null,
+    wordCount: wordCount(coverLetterMd),
+    docUrl,
+    cost: cost.totalUsd,
+  });
 
   return {
     ok: true,

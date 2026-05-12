@@ -47,6 +47,7 @@ import type {
 } from '../../types/api-contract.js';
 import { renderCritiqueResult } from '../features/critique.js';
 import { renderRevisionDiff } from '../features/autoRevise.js';
+import { getRuntimeConfig } from '../index.js';
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-4-6';
@@ -90,7 +91,7 @@ export interface GenerateTabController {
   applyScraperOutput(output: ScraperOutput): void;
   showResume(md: string): void;
   /** Show resume after a successful generate; also unlocks the finalize section. */
-  showGenerateResult(md: string, docUrl: string, jobFolderUrl: string): void;
+  showGenerateResult(md: string, docUrl: string, jobFolderUrl: string, sheetRowUrl?: string): void;
   setBusy(busy: boolean, label?: string): void;
 }
 
@@ -148,6 +149,10 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     // Populated after a successful generate; needed by finalize.
     docId: null as string | null,
     jobFolderId: null as string | null,
+    // Tracking-sheet row URL from the generate result — passed into the v2
+    // post-gen calls (critique / cover letter / verify hooks) so they can
+    // update the sheet's result columns.
+    sheetRowUrl: null as string | null,
 
     // ─── v2 feature toggle state ─────────────────────────────────────────
     researchEnabled: false,
@@ -607,9 +612,15 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     finalizeStatusEl.className = 'generate__finalize-status';
     state.docId = null;
     state.jobFolderId = null;
+    state.sheetRowUrl = null;
     state.coverLetterMd = null;
 
-    const cfg = await loadConfigFromStorage();
+    const cfg = getRuntimeConfig();
+    if (!cfg) {
+      setBusy(false);
+      statusEl.textContent = 'JobHelp config not loaded. Run setup in Settings first.';
+      return;
+    }
 
     // ── Multi-version branch (mutually exclusive with standard generate) ──
     if (state.multiVersionEnabled) {
@@ -624,8 +635,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
           company: state.company,
           role: state.role,
           jobInsights: state.scraperOutput?.jobInsights ?? null,
-          sourceFolderId: cfg.sourceFolderId,
-          rulesFolderId: cfg.rulesFolderId,
+          sourceFolderId: cfg.folders.source,
+          rulesFolderId: cfg.folders.rules,
           count: state.multiVersionCount,
           model: state.multiVersionModel,
         });
@@ -686,9 +697,9 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       url: state.url,
       jobInsights: state.scraperOutput?.jobInsights ?? null,
       toggles: state.toggles,
-      sourceFolderId: cfg.sourceFolderId,
-      rulesFolderId: cfg.rulesFolderId,
-      outputFolderId: cfg.outputFolderId,
+      sourceFolderId: cfg.folders.source,
+      rulesFolderId: cfg.folders.rules,
+      outputFolderId: cfg.folders.output,
       sheetId: cfg.sheetId,
       model: state.generateModel,
       researchSummary,
@@ -753,7 +764,12 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
    * Show the resume editor AND unlock the finalize section with the doc/folder
    * IDs derived from the generate result URLs.
    */
-  function showGenerateResult(md: string, docUrl: string, jobFolderUrl: string): void {
+  function showGenerateResult(
+    md: string,
+    docUrl: string,
+    jobFolderUrl: string,
+    sheetRowUrl?: string,
+  ): void {
     showResume(md);
 
     const docId = extractDocId(docUrl);
@@ -769,6 +785,9 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
 
     state.docId = docId;
     state.jobFolderId = jobFolderId;
+    // Capture the tracking-sheet row URL alongside jobFolderId so the v2
+    // post-gen calls can write their result columns to that row.
+    state.sheetRowUrl = sheetRowUrl && sheetRowUrl.length > 0 ? sheetRowUrl : null;
 
     // Clear any previous finalize results and show the section
     finalizeStatusEl.textContent = '';
@@ -778,6 +797,18 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
 
     // ── Post-gen feature chain: critique + cover letter run in parallel ──
     void runPostGenerateChain(md, jobFolderId);
+  }
+
+  /**
+   * Build the optional `{ sheetId, rowUrl }` pair that the v2 handlers use to
+   * update the tracking sheet. Returns an empty object when either piece is
+   * missing — the backend only writes when BOTH are present.
+   */
+  function sheetRowParams(): { sheetId?: string; rowUrl?: string } {
+    const sheetId = getRuntimeConfig()?.sheetId;
+    const rowUrl = state.sheetRowUrl;
+    if (!sheetId || !rowUrl) return {};
+    return { sheetId, rowUrl };
   }
 
   /** Run critique + cover-letter in parallel after generate succeeds. */
@@ -807,6 +838,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
         jobInsights: state.scraperOutput?.jobInsights ?? null,
         jobFolderId,
         model: state.critiqueModel,
+        ...sheetRowParams(),
       });
       renderCritiqueResult(root, result);
     } catch (e) {
@@ -817,7 +849,11 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
 
   async function runCoverLetter(resumeMd: string, jobFolderId: string): Promise<void> {
     if (!hooks.onCoverLetter) return;
-    const cfg = await loadConfigFromStorage();
+    const cfg = getRuntimeConfig();
+    if (!cfg) {
+      clResultSlot.textContent = 'JobHelp config not loaded. Run setup in Settings first.';
+      return;
+    }
     clResultSlot.textContent = 'Generating cover letter…';
     try {
       const result = await hooks.onCoverLetter({
@@ -825,8 +861,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
         jd: state.jd,
         company: state.company,
         role: state.role,
-        sourceFolderId: cfg.sourceFolderId,
-        rulesFolderId: cfg.rulesFolderId,
+        sourceFolderId: cfg.folders.source,
+        rulesFolderId: cfg.folders.rules,
         jobFolderId,
         model: state.coverLetterModel,
         // Omit "neutral" so the backend default applies (backwards-compat).
@@ -834,6 +870,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
           state.coverLetterTone === 'neutral'
             ? undefined
             : (state.coverLetterTone as CoverLetterTone),
+        ...sheetRowParams(),
       });
       renderCoverLetterResult(result);
     } catch (e) {
@@ -879,6 +916,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       const result = await hooks.onVerifyClHooks({
         coverLetterMd,
         model: state.verifyHooksModel,
+        ...sheetRowParams(),
       });
       renderVerifyHooksResult(result);
     } catch (e) {
@@ -1020,11 +1058,16 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     statusEl.textContent = busy ? label ?? 'Working...' : '';
   }
 
-  // Restore last-used model from storage (best-effort; failures ignored).
+  // Restore last-used model + toggles (best-effort; failures ignored).
+  //
+  // The default generate model comes from the Drive-hosted jobhelp-config.json
+  // (`defaults.model`) — read via getRuntimeConfig() rather than the legacy
+  // `defaultGenerateModel` storage key. If the config hasn't finished loading
+  // yet, the model select stays on its built-in default (HAIKU).
   void (async () => {
     try {
-      const m = await get('defaultGenerateModel');
-      if (m) {
+      const m = getRuntimeConfig()?.defaults.model;
+      if (m && ALL_MODELS.includes(m)) {
         state.generateModel = m;
         renderCostBlock();
       }
@@ -1111,32 +1154,6 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
   })();
 
   return { root, applyScraperOutput, showResume, showGenerateResult, setBusy };
-}
-
-interface PartialConfig {
-  sourceFolderId: string;
-  rulesFolderId: string;
-  outputFolderId: string;
-  sheetId: string;
-}
-
-async function loadConfigFromStorage(): Promise<PartialConfig> {
-  try {
-    const [src, rules, out, sheet] = await Promise.all([
-      get('driveSourceFolderId'),
-      get('driveRulesFolderId'),
-      get('driveOutputFolderId'),
-      get('sheetId'),
-    ]);
-    return {
-      sourceFolderId: src ?? '',
-      rulesFolderId: rules ?? '',
-      outputFolderId: out ?? '',
-      sheetId: sheet ?? '',
-    };
-  } catch {
-    return { sourceFolderId: '', rulesFolderId: '', outputFolderId: '', sheetId: '' };
-  }
 }
 
 function escapeHtml(s: string): string {

@@ -12,6 +12,7 @@ export default defineConfig({
       'extension/tests/**/*.test.ts',
       'appsscript/tests/**/*.test.ts',
       'tests/**/*.test.ts',
+      'prompts/**/*.test.ts',
     ],
   },
 });

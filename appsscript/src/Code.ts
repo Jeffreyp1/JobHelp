@@ -53,6 +53,7 @@ import type { ClaudeClient, SystemBlock } from './types/claude-api.js';
 import { ClaudeApiError } from './types/claude-api.js';
 import { calculateCost } from './cost.js';
 import { buildUserMessage, buildJobInsightsSummary } from './message-builder.js';
+import { log } from './lib/structuredLog.js';
 
 // Production dependencies — esbuild inlines these. In tests, doPost(e, deps)
 // receives mocked versions via the optional second arg.
@@ -92,11 +93,20 @@ export function doPost(
   let body: unknown;
   try {
     body = JSON.parse(e.postData.contents);
-  } catch {
+  } catch (err) {
+    log('warn', 'Rejected request: body is not valid JSON', {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return jsonOutput(validationError('Request body is not valid JSON'));
   }
 
   const resolved = deps ?? resolveDeps();
+
+  const action =
+    typeof body === 'object' && body !== null
+      ? (body as Record<string, unknown>)['action']
+      : undefined;
+  log('info', 'doPost received request', { action: typeof action === 'string' ? action : null });
 
   try {
     const result = route(body, resolved);
@@ -268,6 +278,7 @@ function handleGenerate(deps: Deps, req: GenerateRequest): ApiResult<GenerateRes
     ruleFiles = drive.readRuleFiles(req.rulesFolderId);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    log('warn', 'generate: rules folder unreadable/empty', { error: msg });
     return driveError(
       `Rules folder appears empty. Seed defaults first. (${msg})`,
     );
@@ -354,6 +365,14 @@ function handleGenerate(deps: Deps, req: GenerateRequest): ApiResult<GenerateRes
           req.jobInsights.salaryMax != null ? `-$${(req.jobInsights.salaryMax / 1000).toFixed(0)}k` : ''
         }`
       : '';
+
+  log('info', 'generate complete', {
+    company: req.company,
+    role: req.role,
+    modelUsed: claudeResponse.model,
+    cost: cost.totalUsd,
+    keywordMatchRate: keywordCoverage.rate,
+  });
 
   const { rowUrl: sheetRowUrl } = drive.appendSheetRow(req.sheetId, {
     date: dateReadable,
@@ -473,7 +492,41 @@ function validateGenerate(raw: Record<string, unknown>): ApiErrorResponse | null
       return validationError(`Missing or invalid required field: ${field}`);
     }
   }
+
+  // H11 (silent-failure-audit): when the scraper fails to extract BOTH company
+  // and role, the job folder + sheet row collapse to "Unknown - Unknown - <date>"
+  // which then collides across unrelated jobs. Refuse rather than silently
+  // coercing to "Unknown".
+  const companyEmpty = typeof raw['company'] !== 'string' || (raw['company'] as string).trim().length === 0;
+  const roleEmpty = typeof raw['role'] !== 'string' || (raw['role'] as string).trim().length === 0;
+  if (companyEmpty && roleEmpty) {
+    return validationError(
+      'Both company and role are empty — fill in at least one before generating ' +
+      '(otherwise the output folder name would be "Unknown - Unknown").',
+    );
+  }
+
+  // H19 (silent-failure-audit): jobInsights is consumed unchecked downstream
+  // (jobInsights.skillsRequired.length). Reject obviously-wrong shapes upfront.
+  if (raw['jobInsights'] !== undefined && raw['jobInsights'] !== null) {
+    if (!isPlausibleJobInsights(raw['jobInsights'])) {
+      return validationError('jobInsights, when provided, must be an object with a skillsRequired array');
+    }
+  }
   return null;
+}
+
+/**
+ * Minimal structural guard for the JobInsights shape. We only check the fields
+ * handleGenerate actually dereferences (skillsRequired must be an array) — a
+ * full schema validator lives in the extension; the backend just needs to not
+ * crash mid-pipeline on garbage.
+ */
+function isPlausibleJobInsights(v: unknown): boolean {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  if (!Array.isArray(o['skillsRequired'])) return false;
+  return true;
 }
 
 function validateListFiles(raw: Record<string, unknown>): ApiErrorResponse | null {
@@ -586,21 +639,34 @@ function classifyError(err: unknown): ApiErrorResponse {
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
     // Drive errors typically mention "folder not found", "file not found", etc.
+    // NOTE (H8, silent-failure-audit): this english-substring classification is
+    // brittle — a localised Drive error message slips through to type:"other".
+    // The proper fix is a typed DriveError exception hierarchy in drive.ts (a
+    // public-surface change, flagged separately). Until then we at least log the
+    // raw error so the true cause is recoverable from the execution log.
     if (
       msg.includes('folder not found') ||
       msg.includes('file not found') ||
       msg.includes('no files') ||
       msg.includes('empty folder')
     ) {
+      log('warn', 'Request failed with a Drive error (classified by message substring)', {
+        error: err.message,
+      });
       return driveError(err.message);
     }
 
+    log('error', 'Request failed with an unclassified error', {
+      error: err.message,
+      name: err.name,
+    });
     return {
       ok: false,
       error: { type: 'other', message: err.message, retryable: false },
     };
   }
 
+  log('error', 'Request failed with a non-Error throwable', { error: String(err) });
   return {
     ok: false,
     error: { type: 'other', message: 'An unexpected error occurred', retryable: false },

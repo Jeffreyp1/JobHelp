@@ -17900,6 +17900,123 @@ function renderResumeEditor(props) {
   return wrap;
 }
 
+// extension/src/lib/structuredLog.ts
+var minLevel = "debug";
+var LEVEL_RANK = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40
+};
+var SECRET_KEY_RE = /api[-_]?key|token|secret|password|authorization|x-api-key/i;
+var ANTHROPIC_KEY_RE = /^sk-ant-[A-Za-z0-9_-]{20,}$/;
+var MAX_STRING_BYTES = 2048;
+var MAX_REDACT_DEPTH = 6;
+function utf8ByteLength(s) {
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(s).length;
+  }
+  let bytes = 0;
+  for (let i = 0; i < s.length; i++) {
+    const code = s.charCodeAt(i);
+    if (code < 128) bytes += 1;
+    else if (code < 2048) bytes += 2;
+    else if (code >= 55296 && code <= 56319) {
+      bytes += 4;
+      i++;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+function truncateLongString(s) {
+  const totalBytes = utf8ByteLength(s);
+  if (totalBytes <= MAX_STRING_BYTES) return s;
+  const head = s.slice(0, 200);
+  const remaining = totalBytes - utf8ByteLength(head);
+  return `${head} ... <truncated, ${remaining} more bytes>`;
+}
+function redact(value, depth) {
+  if (depth > MAX_REDACT_DEPTH) return "<max-depth>";
+  if (value === null || value === void 0) return value;
+  const t = typeof value;
+  if (t === "string") {
+    const s = value;
+    if (ANTHROPIC_KEY_RE.test(s)) return "<redacted>";
+    return truncateLongString(s);
+  }
+  if (t === "number" || t === "boolean") return value;
+  if (Array.isArray(value)) {
+    return value.map((v2) => redact(v2, depth + 1));
+  }
+  if (t === "object") {
+    const out = {};
+    for (const key of Object.keys(value)) {
+      if (SECRET_KEY_RE.test(key)) {
+        out[key] = "<redacted>";
+      } else {
+        out[key] = redact(value[key], depth + 1);
+      }
+    }
+    return out;
+  }
+  try {
+    return String(value);
+  } catch {
+    return "<unserialisable>";
+  }
+}
+function redactContext(ctx) {
+  if (!ctx) return void 0;
+  return redact(ctx, 0);
+}
+var RING_CAPACITY = 100;
+var ring = [];
+function buildEntry(level, msg, ctx) {
+  const ts = (/* @__PURE__ */ new Date()).toISOString();
+  const redacted = redactContext(ctx);
+  const entry = { ts, level, msg };
+  if (redacted !== void 0) entry.ctx = redacted;
+  return entry;
+}
+function formatEntry(entry) {
+  let body;
+  try {
+    body = JSON.stringify(entry);
+  } catch {
+    body = JSON.stringify({
+      ts: entry.ts,
+      level: entry.level,
+      msg: entry.msg,
+      ctx: { _logError: "JSON.stringify failed" }
+    });
+  }
+  return `[JobHelp] ${body}`;
+}
+function consoleFor(level) {
+  const c = globalThis.console ?? console;
+  switch (level) {
+    case "debug":
+      return (c.log ?? c.info ?? c.warn).bind(c);
+    case "info":
+      return (c.info ?? c.log).bind(c);
+    case "warn":
+      return (c.warn ?? c.log).bind(c);
+    case "error":
+      return (c.error ?? c.log).bind(c);
+  }
+}
+function pushRing(entry) {
+  ring.push(entry);
+  while (ring.length > RING_CAPACITY) ring.shift();
+}
+function log(level, msg, ctx) {
+  const entry = buildEntry(level, msg, ctx);
+  pushRing(entry);
+  if (LEVEL_RANK[level] < LEVEL_RANK[minLevel]) return;
+  const line = formatEntry(entry);
+  consoleFor(level)(line);
+}
+
 // extension/src/lib/costCalculator.ts
 var PRICING_PER_M = {
   "claude-haiku-4-5-20251001": { input: 1, output: 5, cacheRead: 0.1 },
@@ -17924,8 +18041,19 @@ var VERIFY_HOOKS_PER_ENTITY = {
   freshInput: 500,
   output: 300
 };
+var warnedUnknownModels = /* @__PURE__ */ new Set();
 function costFor(modelId, profile) {
-  const pricing = PRICING_PER_M[modelId] ?? DEFAULT_PRICING;
+  let pricing = PRICING_PER_M[modelId];
+  if (!pricing) {
+    if (!warnedUnknownModels.has(modelId)) {
+      warnedUnknownModels.add(modelId);
+      log("warn", "costCalculator: unknown model id \u2014 falling back to Haiku pricing", {
+        modelId,
+        knownModels: Object.keys(PRICING_PER_M)
+      });
+    }
+    pricing = DEFAULT_PRICING;
+  }
   return (profile.cacheRead * pricing.cacheRead + profile.freshInput * pricing.input + profile.output * pricing.output) / 1e6;
 }
 function round4(n) {
@@ -18137,6 +18265,10 @@ function renderGenerateTab(hooks) {
     // Populated after a successful generate; needed by finalize.
     docId: null,
     jobFolderId: null,
+    // Tracking-sheet row URL from the generate result — passed into the v2
+    // post-gen calls (critique / cover letter / verify hooks) so they can
+    // update the sheet's result columns.
+    sheetRowUrl: null,
     // ─── v2 feature toggle state ─────────────────────────────────────────
     researchEnabled: false,
     researchModel: HAIKU,
@@ -18567,8 +18699,14 @@ function renderGenerateTab(hooks) {
     finalizeStatusEl.className = "generate__finalize-status";
     state.docId = null;
     state.jobFolderId = null;
+    state.sheetRowUrl = null;
     state.coverLetterMd = null;
-    const cfg = await loadConfigFromStorage();
+    const cfg = getRuntimeConfig();
+    if (!cfg) {
+      setBusy(false);
+      statusEl.textContent = "JobHelp config not loaded. Run setup in Settings first.";
+      return;
+    }
     if (state.multiVersionEnabled) {
       if (!hooks.onMultiVersion) {
         console.warn("[generate] multi-version enabled but onMultiVersion hook missing");
@@ -18581,8 +18719,8 @@ function renderGenerateTab(hooks) {
           company: state.company,
           role: state.role,
           jobInsights: state.scraperOutput?.jobInsights ?? null,
-          sourceFolderId: cfg.sourceFolderId,
-          rulesFolderId: cfg.rulesFolderId,
+          sourceFolderId: cfg.folders.source,
+          rulesFolderId: cfg.folders.rules,
           count: state.multiVersionCount,
           model: state.multiVersionModel
         });
@@ -18638,9 +18776,9 @@ function renderGenerateTab(hooks) {
       url: state.url,
       jobInsights: state.scraperOutput?.jobInsights ?? null,
       toggles: state.toggles,
-      sourceFolderId: cfg.sourceFolderId,
-      rulesFolderId: cfg.rulesFolderId,
-      outputFolderId: cfg.outputFolderId,
+      sourceFolderId: cfg.folders.source,
+      rulesFolderId: cfg.folders.rules,
+      outputFolderId: cfg.folders.output,
       sheetId: cfg.sheetId,
       model: state.generateModel,
       researchSummary,
@@ -18688,7 +18826,7 @@ function renderGenerateTab(hooks) {
       }
     });
   }
-  function showGenerateResult(md, docUrl, jobFolderUrl) {
+  function showGenerateResult(md, docUrl, jobFolderUrl, sheetRowUrl) {
     showResume(md);
     const docId = extractDocId(docUrl);
     const jobFolderId = extractFolderId(jobFolderUrl);
@@ -18701,11 +18839,18 @@ function renderGenerateTab(hooks) {
     }
     state.docId = docId;
     state.jobFolderId = jobFolderId;
+    state.sheetRowUrl = sheetRowUrl && sheetRowUrl.length > 0 ? sheetRowUrl : null;
     finalizeStatusEl.textContent = "";
     finalizeStatusEl.className = "generate__finalize-status";
     finalizeSection.hidden = false;
     updateFinalizeButtons();
     void runPostGenerateChain(md, jobFolderId);
+  }
+  function sheetRowParams() {
+    const sheetId = getRuntimeConfig()?.sheetId;
+    const rowUrl = state.sheetRowUrl;
+    if (!sheetId || !rowUrl) return {};
+    return { sheetId, rowUrl };
   }
   async function runPostGenerateChain(resumeMd, jobFolderId) {
     const tasks = [];
@@ -18726,7 +18871,8 @@ function renderGenerateTab(hooks) {
         jd: state.jd,
         jobInsights: state.scraperOutput?.jobInsights ?? null,
         jobFolderId,
-        model: state.critiqueModel
+        model: state.critiqueModel,
+        ...sheetRowParams()
       });
       renderCritiqueResult(root, result);
     } catch (e) {
@@ -18736,7 +18882,11 @@ function renderGenerateTab(hooks) {
   }
   async function runCoverLetter(resumeMd, jobFolderId) {
     if (!hooks.onCoverLetter) return;
-    const cfg = await loadConfigFromStorage();
+    const cfg = getRuntimeConfig();
+    if (!cfg) {
+      clResultSlot.textContent = "JobHelp config not loaded. Run setup in Settings first.";
+      return;
+    }
     clResultSlot.textContent = "Generating cover letter\u2026";
     try {
       const result = await hooks.onCoverLetter({
@@ -18744,12 +18894,13 @@ function renderGenerateTab(hooks) {
         jd: state.jd,
         company: state.company,
         role: state.role,
-        sourceFolderId: cfg.sourceFolderId,
-        rulesFolderId: cfg.rulesFolderId,
+        sourceFolderId: cfg.folders.source,
+        rulesFolderId: cfg.folders.rules,
         jobFolderId,
         model: state.coverLetterModel,
         // Omit "neutral" so the backend default applies (backwards-compat).
-        tone: state.coverLetterTone === "neutral" ? void 0 : state.coverLetterTone
+        tone: state.coverLetterTone === "neutral" ? void 0 : state.coverLetterTone,
+        ...sheetRowParams()
       });
       renderCoverLetterResult(result);
     } catch (e) {
@@ -18789,7 +18940,8 @@ function renderGenerateTab(hooks) {
     try {
       const result = await hooks.onVerifyClHooks({
         coverLetterMd,
-        model: state.verifyHooksModel
+        model: state.verifyHooksModel,
+        ...sheetRowParams()
       });
       renderVerifyHooksResult(result);
     } catch (e) {
@@ -18909,8 +19061,8 @@ function renderGenerateTab(hooks) {
   }
   void (async () => {
     try {
-      const m2 = await get("defaultGenerateModel");
-      if (m2) {
+      const m2 = getRuntimeConfig()?.defaults.model;
+      if (m2 && ALL_MODELS.includes(m2)) {
         state.generateModel = m2;
         renderCostBlock();
       }
@@ -18987,24 +19139,6 @@ function renderGenerateTab(hooks) {
     }
   })();
   return { root, applyScraperOutput, showResume, showGenerateResult, setBusy };
-}
-async function loadConfigFromStorage() {
-  try {
-    const [src, rules, out, sheet] = await Promise.all([
-      get("driveSourceFolderId"),
-      get("driveRulesFolderId"),
-      get("driveOutputFolderId"),
-      get("sheetId")
-    ]);
-    return {
-      sourceFolderId: src ?? "",
-      rulesFolderId: rules ?? "",
-      outputFolderId: out ?? "",
-      sheetId: sheet ?? ""
-    };
-  } catch {
-    return { sourceFolderId: "", rulesFolderId: "", outputFolderId: "", sheetId: "" };
-  }
 }
 function escapeHtml3(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -19140,6 +19274,9 @@ function networkError(message) {
     }
   };
 }
+function headSnippet(s, n = 200) {
+  return s.slice(0, n).replace(/\s+/g, " ").trim();
+}
 var ApiClient = class {
   constructor(appsScriptUrl) {
     this.appsScriptUrl = appsScriptUrl;
@@ -19155,12 +19292,51 @@ var ApiClient = class {
       });
     } catch (err) {
       const message = err?.message ?? "Network request failed";
+      log("warn", "apiClient: network request failed", {
+        action: body.action,
+        error: message
+      });
       return networkError(message);
     }
     if (!response.ok) {
+      log("warn", "apiClient: HTTP error response", {
+        action: body.action,
+        status: response.status,
+        statusText: response.statusText
+      });
       return networkError(`HTTP ${response.status}: ${response.statusText}`);
     }
-    return response.json();
+    let rawText;
+    try {
+      rawText = await response.text();
+    } catch (err) {
+      const message = err?.message ?? "Failed to read response body";
+      log("error", "apiClient: failed to read response body", {
+        action: body.action,
+        error: message
+      });
+      return networkError(message);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      const snippet = headSnippet(rawText);
+      log("error", "apiClient: response was not valid JSON", {
+        action: body.action,
+        bodySnippet: snippet
+      });
+      return networkError(`Response was not valid JSON: ${snippet}`);
+    }
+    if (typeof parsed !== "object" || parsed === null || typeof parsed.ok !== "boolean") {
+      const snippet = headSnippet(rawText);
+      log("error", "apiClient: malformed response \u2014 missing ok flag", {
+        action: body.action,
+        bodySnippet: snippet
+      });
+      return networkError(`Malformed response \u2014 missing ok flag: ${snippet}`);
+    }
+    return parsed;
   }
   /**
    * Trigger the generate pipeline on the backend.
@@ -19286,6 +19462,7 @@ var ConfigValidationError = class _ConfigValidationError extends Error {
 };
 
 // extension/src/lib/configLoader.ts
+var ANTHROPIC_KEY_PREFIX_RE = /^sk-ant-/;
 var cache = /* @__PURE__ */ new Map();
 function clearConfigCache() {
   cache.clear();
@@ -19351,6 +19528,11 @@ function validateConfig(parsed) {
     );
   }
   const anthropicApiKey = requireString(parsed, "anthropicApiKey", "anthropicApiKey");
+  if (!ANTHROPIC_KEY_PREFIX_RE.test(anthropicApiKey)) {
+    log("warn", "configLoader: anthropicApiKey does not start with 'sk-ant-' \u2014 likely a typo", {
+      anthropicApiKey
+    });
+  }
   const appsScriptUrl = requireString(parsed, "appsScriptUrl", "appsScriptUrl");
   const foldersRaw = requireObject(parsed, "folders", "folders");
   const folders = {
@@ -19395,14 +19577,24 @@ async function loadConfigFromDrive(fileId, apiClient) {
   }
   const response = await apiClient.downloadTemplate({ fileId });
   if (!response.ok) {
+    log("warn", "configLoader: download of jobhelp-config.json failed", {
+      fileId,
+      errorType: response.error.type,
+      error: response.error.message,
+      retryable: response.error.retryable
+    });
     throw new Error(
-      `Failed to download jobhelp-config.json (fileId=${fileId}): ${response.error.message}`
+      `Failed to download jobhelp-config.json (fileId=${fileId}): [${response.error.type}] ${response.error.message}`
     );
   }
   let jsonText;
   try {
     jsonText = decodeBase64ToUtf8(response.base64);
   } catch (err) {
+    log("warn", "configLoader: base64 decode of jobhelp-config.json failed", {
+      fileId,
+      error: err?.message ?? "unknown error"
+    });
     throw new ConfigValidationError(
       `Could not base64-decode config file: ${err?.message ?? "unknown error"}`,
       null
@@ -19412,6 +19604,11 @@ async function loadConfigFromDrive(fileId, apiClient) {
   try {
     parsed = JSON.parse(jsonText);
   } catch (err) {
+    log("warn", "configLoader: jobhelp-config.json is not valid JSON", {
+      fileId,
+      error: err?.message ?? "unknown error",
+      contentSnippet: jsonText.slice(0, 200)
+    });
     throw new ConfigValidationError(
       `Config file is not valid JSON: ${err?.message ?? "unknown error"}`,
       null
@@ -20106,6 +20303,7 @@ function parseHeader(headerLines) {
 }
 function parseSkillsLines(lines) {
   const groups = [];
+  const unmatched = [];
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
@@ -20125,6 +20323,13 @@ function parseSkillsLines(lines) {
       groups.push({ category: m2[1].trim(), items: m2[2].trim() });
       continue;
     }
+    unmatched.push(line);
+  }
+  if (unmatched.length > 0) {
+    log("warn", "templateFiller: dropped unrecognised Skills line(s)", {
+      count: unmatched.length,
+      samples: unmatched.slice(0, 5)
+    });
   }
   return groups;
 }
@@ -20193,6 +20398,7 @@ function peelCityStateFromTail(s) {
 function parseExperienceLines(lines) {
   const entries = [];
   let cur = null;
+  const lostLines = [];
   const startsEntry = (line) => /^\*\*[^*]+\*\*/.test(line.trim()) && !/^\s*[-*]\s+/.test(line);
   for (const raw of lines) {
     const line = raw.replace(/\r$/, "");
@@ -20203,6 +20409,8 @@ function parseExperienceLines(lines) {
       if (header) {
         cur = { ...header, bullets: [] };
         entries.push(cur);
+      } else {
+        lostLines.push(trimmed);
       }
       continue;
     }
@@ -20213,7 +20421,16 @@ function parseExperienceLines(lines) {
       const { plain, links } = extractLinks(rest);
       cur.bullets.push({ lead, rest: plain, links });
     } else if (cur && !bulletMatch) {
+      lostLines.push(trimmed);
+    } else if (!cur && !bulletMatch) {
+      lostLines.push(trimmed);
     }
+  }
+  if (lostLines.length > 0) {
+    log("warn", "templateFiller: dropped non-bullet/continuation line(s) in Experience", {
+      count: lostLines.length,
+      samples: lostLines.slice(0, 5)
+    });
   }
   return entries;
 }
@@ -20303,6 +20520,32 @@ function getRuntimeConfig() {
 function setRuntimeConfig(config) {
   runtimeConfig = config;
 }
+function applyRuntimeConfig(config) {
+  setRuntimeConfig(config);
+  void (async () => {
+    try {
+      await Promise.all([
+        set("appsScriptUrl", config.appsScriptUrl),
+        set("driveSourceFolderId", config.folders.source),
+        set("driveRulesFolderId", config.folders.rules),
+        set("driveOutputFolderId", config.folders.output),
+        set("sheetId", config.sheetId),
+        set("driveTemplateDocxId", config.templateDocxId),
+        set("defaultGenerateModel", config.defaults.model)
+      ]);
+    } catch {
+    }
+  })();
+}
+async function resolveAppsScriptUrl() {
+  const cfg = getRuntimeConfig();
+  if (cfg?.appsScriptUrl) return cfg.appsScriptUrl;
+  try {
+    return await get("appsScriptUrl");
+  } catch {
+    return null;
+  }
+}
 function base64ToArrayBuffer(b64) {
   const bin = atob(b64);
   const buf = new ArrayBuffer(bin.length);
@@ -20326,12 +20569,7 @@ function getChrome() {
   return null;
 }
 async function getApiClient() {
-  let url = null;
-  try {
-    url = await get("appsScriptUrl");
-  } catch {
-    return null;
-  }
+  const url = await resolveAppsScriptUrl();
   if (!url) return null;
   return new ApiClient(url);
 }
@@ -20353,13 +20591,9 @@ function buildControllers(opts = { autoOpenWizard: false }) {
       console.info("Resume captured:", md.length, "chars");
     },
     onFinalize: async ({ format, markdown, docId, jobFolderId }) => {
-      let appsScriptUrl = null;
-      try {
-        appsScriptUrl = await get("appsScriptUrl");
-      } catch {
-      }
+      const appsScriptUrl = await resolveAppsScriptUrl();
       if (!appsScriptUrl) {
-        return { ok: false, message: "Apps Script URL not configured. Check Settings." };
+        return { ok: false, message: "JobHelp config not loaded. Run setup in Settings first." };
       }
       const client = new ApiClient(appsScriptUrl);
       const resp = await client.finalize({
@@ -20378,22 +20612,16 @@ function buildControllers(opts = { autoOpenWizard: false }) {
       return { ok: true, url: file.url, fileName: file.fileName };
     },
     onConvertViaTemplate: async ({ markdown, jobFolderId }) => {
-      let appsScriptUrl = null;
-      let templateId = null;
-      try {
-        [appsScriptUrl, templateId] = await Promise.all([
-          get("appsScriptUrl"),
-          get("driveTemplateDocxId")
-        ]);
-      } catch {
-      }
+      const cfg = getRuntimeConfig();
+      const appsScriptUrl = await resolveAppsScriptUrl();
       if (!appsScriptUrl) {
-        return { ok: false, message: "Apps Script URL not configured. Check Settings." };
+        return { ok: false, message: "JobHelp config not loaded. Run setup in Settings first." };
       }
+      const templateId = cfg?.templateDocxId ?? null;
       if (!templateId) {
         return {
           ok: false,
-          message: 'No template configured. Set "Drive: template DOCX file ID" in Settings first.'
+          message: "No template configured in your jobhelp-config.json. Run setup in Settings first."
         };
       }
       const client = new ApiClient(appsScriptUrl);
@@ -20491,7 +20719,9 @@ function buildControllers(opts = { autoOpenWizard: false }) {
   });
   const files = renderFilesTab({
     fetchFiles: async (folder) => {
-      const folderId = folder === "source" ? await get("driveSourceFolderId") : await get("driveRulesFolderId");
+      const cfg = getRuntimeConfig();
+      if (!cfg) return [];
+      const folderId = folder === "source" ? cfg.folders.source : cfg.folders.rules;
       if (!folderId) return [];
       const c = getChrome();
       if (!c) return [];
@@ -20510,7 +20740,7 @@ function buildControllers(opts = { autoOpenWizard: false }) {
   const settingsRoot = renderSettingsTab({
     autoOpenWizard: opts.autoOpenWizard,
     onConfigLoaded: (config) => {
-      setRuntimeConfig(config);
+      applyRuntimeConfig(config);
     }
   });
   return { generate, files, settingsRoot };
@@ -20594,7 +20824,7 @@ async function hydrateRuntimeConfig(fileId, tabContent, panes, buttons) {
   const client = new ApiClient(appsScriptUrl);
   try {
     const config = await loadConfigFromDrive(fileId, client);
-    setRuntimeConfig(config);
+    applyRuntimeConfig(config);
   } catch (err) {
     const msg = err?.message ?? "Unknown error";
     showRuntimeConfigError(msg, tabContent, panes, buttons);
@@ -20621,7 +20851,8 @@ function handleMessage(message, controllers) {
         controllers.generate.showGenerateResult(
           message.payload.resumeMd,
           message.payload.docUrl,
-          message.payload.jobFolderUrl
+          message.payload.jobFolderUrl,
+          message.payload.sheetRowUrl
         );
       } else {
         const err = message.payload.error;
@@ -20654,7 +20885,8 @@ if (typeof document !== "undefined") {
   }
 }
 export {
-  getRuntimeConfig
+  getRuntimeConfig,
+  setRuntimeConfig
 };
 /*! Bundled license information:
 

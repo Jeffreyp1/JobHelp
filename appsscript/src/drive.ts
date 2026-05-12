@@ -12,6 +12,7 @@ import type {
   ConcatenatedSourceMaterials,
   SheetRow,
 } from './types/drive-ops.js';
+import { log } from './lib/structuredLog.js';
 
 // ---------------------------------------------------------------------------
 // GAS global accessors (via globalThis so tests can stub them)
@@ -149,8 +150,17 @@ function fileToEntry(file: any, parseFm = false): FileEntry {
     try {
       const DocumentApp = getDocumentApp();
       contents = DocumentApp.openById(file.getId()).getBody().getText();
-    } catch {
-      // Fall back to blob read; will likely be empty/garbage but won't crash
+    } catch (err) {
+      // M8 (silent-failure-audit): the blob fallback "will likely be empty/
+      // garbage" — for a rule file that means the system prompt silently loses
+      // load-bearing rules. We can't make this fatal here without a public-
+      // surface change, but we make it visible so a degraded resume is
+      // diagnosable from the execution log.
+      log('warn', 'Google Doc text extraction failed — falling back to raw blob (content may be empty/garbage)', {
+        fileName: typeof file.getName === 'function' ? file.getName() : undefined,
+        fileId: typeof file.getId === 'function' ? file.getId() : undefined,
+        error: err instanceof Error ? err.message : String(err),
+      });
       contents = file.getBlob().getDataAsString();
     }
   } else {
@@ -234,7 +244,23 @@ function cacheGet<T>(key: string): T | null {
   if (!raw) return null;
   try {
     return JSON.parse(raw) as T;
-  } catch {
+  } catch (err) {
+    // M9 (silent-failure-audit): a corrupted cache entry would otherwise force
+    // a full Drive re-read on every request, silently. Log it and evict the
+    // bad entry so the next write replaces it.
+    log('warn', 'cache entry was not valid JSON — evicting', {
+      key,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    try {
+      const c = getCache() as { remove?: (k: string) => void };
+      if (typeof c.remove === 'function') c.remove(key);
+    } catch (removeErr) {
+      log('warn', 'failed to evict corrupted cache entry', {
+        key,
+        error: removeErr instanceof Error ? removeErr.message : String(removeErr),
+      });
+    }
     return null;
   }
 }
@@ -281,6 +307,58 @@ function renderMarkdownToBody(body: any, DocumentApp: any, markdownContent: stri
     } else {
       body.appendParagraph(line);
     }
+  }
+}
+
+/**
+ * Move a freshly-created Google Doc (which DocumentApp.create() places at the
+ * user's My Drive root) into `targetFolder`. The DriveApp folder API exposes
+ * `removeFile`/`addFile`; some test stubs omit them, so we keep the `typeof`
+ * guard — but unlike the original code we LOG a warning when a move step can't
+ * run, so an orphaned Doc at My Drive root is diagnosable (H14).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function moveDocIntoFolder(DriveApp: any, docId: string, targetFolder: any, context: string): void {
+  let docFile: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  try {
+    docFile = DriveApp.getFileById(docId);
+  } catch (err) {
+    log('warn', 'moveDocIntoFolder: could not look up created Doc — leaving at My Drive root', {
+      context,
+      docId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+
+  const parents = docFile.getParents();
+  let removedFromAny = false;
+  let removeUnavailable = false;
+  while (parents.hasNext()) {
+    const oldParent = parents.next();
+    if (typeof oldParent.removeFile === 'function') {
+      oldParent.removeFile(docFile);
+      removedFromAny = true;
+    } else {
+      removeUnavailable = true;
+    }
+  }
+
+  if (typeof targetFolder.addFile === 'function') {
+    targetFolder.addFile(docFile);
+  } else {
+    log('warn', 'moveDocIntoFolder: target folder has no addFile — Doc not moved into job folder', {
+      context,
+      docId,
+    });
+    return;
+  }
+
+  if (removeUnavailable && !removedFromAny) {
+    log('warn', 'moveDocIntoFolder: could not detach Doc from My Drive root (no removeFile) — Doc now lives in two parents', {
+      context,
+      docId,
+    });
   }
 }
 
@@ -479,22 +557,13 @@ export const driveOps: DriveOps = {
     }
     const docId: string = doc.getId();
 
-    // Move the Google Doc from My Drive root into the job folder
-    const docFile = DriveApp.getFileById(docId);
-    const parents = docFile.getParents();
-    while (parents.hasNext()) {
-      const oldParent = parents.next();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (typeof (oldParent as any).removeFile === 'function') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (oldParent as any).removeFile(docFile);
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (typeof (jobFolder as any).addFile === 'function') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (jobFolder as any).addFile(docFile);
-    }
+    // Move the Google Doc from My Drive root into the job folder.
+    // H14 (silent-failure-audit): both removeFile/addFile were guarded with
+    // `typeof === 'function'` and NO else branch — on a runtime where the API
+    // shape differs the Doc would be silently left at My Drive root. We keep
+    // the guard (so unit-test stubs that omit these still work) but log a warn
+    // when the move can't be performed so the orphaned Doc is diagnosable.
+    moveDocIntoFolder(DriveApp, docId, jobFolder, 'writeJobOutput');
     const docUrl: string = doc.getUrl();
 
     return {
@@ -563,6 +632,14 @@ export const driveOps: DriveOps = {
         const statusCode: number = response.getResponseCode();
 
         if (statusCode !== 200) {
+          // H17 (silent-failure-audit): per-file failures already flow into
+          // errors[] (correct shape) but the extension doesn't always surface
+          // that array — log so a half-failed seed is visible server-side too.
+          log('warn', 'seedDefaults: rule file fetch returned non-200', {
+            filename,
+            statusCode,
+            url,
+          });
           errors.push({
             filename,
             reason: `HTTP ${statusCode} from ${url}`,
@@ -574,13 +651,18 @@ export const driveOps: DriveOps = {
         folder.createFile(filename, contents, MD_MIME_TYPE);
         seeded.push(filename);
       } catch (err: unknown) {
-        errors.push({
-          filename,
-          reason: err instanceof Error ? err.message : String(err),
-        });
+        const reason = err instanceof Error ? err.message : String(err);
+        log('warn', 'seedDefaults: failed to seed a rule file', { filename, error: reason });
+        errors.push({ filename, reason });
       }
     }
 
+    if (errors.length > 0) {
+      log('warn', 'seedDefaults completed with errors', {
+        seededCount: seeded.length,
+        errorCount: errors.length,
+      });
+    }
     return { seeded, errors };
   },
 
@@ -803,23 +885,10 @@ export const driveOps: DriveOps = {
     const docId: string = doc.getId();
     const docUrl: string = doc.getUrl();
 
-    // Move the Google Doc from My Drive root into the target folder
-    const docFile = DriveApp.getFileById(docId);
-    const parents = docFile.getParents();
-    while (parents.hasNext()) {
-      const oldParent = parents.next();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (typeof (oldParent as any).removeFile === 'function') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (oldParent as any).removeFile(docFile);
-      }
-    }
+    // Move the Google Doc from My Drive root into the target folder.
+    // See H14 note in writeJobOutput.
     const folder = DriveApp.getFolderById(folderId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (typeof (folder as any).addFile === 'function') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (folder as any).addFile(docFile);
-    }
+    moveDocIntoFolder(DriveApp, docId, folder, 'createGoogleDoc');
 
     return { docId, docUrl };
   },
@@ -884,6 +953,18 @@ export const driveOps: DriveOps = {
     const gid: number = sheet.getSheetId();
     const ssUrl: string = ss.getUrl();
 
+    // H16 (silent-failure-audit): we trust getLastRow() to point at the row we
+    // just appended (documented behaviour). If it ever comes back implausible
+    // (≤ header row) the returned rowUrl is wrong and downstream v2 column
+    // updates would patch the wrong row — surface that rather than swallow it.
+    if (!Number.isFinite(rowIndex) || rowIndex < 2) {
+      log('warn', 'appendSheetRow: getLastRow() returned an implausible index after append — rowUrl may be wrong', {
+        rowIndex,
+        company: row.company,
+        role: row.role,
+      });
+    }
+
     // T18: rowUrl with #gid+row anchor
     const rowUrl = `${ssUrl}#gid=${gid}&range=A${rowIndex}`;
 
@@ -912,16 +993,39 @@ export const driveOps: DriveOps = {
     //    If parsing fails (caller passed a garbage URL) we silently no-op —
     //    v2 sheet updates are non-fatal, and the v2 handler is responsible
     //    for logging if it cares.
+    // H15 (silent-failure-audit): these early returns used to be completely
+    // silent — a future code path with a different anchor shape would leave the
+    // v2 columns permanently empty with no trace. We still no-op (v2 sheet
+    // writes are non-fatal by design) but we log a warn so it's diagnosable.
     const rowMatch = rowUrl.match(/[#&]range=[A-Z]+(\d+)/);
-    if (!rowMatch) return;
+    if (!rowMatch) {
+      log('warn', 'updateSheetRow: rowUrl has no parseable range anchor — skipping', {
+        rowUrl,
+        fields: Object.keys(fields),
+      });
+      return;
+    }
     const rowIndex = Number(rowMatch[1]);
-    if (!Number.isFinite(rowIndex) || rowIndex < 1) return;
+    if (!Number.isFinite(rowIndex) || rowIndex < 1) {
+      log('warn', 'updateSheetRow: parsed row index is invalid — skipping', {
+        rowUrl,
+        rowIndex,
+        fields: Object.keys(fields),
+      });
+      return;
+    }
 
     const SpreadsheetApp = getSpreadsheetApp();
     const ss = SpreadsheetApp.openById(sheetId);
 
     const sheet = ss.getSheetByName(SHEET_NAME);
-    if (!sheet) return; // sheet was never created — nothing to update
+    if (!sheet) {
+      log('warn', 'updateSheetRow: tracking sheet does not exist — skipping', {
+        sheetId,
+        fields: Object.keys(fields),
+      });
+      return; // sheet was never created — nothing to update
+    }
 
     // 2. Write each provided field into its column. We use getRange(row,col)
     //    .setValue() so the rest of the row is preserved (vs. rewriting the
@@ -929,7 +1033,10 @@ export const driveOps: DriveOps = {
     //    about) are silently ignored.
     for (const key of Object.keys(fields) as (keyof SheetRow)[]) {
       const col = COLUMN_INDEX[key];
-      if (!col) continue;
+      if (!col) {
+        log('debug', 'updateSheetRow: ignoring field with no known column', { key: String(key) });
+        continue;
+      }
       const raw = fields[key];
       // Coerce null/undefined → '' so blank cells stay blank.
       const value: unknown = raw === null || raw === undefined ? '' : raw;

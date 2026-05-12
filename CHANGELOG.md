@@ -4,6 +4,46 @@ All notable changes to JobHelp are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-05-11
+
+Wires the v2.1 single-file config into the runtime, adopts the structured logger across both packages, and clears the highest-priority silent-failure findings from the v0.2.2 audit.
+
+### Changed (v2.1 config now live)
+
+- **Side panel reads `getRuntimeConfig()` instead of legacy `chrome.storage` keys.** `generate.ts`, the Files tab data hook, and the `onFinalize` / `onConvertViaTemplate` hooks in `sidepanel/index.ts` now pull folder IDs / sheet ID / Apps Script URL / default model from the Drive-hosted `jobhelp-config.json` (loaded on side-panel open). When config isn't linked yet, they degrade gracefully ("Run setup in Settings first") instead of silently using empty IDs.
+- **Legacy-key mirror bridge.** When the side panel resolves the Drive config, it fire-and-forget mirror-writes the resolved values back into the 8 deprecated `chrome.storage.local` keys. The background service worker (`background.ts`) still reads those keys for the `generate`/`finalize`/etc. actions — keeping them populated as a derived cache means the worker needs zero changes during the migration window. The Drive file remains the source of truth.
+- **v2 handlers now receive `sheetId` + `rowUrl`.** `generate.ts` captures `sheetRowUrl` from the generate result (4th arg to `showGenerateResult`) and threads `{ sheetId, rowUrl }` into the `critique` / `cover_letter` / `verify_cl_hooks` calls — so the Critique Score / Cover Letter URL / Verify Unverified Count sheet columns now actually get written. Omitted cleanly when either value is missing (matches the backend's "write only if both present" contract).
+
+### Changed (observability)
+
+- **`structuredLog` adopted across both packages.** ~55 raw `console.*` calls in the Apps Script handlers + `Code.ts` + `drive.ts` + `claude.ts` + `cost.ts` replaced with leveled `log(level, msg, ctx)` calls passing structured context objects (`{ company, role, cached, cost, error, ... }`) — automatic API-key redaction + 2 KB truncation now applies everywhere. Same on the extension side at every silent-failure site in `apiClient.ts`, `background.ts`, `templateFiller.ts`, `configLoader.ts`, `costCalculator.ts`. `doPost` logs every request (`info`) and every error path (`warn`/`error`).
+
+### Fixed (HIGH-priority silent failures from `docs/superpowers/reviews/silent-failure-audit.md`)
+
+- **`generate` accepted requests with no company AND no role.** Now rejected with a validation error before any Claude call (H11).
+- **Malformed `jobInsights` payloads silently degraded.** `handleGenerate` now guards with a plausibility check and rejects obviously-malformed insights instead of passing junk to the prompt (H19).
+- **`writeJobOutput` / `createGoogleDoc` left the Doc at My Drive root if `removeFile`/`addFile` were unavailable** — no signal. Now logs a `warn` (H14).
+- **`updateSheetRow` / `appendSheetRow` no-op'd silently on bad row indices.** Now each early-return logs a `warn` (H15, H16).
+- **`seedDefaults` per-file failures vanished.** Each failure + a summary now logs (H17).
+- **`classifyError` misclassified Drive vs other errors via a fragile substring match** — silently. Now logs the raw error on every branch so misclassifications are diagnosable (H8, partial — full fix needs a typed exception hierarchy).
+- **`apiClient.post` rejected with an opaque error on a 200-with-HTML body.** Now reads `.text()` → `JSON.parse` → shape-checks the `ok` flag → returns a typed `ok:false` server error with a body snippet (H5, M10).
+- **`background.ts safeSend` swallowed all send failures the same way.** Now distinguishes "no receiver" (benign, silent) from real send errors (logged `warn`); `tabs.get` similarly distinguishes "no such tab" from other errors (H1, H3).
+- **`templateFiller` silently dropped skills/experience lines it couldn't parse.** Now logs a `warn` listing the dropped lines (H6, H7).
+- **`verifyHooks` non-JSON web-search responses** now log a `warn` with a body snippet and keep the entity at `uncertain` with the raw text in `reason` (H4, M6).
+- **`costCalculator` / `cost.ts` silently used Haiku pricing for unknown model IDs.** Now logs a once-per-session `warn` ("reported cost may be wrong") before falling back (M16).
+- **`coverLetter` accepted non-string `company`/`role`.** Now type-checked in the validator (H21).
+
+### Fixed (contract cleanup)
+
+- JSDoc on `MultiVersionRequest.count` documents the valid `[2, 5]` range (the type stays `number` — a literal union would force every caller to widen); `MultiVersionRequest.sheetId`/`rowUrl` documented as currently-ignored (the Multi-Version Label column is written by the not-yet-built finalize-variant flow); `HookVerification.sources` documented as always-present-possibly-empty. Mirrored byte-identically in both `api-contract.ts` copies (T2 ambiguities).
+- `prompts/**/*.test.ts` added to the vitest `include` glob — `prompts/shared/_validate.test.ts` (the rule-file validator) now runs in CI (+10 tests). C3 had already aligned its assertions; no re-alignment needed.
+- Rule 13's prose said "em-dash between school and degree" while its template uses an en-dash — prose corrected to "en-dash" with a "matching the template above" note.
+
+### Internal
+
+- 688 tests passing (up from 650 at v0.2.2; +38: 7 config-plumbing, 5 generate-validation, 3 cover-letter-validation, 3 apiClient non-JSON, 4 background-logging, 3 templateFiller-logging, 3 configLoader, 10 rule-file validator, 2 `_silent-failure-probes` flipped to "asserts fixed", plus the new probe V11). tsc clean both packages. Bundles: extension/public/sidepanel/index.js ~800 KB, Apps Script `Code.gs` 107.7 KB.
+- 4 parallel opus-4.7 agents (E1 config wiring · E2 Apps Script observability+fixes · E3 extension observability+fixes · E4 contract cleanup). The deferred multi-version finalize-variant flow remains unimplemented; ~20-30 MEDIUM/LOW audit findings (mostly blocked on `types/*` additions) remain — see the audit doc.
+
 ## [0.2.2] - 2026-05-11
 
 v2.1 setup-simplification scaffold + observability + multiple silent-failure fixes surfaced by an audit + black-box / smoke test pass.

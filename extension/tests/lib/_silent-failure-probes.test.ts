@@ -39,26 +39,24 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('apiClient.post — non-JSON 200 body', () => {
-  it('S1: HTTP 200 with non-JSON body — apiClient surfaces the JSON parse error, not silently returns undefined', async () => {
-    // Server returns 200 + plain-text body. response.json() throws.
-    // The current implementation does `return response.json() as Promise<T>`
-    // — it never catches that throw. Probe: does the caller get a rejection
-    // (loud) or some silent return-undefined behavior?
-    const jsonError = new SyntaxError('Unexpected token < in JSON at position 0');
+  it('S1: HTTP 200 with non-JSON body — apiClient normalizes it into an ok:false server error (FIXED)', async () => {
+    // Server returns 200 + an HTML body (auth landing page, Cloudflare 502
+    // page, etc.). apiClient.post now reads the body as text, attempts to
+    // JSON.parse it, and on failure returns a typed ok:false error carrying a
+    // body snippet — so the caller's normal `if (!resp.ok)` branch handles it
+    // and the button never hangs (audit H5 — fixed).
+    const html = '<!DOCTYPE html><html><body>Sign in to continue</body></html>';
     const response = {
       ok: true,
       status: 200,
       statusText: 'OK',
-      json: vi.fn().mockRejectedValue(jsonError),
+      json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON at position 0')),
+      text: vi.fn().mockResolvedValue(html),
     } as unknown as Response;
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
 
     const client = new ApiClient(URL);
 
-    // The expected SAFE behavior: rejection (a loud error the caller can
-    // surface to the user). If the call resolves silently with undefined or
-    // any shape that lacks `ok`, that's a silent failure (UI would interpret
-    // it as success and crash later).
     let caught: unknown = null;
     let result: unknown = null;
     try {
@@ -67,15 +65,14 @@ describe('apiClient.post — non-JSON 200 body', () => {
       caught = err;
     }
 
-    // The current behavior (no try/catch around response.json()) is that the
-    // SyntaxError propagates up as a rejection. Assert that explicitly.
-    expect(caught).toBeInstanceOf(SyntaxError);
-    expect(result).toBeNull();
-    // SILENT BEHAVIOR: apiClient.post does NOT catch the SyntaxError from
-    // JSON.parse on a 200 OK response — it propagates as an uncaught
-    // rejection. Acceptable in current callers (they wrap in try/catch),
-    // but should be normalized into the ApiResponse shape (ok:false,
-    // error: server) for symmetry with the 4xx/5xx and network-error paths.
+    // FIXED BEHAVIOR: no rejection — the call resolves with a normalized
+    // ok:false server error that the UI surfaces like any other API failure.
+    expect(caught).toBeNull();
+    const r = result as { ok: boolean; error?: { type: string; message: string } };
+    expect(r.ok).toBe(false);
+    expect(r.error?.type).toBe('server');
+    expect(r.error?.message).toMatch(/not valid JSON/i);
+    expect(r.error?.message).toContain('DOCTYPE');
   });
 });
 
@@ -182,17 +179,16 @@ describe('templateFiller.parseResumeMarkdown — 0-section markdown', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('costCalculator.estimateCost — unknown model id', () => {
-  it('S5: unknown model id falls back to default haiku pricing (silent, no warning, no NaN)', () => {
-    // Probe: what happens with a typo'd model name?
-    // costCalculator's costFor uses `PRICING_PER_M[modelId] ?? DEFAULT_PRICING`
-    // — so an unknown model SILENTLY uses haiku pricing.
-    // Expectation: we'd prefer a console.warn or a throw so the user
-    // doesn't get a wrong cost estimate. But the current contract is
-    // silent fallback. Probe + assert; flag as a silent failure.
+  it('S5: unknown model id still falls back to Haiku pricing, but now emits a structured warn (FIXED)', () => {
+    // costCalculator falls back to DEFAULT_PRICING (Haiku) for an unknown
+    // model id so the preview keeps working, but it now logs a structured
+    // warning via structuredLog so the (potentially ~75x-wrong) fallback is
+    // diagnosable instead of silent (audit M16 — fixed). The fallback uses a
+    // once-per-session de-dup, so use a model id no other test references.
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const haikuCost = estimateCost({}, 'claude-haiku-4-5-20251001');
-    const unknownCost = estimateCost({}, 'claude-fictional-9000');
+    const unknownCost = estimateCost({}, 'claude-fictional-probe-9000');
 
     expect(haikuCost.total).toBeGreaterThan(0);
     expect(Number.isFinite(unknownCost.total)).toBe(true);
@@ -201,12 +197,12 @@ describe('costCalculator.estimateCost — unknown model id', () => {
     // Same fallback → identical numbers.
     expect(unknownCost.total).toBeCloseTo(haikuCost.total, 6);
 
-    // SILENT BEHAVIOR: unknown model id silently uses DEFAULT_PRICING
-    // (haiku). console.warn is never called. The user's cost preview will
-    // be WRONG by up to 75x if they typed an Opus model name with a typo.
-    // This is a documented silent failure — fix would be a one-line
-    // console.warn in costFor() when the lookup misses.
-    expect(warnSpy).not.toHaveBeenCalled();
+    // FIXED BEHAVIOR: a structured `[JobHelp] {...}` warn line is emitted for
+    // the unknown model. The known-good model id triggers no warning.
+    expect(warnSpy).toHaveBeenCalled();
+    const logged = warnSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).toContain('claude-fictional-probe-9000');
+    expect(logged).toContain('[JobHelp]');
   });
 });
 

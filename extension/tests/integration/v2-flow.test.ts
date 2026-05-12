@@ -21,6 +21,8 @@ import type {
   GenerateTabHooks,
   GenerateTabController,
 } from '../../src/sidepanel/tabs/generate';
+import { setRuntimeConfig } from '../../src/sidepanel/index';
+import type { JobhelpConfig } from '../../src/types/jobhelp-config';
 import type {
   ResearchCompanyResponse,
   BenchmarkRoleResponse,
@@ -35,6 +37,17 @@ import { installChromeMock } from '../helpers/chrome-mocks';
 const HAIKU = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-4-6';
 const OPUS = 'claude-opus-4-7';
+
+/** Fixture JobhelpConfig — primes getRuntimeConfig() so the Generate tab works. */
+const TEST_CONFIG: JobhelpConfig = {
+  anthropicApiKey: 'sk-ant-test',
+  appsScriptUrl: 'https://script.google.com/macros/s/test/exec',
+  folders: { source: 'srcFolderId', rules: 'rulesFolderId', output: 'outFolderId' },
+  sheetId: 'trackingSheetId',
+  templateDocxId: 'templateDocxId',
+  defaults: { model: HAIKU, togglePreset: 'default' },
+  preferences: { autoConvertOnGenerate: false, showCostInline: true },
+};
 
 // ─── fixtures ───────────────────────────────────────────────────────
 
@@ -180,6 +193,7 @@ function setModelOnRow(
 describe('v2-flow integration probes', () => {
   beforeEach(() => {
     installChromeMock();
+    setRuntimeConfig(TEST_CONFIG);
     if (!('scrollIntoView' in Element.prototype)) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (Element.prototype as any).scrollIntoView = function () {};
@@ -188,6 +202,7 @@ describe('v2-flow integration probes', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    setRuntimeConfig(null);
   });
 
   // ─── PROBE 1: research summary truthfully prepended ─────────────
@@ -545,5 +560,44 @@ describe('v2-flow integration probes', () => {
     // the bug is fixed.
     const validModels = [HAIKU, SONNET, OPUS];
     expect(validModels).toContain(researchSel?.value ?? '');
+  });
+
+  // ─── PROBE 11: sheetId + rowUrl reach the v2 post-gen handlers ──
+
+  it('V11: showGenerateResult with a sheetRowUrl → critique + cover letter both receive sheetId and rowUrl', async () => {
+    // Probe: the v2 handlers can only update the tracking sheet's result
+    // columns if generate.ts forwards { sheetId, rowUrl }. sheetId comes
+    // from getRuntimeConfig(); rowUrl is the 4th arg of showGenerateResult
+    // (the generate result's sheetRowUrl). If either is dropped, the sheet
+    // columns silently stay blank.
+    const SHEET_ROW_URL =
+      'https://docs.google.com/spreadsheets/d/trackingSheetId/edit#gid=0&range=A12';
+    const onCritique = vi.fn().mockResolvedValue(OK_CRITIQUE);
+    const onCoverLetter = vi.fn().mockResolvedValue(OK_COVER_LETTER);
+    const ctrl = await mount(buildHooks({ onCritique, onCoverLetter }));
+
+    setMetaInputs(ctrl, { company: 'Acme', role: 'SWE', url: 'https://e.x', jd: 'JD' });
+    toggleFeature(ctrl, 'critique', true);
+    toggleFeature(ctrl, 'coverLetter', true);
+    await flush();
+
+    ctrl.showGenerateResult(
+      '# Resume',
+      'https://docs.google.com/document/d/docABC/edit',
+      'https://drive.google.com/drive/folders/folderXYZ',
+      SHEET_ROW_URL,
+    );
+    await flush();
+
+    expect(onCritique).toHaveBeenCalledTimes(1);
+    expect(onCoverLetter).toHaveBeenCalledTimes(1);
+    const critReq = onCritique.mock.calls[0][0];
+    const clReq = onCoverLetter.mock.calls[0][0];
+    // SILENT BEHAVIOR (passing post-fix): sheetId + rowUrl truthfully forwarded
+    // to both v2 post-gen handlers so they can write the sheet columns.
+    expect(critReq.sheetId).toBe('trackingSheetId');
+    expect(critReq.rowUrl).toBe(SHEET_ROW_URL);
+    expect(clReq.sheetId).toBe('trackingSheetId');
+    expect(clReq.rowUrl).toBe(SHEET_ROW_URL);
   });
 });

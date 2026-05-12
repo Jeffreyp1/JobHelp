@@ -25,6 +25,7 @@ import type {
   ApiResult,
   ApiErrorResponse,
 } from '../types/api-contract.js';
+import { log } from '../lib/structuredLog.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -118,18 +119,18 @@ export function handleCreateDriveFile(
   deps: Deps,
   req: CreateDriveFileRequest,
 ): ApiResult<CreateDriveFileResult> {
-  console.log(
-    `[create_drive_file] start fileName="${req.fileName}" parentFolderId=${
-      req.parentFolderId ? `"${req.parentFolderId}"` : 'root'
-    } mimeType="${req.mimeType ?? DEFAULT_MIME_TYPE}"`,
-  );
+  log('info', 'create_drive_file start', {
+    fileName: req.fileName,
+    parentFolderId: req.parentFolderId ?? null,
+    mimeType: req.mimeType ?? DEFAULT_MIME_TYPE,
+  });
 
   // Defensive validation in case caller bypassed validateCreateDriveFile
   const validationErr = validateCreateDriveFile(
     req as unknown as Record<string, unknown>,
   );
   if (validationErr) {
-    console.error(`[create_drive_file] validation error: ${validationErr.error.message}`);
+    log('warn', 'create_drive_file validation error', { message: validationErr.error.message });
     return validationErr;
   }
 
@@ -145,13 +146,11 @@ export function handleCreateDriveFile(
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[create_drive_file] drive failure: ${message}`);
+    log('error', 'create_drive_file drive failure', { error: message, fileName: req.fileName });
     return driveError(message);
   }
 
-  console.log(
-    `[create_drive_file] done fileId="${result.fileId}" fileUrl="${result.fileUrl}"`,
-  );
+  log('info', 'create_drive_file done', { fileId: result.fileId });
   return {
     ok: true,
     fileId: result.fileId,

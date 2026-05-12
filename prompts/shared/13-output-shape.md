@@ -59,7 +59,7 @@ only the resume markdown.
 - Each bullet under a role uses `- **Lead:** rest` — the lead word/phrase before the colon must be bolded.
 - Project header lines use `**Project Title** | *url-or-link*` — no other format.
 - Project bullets use `- text` (no bold lead required).
-- Education lines use `**School** – Degree | Date` (em-dash between school and degree).
+- Education lines use `**School** – Degree | Date` (en-dash between school and degree, matching the template above).
 - Output ONLY the resume markdown. No code fences, no commentary, no "Here is your resume:" preamble.
 
 ## Self-check before returning
