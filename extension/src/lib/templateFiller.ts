@@ -35,6 +35,7 @@
 
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+import { log } from './structuredLog.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -270,6 +271,7 @@ function parseHeader(headerLines: string[]): { name: string; contact: string } {
  */
 export function parseSkillsLines(lines: string[]): SkillsGroup[] {
   const groups: SkillsGroup[] = [];
+  const unmatched: string[] = [];
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
@@ -297,6 +299,18 @@ export function parseSkillsLines(lines: string[]): SkillsGroup[] {
       groups.push({ category: m[1].trim(), items: m[2].trim() });
       continue;
     }
+
+    // No regex matched — the line is dropped from the filled DOCX. Record it
+    // so this isn't an invisible "blank Skills section" (audit H6). Changing
+    // the return type to surface `unmatched` to the UI is a follow-up; for now
+    // we at least leave a structured trace.
+    unmatched.push(line);
+  }
+  if (unmatched.length > 0) {
+    log('warn', 'templateFiller: dropped unrecognised Skills line(s)', {
+      count: unmatched.length,
+      samples: unmatched.slice(0, 5),
+    });
   }
   return groups;
 }
@@ -416,6 +430,7 @@ function peelCityStateFromTail(
 function parseExperienceLines(lines: string[]): ExperienceEntry[] {
   const entries: ExperienceEntry[] = [];
   let cur: ExperienceEntry | null = null;
+  const lostLines: string[] = [];
 
   const startsEntry = (line: string): boolean =>
     /^\*\*[^*]+\*\*/.test(line.trim()) && !/^\s*[-*]\s+/.test(line);
@@ -431,6 +446,9 @@ function parseExperienceLines(lines: string[]): ExperienceEntry[] {
       if (header) {
         cur = { ...header, bullets: [] };
         entries.push(cur);
+      } else {
+        // Looked like an entry header but didn't parse — that's a dropped line.
+        lostLines.push(trimmed);
       }
       continue;
     }
@@ -443,10 +461,22 @@ function parseExperienceLines(lines: string[]): ExperienceEntry[] {
       const { plain, links } = extractLinks(rest);
       cur.bullets.push({ lead, rest: plain, links });
     } else if (cur && !bulletMatch) {
-      // Continuation prose — append to last bullet's rest, or skip silently.
-      // For now we ignore non-bulleted text inside experience to avoid
-      // surprising the template.
+      // Continuation prose (a wrapped bullet, a stray paragraph) — we don't
+      // append it to the previous bullet to avoid surprising the template, so
+      // it's dropped from the DOCX. Record it instead of losing it silently
+      // (audit H7). Surfacing `lostLines` to the UI is a follow-up.
+      lostLines.push(trimmed);
+    } else if (!cur && !bulletMatch) {
+      // Prose before any entry header — also dropped.
+      lostLines.push(trimmed);
     }
+  }
+
+  if (lostLines.length > 0) {
+    log('warn', 'templateFiller: dropped non-bullet/continuation line(s) in Experience', {
+      count: lostLines.length,
+      samples: lostLines.slice(0, 5),
+    });
   }
 
   return entries;

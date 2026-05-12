@@ -24,6 +24,7 @@ import type {
 } from '../types/api-contract.js';
 import { ClaudeApiError } from '../types/claude-api.js';
 import { calculateCost } from '../cost.js';
+import { log } from '../lib/structuredLog.js';
 
 // ---------------------------------------------------------------------------
 // Validate
@@ -37,7 +38,7 @@ export function validateVerifyClHooks(
   raw: Record<string, unknown>,
 ): ApiErrorResponse | null {
   if (!raw['coverLetterMd'] || typeof raw['coverLetterMd'] !== 'string') {
-    console.warn('[verifyHooks] validation failed: missing or invalid field "coverLetterMd"');
+    log('warn', 'verifyHooks validation failed: missing or invalid field "coverLetterMd"');
     return {
       ok: false,
       error: {
@@ -49,7 +50,7 @@ export function validateVerifyClHooks(
   }
 
   if (!raw['model'] || typeof raw['model'] !== 'string') {
-    console.warn('[verifyHooks] validation failed: missing or invalid field "model"');
+    log('warn', 'verifyHooks validation failed: missing or invalid field "model"');
     return {
       ok: false,
       error: {
@@ -107,7 +108,7 @@ export function handleVerifyClHooks(
   deps: Deps,
   req: VerifyClHooksRequest,
 ): ApiResult<VerifyClHooksResult> {
-  console.log(`[verifyHooks] start model=${req.model}`);
+  log('info', 'verifyHooks start', { model: req.model });
 
   // ── STEP 1: Entity extraction ────────────────────────────────────────────
   let extractionResponse: ReturnType<typeof deps.claude.call>;
@@ -129,7 +130,7 @@ export function handleVerifyClHooks(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[verifyHooks] entity extraction Claude call failed: ${message}`);
+    log('error', 'verifyHooks: entity extraction Claude call failed', { error: message });
     if (err instanceof ClaudeApiError) {
       return {
         ok: false,
@@ -160,8 +161,10 @@ export function handleVerifyClHooks(
     entities = parsed as ExtractedEntity[];
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[verifyHooks] failed to parse entity extraction JSON: ${message}`);
-    console.warn(`[verifyHooks] raw extraction text: ${extractionResponse.text.slice(0, 200)}`);
+    log('error', 'verifyHooks: failed to parse entity extraction JSON', {
+      error: message,
+      textSnippet: extractionResponse.text.slice(0, 200),
+    });
     return {
       ok: false,
       error: {
@@ -187,12 +190,15 @@ export function handleVerifyClHooks(
           verifyHookUnverifiedCount: 0,
         });
       } catch (err) {
-        console.warn(
-          `[verifyHooks] sheet update failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-        );
+        // M4 (silent-failure-audit): zero-entity short-circuit's sheet write —
+        // surface the failure so the blank column is explained.
+        log('warn', 'verifyHooks: sheet column back-fill failed on zero-entity path (non-fatal)', {
+          error: err instanceof Error ? err.message : String(err),
+          rowUrl: req.rowUrl,
+        });
       }
     }
-    console.log(`[verifyHooks] done entities=0 unverified=0 cost=$${totalCost.totalUsd}`);
+    log('info', 'verifyHooks done', { entities: 0, unverified: 0, cost: totalCost.totalUsd });
     return {
       ok: true,
       verifications: [],
@@ -201,7 +207,7 @@ export function handleVerifyClHooks(
     };
   }
 
-  console.log(`[verifyHooks] extracted ${entities.length} entities, verifying each...`);
+  log('debug', 'verifyHooks: extracted entities — verifying each', { entities: entities.length });
 
   // ── STEP 2: Verify each entity via web_search ────────────────────────────
   const verifications: HookVerification[] = [];
@@ -234,23 +240,38 @@ export function handleVerifyClHooks(
       let parsed: SearchResult;
       try {
         parsed = JSON.parse(searchResponse.text.trim()) as SearchResult;
-      } catch {
-        // Non-JSON search response → treat as uncertain
-        console.warn(
-          `[verifyHooks] non-JSON search response for "${entity}": ${searchResponse.text.slice(0, 100)}`,
-        );
+      } catch (parseErr) {
+        // H4 (silent-failure-audit): a non-JSON search response (rate-limit
+        // returning HTML, etc.) was silently mapped to "uncertain". We keep the
+        // "uncertain" status (the UI's "?" icon is still the right user signal)
+        // but we (a) log at WARN with the raw text so the genuine Claude
+        // misbehaviour is diagnosable, and (b) keep the raw snippet in `reason`
+        // so the UI can render "? — non-JSON response" rather than a generic "?".
+        const snippet = searchResponse.text.slice(0, 200);
+        log('warn', 'verifyHooks: non-JSON search response — marking entity uncertain', {
+          entity,
+          entityType,
+          error: parseErr instanceof Error ? parseErr.message : String(parseErr),
+          textSnippet: snippet,
+        });
         verifications.push({
           entity,
           entityType,
           status: 'uncertain',
           sources: [],
-          reason: `Search response was not valid JSON: ${searchResponse.text.slice(0, 100)}`,
+          reason: `Search response was not valid JSON: ${snippet}`,
         });
         totalCost = accumulateCost(
           totalCost,
           calculateCost(searchResponse.usage, searchResponse.model),
         );
         continue;
+      }
+
+      if (parsed.status === undefined) {
+        // L7 (silent-failure-audit): valid JSON missing `status` silently
+        // defaults to "uncertain" — acceptable, but worth a debug note.
+        log('debug', 'verifyHooks: search JSON missing "status" field — defaulting to uncertain', { entity, entityType });
       }
 
       totalCost = accumulateCost(
@@ -266,17 +287,23 @@ export function handleVerifyClHooks(
         reason: parsed.reason,
       });
     } catch (err) {
-      // Per-entity search failure → mark uncertain, continue
-      console.warn(
-        `[verifyHooks] search failed for entity "${entity}" (${entityType}):`,
-        err instanceof Error ? err.message : String(err),
-      );
+      // M6 (silent-failure-audit): per-entity search failure → mark uncertain,
+      // continue. We can't add an errorType field to HookVerification without a
+      // shared-type change (flagged); the error class is logged here and kept
+      // verbatim in `reason` so the UI can still surface it.
+      const message = err instanceof Error ? err.message : String(err);
+      log('warn', 'verifyHooks: per-entity search failed — marking entity uncertain', {
+        entity,
+        entityType,
+        error: message,
+        errorType: err instanceof ClaudeApiError ? err.errorType : 'other',
+      });
       verifications.push({
         entity,
         entityType,
         status: 'uncertain',
         sources: [],
-        reason: err instanceof Error ? err.message : String(err),
+        reason: message,
       });
     }
   }
@@ -293,15 +320,19 @@ export function handleVerifyClHooks(
         verifyHookUnverifiedCount: unverifiedCount,
       });
     } catch (err) {
-      console.warn(
-        `[verifyHooks] sheet update failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-      );
+      // M5 (silent-failure-audit): populated-entities path sheet write.
+      log('warn', 'verifyHooks: sheet column back-fill failed (non-fatal)', {
+        error: err instanceof Error ? err.message : String(err),
+        rowUrl: req.rowUrl,
+      });
     }
   }
 
-  console.log(
-    `[verifyHooks] done entities=${verifications.length} unverified=${unverifiedCount} cost=$${totalCost.totalUsd}`,
-  );
+  log('info', 'verifyHooks done', {
+    entities: verifications.length,
+    unverified: unverifiedCount,
+    cost: totalCost.totalUsd,
+  });
 
   return {
     ok: true,

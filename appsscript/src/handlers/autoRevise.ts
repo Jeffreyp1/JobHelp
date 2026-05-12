@@ -31,6 +31,7 @@ import type {
 } from '../types/api-contract.js';
 import { ClaudeApiError } from '../types/claude-api.js';
 import { calculateCost } from '../cost.js';
+import { log } from '../lib/structuredLog.js';
 
 // ---------------------------------------------------------------------------
 // Validate
@@ -49,33 +50,35 @@ export function validateAutoRevise(
   raw: Record<string, unknown>,
 ): ApiErrorResponse | null {
   if (typeof raw['currentMarkdown'] !== 'string' || (raw['currentMarkdown'] as string).length === 0) {
-    console.warn('[autoRevise] validate fail: currentMarkdown missing/empty');
+    log('warn', 'autoRevise validate fail: currentMarkdown missing/empty');
     return validationError('Missing or invalid required field: currentMarkdown');
   }
   if (typeof raw['instruction'] !== 'string' || (raw['instruction'] as string).length === 0) {
-    console.warn('[autoRevise] validate fail: instruction missing/empty');
+    log('warn', 'autoRevise validate fail: instruction missing/empty');
     return validationError('Missing or invalid required field: instruction');
   }
   // Reject whitespace-only instructions: rule 14 requires the instruction to
   // "explicitly authorise" lines, so " \n\t " carries no authorisation and
-  // must not be accepted. Uses vanilla \s (no Unicode whitespace handling).
+  // must not be accepted. Note: String.prototype.trim() already strips Unicode
+  // whitespace (incl. NBSP, EN/EM SPACE) per the ES spec, so the M25 audit
+  // concern about Unicode-only-whitespace instructions is covered here.
   if ((raw['instruction'] as string).trim().length === 0) {
-    console.warn('[autoRevise] validate fail: instruction is whitespace-only');
+    log('warn', 'autoRevise validate fail: instruction is whitespace-only');
     return validationError('instruction must be non-whitespace');
   }
   if (typeof raw['model'] !== 'string' || (raw['model'] as string).length === 0) {
-    console.warn('[autoRevise] validate fail: model missing/empty');
+    log('warn', 'autoRevise validate fail: model missing/empty');
     return validationError('Missing or invalid required field: model');
   }
   const scope = raw['targetScope'];
   if (!scope || typeof scope !== 'object') {
-    console.warn('[autoRevise] validate fail: targetScope missing/not object');
+    log('warn', 'autoRevise validate fail: targetScope missing/not object');
     return validationError('Missing or invalid required field: targetScope');
   }
   const s = scope as Record<string, unknown>;
   const kind = s['kind'];
   if (typeof kind !== 'string' || !(VALID_SCOPE_KINDS as readonly string[]).includes(kind)) {
-    console.warn(`[autoRevise] validate fail: invalid scope kind "${String(kind)}"`);
+    log('warn', 'autoRevise validate fail: invalid scope kind', { kind: String(kind) });
     return validationError(`targetScope.kind must be one of: ${VALID_SCOPE_KINDS.join(', ')}`);
   }
   if (kind === 'bullet' && (typeof s['bulletId'] !== 'string' || (s['bulletId'] as string).length === 0)) {
@@ -331,7 +334,9 @@ function partitionUnauthorized(
 
   if (!range) {
     // Can't locate the scope — treat ALL diff entries as unauthorised so the UI warns.
-    console.warn(`[autoRevise] scope not found in source markdown — treating all changes as unauthorized`);
+    log('warn', 'autoRevise: target scope not found in source markdown — treating all changes as unauthorized', {
+      scopeKind: scope.kind,
+    });
     return diff.slice();
   }
 
@@ -359,7 +364,7 @@ export function handleAutoRevise(
   deps: Deps,
   req: AutoReviseRequest,
 ): ApiResult<AutoReviseResult> {
-  console.log(`[autoRevise] start scope=${req.targetScope.kind} model=${req.model}`);
+  log('info', 'autoRevise start', { scopeKind: req.targetScope.kind, model: req.model });
 
   const system = buildSystemPrompt(req.targetScope);
   const userMessage = buildUserMessage(req);
@@ -375,7 +380,12 @@ export function handleAutoRevise(
     });
   } catch (err) {
     if (err instanceof ClaudeApiError) {
-      console.error(`[autoRevise] Claude error type=${err.errorType} status=${err.statusCode}: ${err.message}`);
+      log('error', 'autoRevise Claude API error', {
+        errorType: err.errorType,
+        status: err.statusCode,
+        retryable: err.retryable,
+        error: err.message,
+      });
       return {
         ok: false,
         error: {
@@ -386,7 +396,7 @@ export function handleAutoRevise(
       };
     }
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[autoRevise] unexpected Claude failure: ${msg}`);
+    log('error', 'autoRevise unexpected Claude failure', { error: msg });
     return {
       ok: false,
       error: { type: 'server', message: msg, retryable: true },
@@ -403,14 +413,19 @@ export function handleAutoRevise(
   const unauthorizedChanges = partitionUnauthorized(diff, req.targetScope, originalLines);
 
   if (unauthorizedChanges.length > 0) {
-    console.warn(`[autoRevise] WARNING: ${unauthorizedChanges.length} unauthorized changes detected`);
+    log('warn', 'autoRevise: Claude made changes outside the requested scope (rule 14 violation)', {
+      unauthorizedCount: unauthorizedChanges.length,
+      scopeKind: req.targetScope.kind,
+    });
   }
 
   const cost = calculateCost(claudeResponse.usage, claudeResponse.model);
 
-  console.log(
-    `[autoRevise] done diffLines=${diff.length} unauthorized=${unauthorizedChanges.length} cost=$${cost.totalUsd}`,
-  );
+  log('info', 'autoRevise done', {
+    diffLines: diff.length,
+    unauthorized: unauthorizedChanges.length,
+    cost: cost.totalUsd,
+  });
 
   return {
     ok: true,

@@ -6,6 +6,7 @@
  * never has to deal with raw fetch / error shapes.
  */
 
+import { log } from './structuredLog.js';
 import type {
   GenerateRequest,
   GenerateResponse,
@@ -53,6 +54,11 @@ function networkError(message: string): { ok: false; error: ApiError } {
   };
 }
 
+/** First N chars of a string, single-lined, for diagnostic context. */
+function headSnippet(s: string, n = 200): string {
+  return s.slice(0, n).replace(/\s+/g, ' ').trim();
+}
+
 export class ApiClient {
   constructor(private readonly appsScriptUrl: string) {}
 
@@ -68,15 +74,70 @@ export class ApiClient {
     } catch (err) {
       // Network-level failure (offline, DNS, CORS hard block, etc.)
       const message = (err as Error)?.message ?? 'Network request failed';
+      log('warn', 'apiClient: network request failed', {
+        action: body.action,
+        error: message,
+      });
       return networkError(message) as T;
     }
 
     // HTTP-level errors (4xx/5xx from the reverse-proxy, not from Apps Script)
     if (!response.ok) {
+      log('warn', 'apiClient: HTTP error response', {
+        action: body.action,
+        status: response.status,
+        statusText: response.statusText,
+      });
       return networkError(`HTTP ${response.status}: ${response.statusText}`) as T;
     }
 
-    return response.json() as Promise<T>;
+    // The Apps Script endpoint can return 200 with a non-JSON body — an auth
+    // landing page, a Cloudflare 502 HTML page, etc. `response.json()` would
+    // reject with a SyntaxError that the caller's `if (!resp.ok)` branch never
+    // sees because `resp` itself never resolves (audit H5). Read the body as
+    // text first, then parse, so a non-JSON body becomes a loud, typed error.
+    let rawText: string;
+    try {
+      rawText = await response.text();
+    } catch (err) {
+      const message = (err as Error)?.message ?? 'Failed to read response body';
+      log('error', 'apiClient: failed to read response body', {
+        action: body.action,
+        error: message,
+      });
+      return networkError(message) as T;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      const snippet = headSnippet(rawText);
+      log('error', 'apiClient: response was not valid JSON', {
+        action: body.action,
+        bodySnippet: snippet,
+      });
+      return networkError(`Response was not valid JSON: ${snippet}`) as T;
+    }
+
+    // Every backend response is an ApiResult<T> — i.e. it must carry a boolean
+    // `ok` discriminator. A response missing it is a schema mismatch (wrong
+    // endpoint, partial proxy response, etc.); surface it instead of letting
+    // `undefined` field accesses crash the UI later (audit M10).
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      typeof (parsed as { ok?: unknown }).ok !== 'boolean'
+    ) {
+      const snippet = headSnippet(rawText);
+      log('error', 'apiClient: malformed response — missing ok flag', {
+        action: body.action,
+        bodySnippet: snippet,
+      });
+      return networkError(`Malformed response — missing ok flag: ${snippet}`) as T;
+    }
+
+    return parsed as T;
   }
 
   /**

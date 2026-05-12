@@ -467,7 +467,10 @@ export interface HookVerification {
   /** PI / product / program / company / paper / etc. */
   entityType: string;
   status: HookStatus;
-  /** Search results that backed the status decision */
+  /**
+   * Search results that backed the status decision.
+   * Always present; empty array when no citations were returned.
+   */
   sources: { title: string; url: string }[];
   /** Explanation for unverified/uncertain */
   reason?: string;
@@ -504,13 +507,26 @@ export interface MultiVersionRequest {
   sourceFolderId: string;
   rulesFolderId: string;
   model: string;
-  /** How many variants to generate. Each gets a different framing prompt suffix. */
+  /**
+   * How many variants to generate. Each gets a different framing prompt suffix.
+   * Valid range: [2, 5] inclusive — `validateMultiVersion` rejects anything
+   * outside that range. Kept as `number` (not a literal union) to avoid
+   * widening every caller / breaking the wire format.
+   */
   count: number;
   /** Optional explicit framing labels; default ["Technical depth", "Leadership", "Business outcomes"] */
   framings?: string[];
-  /** Optional sheet+row to update with the result column. If omitted, no sheet write. */
+  /**
+   * Currently ignored by multi_version — the Multi-Version Label sheet column
+   * is written by the (not-yet-implemented) finalize-variant flow. Accepted
+   * for forward-compatibility.
+   */
   sheetId?: string;
-  /** Optional sheet+row to update with the result column. If omitted, no sheet write. */
+  /**
+   * Currently ignored by multi_version — the Multi-Version Label sheet column
+   * is written by the (not-yet-implemented) finalize-variant flow. Accepted
+   * for forward-compatibility.
+   */
   rowUrl?: string;
 }
 export interface MultiVersionResult {

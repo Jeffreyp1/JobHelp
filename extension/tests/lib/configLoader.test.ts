@@ -233,6 +233,48 @@ describe("loadConfigFromDrive — apiClient failure", () => {
       expect((err as Error).message).toContain("Unauthorized");
     }
   });
+
+  it("preserves the original error type in the thrown message (audit M12)", async () => {
+    const { client } = mockApiClient({
+      ok: false,
+      error: { type: "drive", message: "File not found", retryable: false },
+    });
+    await expect(loadConfigFromDrive("file-typed", client)).rejects.toThrow(
+      /\[drive\]/,
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Silent-failure hardening: suspicious API-key format now leaves a trace
+// (audit M24)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("loadConfigFromDrive — anthropicApiKey sanity log", () => {
+  it("logs a structured warn when the API key doesn't start with sk-ant- (but still loads)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { client } = mockApiClient(
+      okResponse(toBase64({ ...VALID_CONFIG, anthropicApiKey: "sk-ANT-typo-key" })),
+    );
+
+    const config = await loadConfigFromDrive("file-badkey", client);
+    expect(config.anthropicApiKey).toBe("sk-ANT-typo-key");
+
+    const logged = warnSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(logged).toMatch(/\[JobHelp\]/);
+    expect(logged).toMatch(/does not start with 'sk-ant-'/i);
+    // The key value itself must be redacted by the logger.
+    expect(logged).not.toContain("sk-ANT-typo-key");
+    warnSpy.mockRestore();
+  });
+
+  it("does not warn for a well-formed sk-ant- key", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { client } = mockApiClient(okResponse(toBase64(VALID_CONFIG)));
+    await loadConfigFromDrive("file-goodkey", client);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -23,6 +23,7 @@ import type {
 } from '../types/api-contract.js';
 import { calculateCost } from '../cost.js';
 import { buildUserMessage, buildJobInsightsSummary } from '../message-builder.js';
+import { log } from '../lib/structuredLog.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -137,14 +138,16 @@ export function handleMultiVersion(
   deps: Deps,
   req: MultiVersionRequest,
 ): ApiResult<MultiVersionResult> {
-  console.log(`[multiVersion] start count=${req.count} model=${req.model}`);
+  log('info', 'multiVersion start', { count: req.count, model: req.model });
 
   // 1. Read source materials ONCE
   let sourceMaterials: ReturnType<typeof deps.drive.readSourceFiles>;
   try {
     sourceMaterials = deps.drive.readSourceFiles(req.sourceFolderId);
   } catch (err) {
-    return driveError(String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    log('warn', 'multiVersion: drive.readSourceFiles failed', { error: message });
+    return driveError(message);
   }
 
   // 2. Read rule files ONCE
@@ -152,7 +155,9 @@ export function handleMultiVersion(
   try {
     ruleFiles = deps.drive.readRuleFiles(req.rulesFolderId);
   } catch (err) {
-    return driveError('Rules folder error: ' + String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    log('warn', 'multiVersion: drive.readRuleFiles failed', { error: message });
+    return driveError('Rules folder error: ' + message);
   }
 
   // 3. Compose base system prompt ONCE
@@ -201,12 +206,18 @@ export function handleMultiVersion(
         messages: [{ role: 'user', content: userContent }],
       });
     } catch (err) {
-      console.error(`[multiVersion] variant ${i + 1} failed (framing="${framing}"):`, err);
+      const message = err instanceof Error ? err.message : String(err);
+      log('error', 'multiVersion: variant generation failed (aborting — all-or-nothing)', {
+        variant: i + 1,
+        of: req.count,
+        framing,
+        error: message,
+      });
       return {
         ok: false,
         error: {
           type: 'server',
-          message: `Variant ${i + 1} ("${framing}") failed: ${String(err)}`,
+          message: `Variant ${i + 1} ("${framing}") failed: ${message}`,
           retryable: true,
         },
       };
@@ -215,9 +226,12 @@ export function handleMultiVersion(
     const variantCost = calculateCost(response.usage, response.model);
     accumulatedCost = accumulateCost(accumulatedCost, variantCost);
 
-    console.log(
-      `[multiVersion] variant ${i + 1}/${req.count} framing="${framing}" done cost=$${variantCost.totalUsd}`,
-    );
+    log('debug', 'multiVersion variant done', {
+      variant: i + 1,
+      of: req.count,
+      framing,
+      cost: variantCost.totalUsd,
+    });
 
     variants.push({
       label: framing,
@@ -226,7 +240,7 @@ export function handleMultiVersion(
     });
   }
 
-  console.log(`[multiVersion] done totalCost=$${accumulatedCost.totalUsd}`);
+  log('info', 'multiVersion done', { variants: variants.length, cost: accumulatedCost.totalUsd });
 
   // TODO: Sheet column "Multi-Version Label" is written by the
   // finalize-variant flow (which knows which variant the user picked),

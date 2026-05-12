@@ -18,6 +18,7 @@
  * If omitted, behaviour is identical to v1 (generate only).
  */
 import type { ToggleConfig } from '../types/api-contract.js';
+import { log } from './structuredLog.js';
 
 export interface CostEstimate {
   generate: number;
@@ -127,9 +128,26 @@ const VERIFY_HOOKS_PER_ENTITY: TokenProfile = {
   output: 300,
 };
 
+/** Models we've already warned about this session — keeps the log from spamming. */
+const warnedUnknownModels = new Set<string>();
+
 /** Cost of a single call given model + token profile. */
 function costFor(modelId: string, profile: TokenProfile): number {
-  const pricing = PRICING_PER_M[modelId] ?? DEFAULT_PRICING;
+  let pricing = PRICING_PER_M[modelId];
+  if (!pricing) {
+    // An unknown model id (typo, or a model added to the backend table but not
+    // mirrored here) silently bills at Haiku rates — the preview can be wrong
+    // by ~75x if the user meant an Opus model. Surface it (audit M16). We
+    // still return a finite number so the existing preview UI keeps working.
+    if (!warnedUnknownModels.has(modelId)) {
+      warnedUnknownModels.add(modelId);
+      log('warn', 'costCalculator: unknown model id — falling back to Haiku pricing', {
+        modelId,
+        knownModels: Object.keys(PRICING_PER_M),
+      });
+    }
+    pricing = DEFAULT_PRICING;
+  }
   return (
     (profile.cacheRead * pricing.cacheRead +
       profile.freshInput * pricing.input +

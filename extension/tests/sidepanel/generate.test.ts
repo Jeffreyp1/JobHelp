@@ -14,6 +14,8 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderGenerateTab } from '../../src/sidepanel/tabs/generate';
 import type { GenerateTabHooks, GenerateTabController } from '../../src/sidepanel/tabs/generate';
+import { setRuntimeConfig } from '../../src/sidepanel/index';
+import type { JobhelpConfig } from '../../src/types/jobhelp-config';
 import type {
   ResearchCompanyResponse,
   BenchmarkRoleResponse,
@@ -28,6 +30,17 @@ import { installChromeMock } from '../helpers/chrome-mocks';
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-4-6';
+
+/** Fixture JobhelpConfig used to prime getRuntimeConfig() for the Generate tab. */
+const TEST_CONFIG: JobhelpConfig = {
+  anthropicApiKey: 'sk-ant-test',
+  appsScriptUrl: 'https://script.google.com/macros/s/test/exec',
+  folders: { source: 'srcFolderId', rules: 'rulesFolderId', output: 'outFolderId' },
+  sheetId: 'trackingSheetId',
+  templateDocxId: 'templateDocxId',
+  defaults: { model: HAIKU, togglePreset: 'default' },
+  preferences: { autoConvertOnGenerate: false, showCostInline: true },
+};
 
 // ─── fixture builders ───────────────────────────────────────────────
 
@@ -179,6 +192,10 @@ function toggleFeature(ctrl: GenerateTabController, featureKey: string, enabled:
 describe('renderGenerateTab — v2 orchestration', () => {
   beforeEach(() => {
     installChromeMock();
+    // The Generate tab now reads its Drive folder/sheet ids from the
+    // module-scoped runtime config (index.ts). Prime it so click handlers
+    // don't short-circuit with "Run setup in Settings first".
+    setRuntimeConfig(TEST_CONFIG);
     // jsdom does not implement scrollIntoView; generate.ts uses it inside a
     // requestAnimationFrame callback after showResume / multi-version render.
     // Polyfill on Element.prototype so the rAF callback doesn't throw an
@@ -191,6 +208,7 @@ describe('renderGenerateTab — v2 orchestration', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    setRuntimeConfig(null);
   });
 
   it('returns a controller exposing the required methods', async () => {
@@ -492,6 +510,128 @@ describe('renderGenerateTab — v2 orchestration', () => {
 
     const verify = ctrl.root.querySelector<HTMLElement>('[data-feature="verifyHooks"]');
     expect(verify?.querySelector<HTMLSelectElement>('select.model-select')?.value).toBe(SONNET);
+  });
+
+  it('config not loaded → clicking Generate shows "Run setup in Settings first" and does not call onGenerate', async () => {
+    setRuntimeConfig(null);
+    const onGenerate = vi.fn().mockResolvedValue(undefined);
+    const ctrl = await mount(buildHooks({ onGenerate }));
+    setMetaInputs(ctrl, { company: 'Acme', role: 'SWE', jd: 'JD' });
+
+    clickGenerate(ctrl);
+    await flush();
+
+    expect(onGenerate).not.toHaveBeenCalled();
+    const statusEl = ctrl.root.querySelector('.generate__status');
+    expect(statusEl?.textContent ?? '').toMatch(/run setup in settings/i);
+  });
+
+  it('onGenerate request carries the Drive folder/sheet ids from the runtime config', async () => {
+    const onGenerate = vi.fn().mockResolvedValue(undefined);
+    const ctrl = await mount(buildHooks({ onGenerate }));
+    setMetaInputs(ctrl, { company: 'Acme', role: 'SWE', jd: 'JD' });
+
+    clickGenerate(ctrl);
+    await flush();
+
+    expect(onGenerate).toHaveBeenCalledTimes(1);
+    const req = onGenerate.mock.calls[0][0];
+    expect(req.sourceFolderId).toBe('srcFolderId');
+    expect(req.rulesFolderId).toBe('rulesFolderId');
+    expect(req.outputFolderId).toBe('outFolderId');
+    expect(req.sheetId).toBe('trackingSheetId');
+  });
+
+  it('showGenerateResult with sheetRowUrl → critique call carries sheetId + rowUrl', async () => {
+    const onCritique = vi.fn().mockResolvedValue(OK_CRITIQUE);
+    const ctrl = await mount(buildHooks({ onCritique }));
+    setMetaInputs(ctrl, { jd: 'JD' });
+    toggleFeature(ctrl, 'critique', true);
+    await flush();
+
+    ctrl.showGenerateResult(
+      '# Resume MD',
+      'https://docs.google.com/document/d/docABC/edit',
+      'https://drive.google.com/drive/folders/folderXYZ',
+      'https://docs.google.com/spreadsheets/d/trackingSheetId/edit#gid=0&range=A7',
+    );
+    await flush();
+
+    expect(onCritique).toHaveBeenCalledTimes(1);
+    const req = onCritique.mock.calls[0][0];
+    expect(req.sheetId).toBe('trackingSheetId');
+    expect(req.rowUrl).toBe('https://docs.google.com/spreadsheets/d/trackingSheetId/edit#gid=0&range=A7');
+  });
+
+  it('showGenerateResult with sheetRowUrl → cover-letter call carries sheetId + rowUrl', async () => {
+    const onCoverLetter = vi.fn().mockResolvedValue(OK_COVER_LETTER);
+    const ctrl = await mount(buildHooks({ onCoverLetter }));
+    setMetaInputs(ctrl, { company: 'Acme', role: 'SWE', jd: 'JD' });
+    toggleFeature(ctrl, 'coverLetter', true);
+    await flush();
+
+    ctrl.showGenerateResult(
+      '# Resume MD',
+      'https://docs.google.com/document/d/docABC/edit',
+      'https://drive.google.com/drive/folders/folderXYZ',
+      'https://docs.google.com/spreadsheets/d/trackingSheetId/edit#range=A7',
+    );
+    await flush();
+
+    expect(onCoverLetter).toHaveBeenCalledTimes(1);
+    const req = onCoverLetter.mock.calls[0][0];
+    expect(req.sheetId).toBe('trackingSheetId');
+    expect(req.rowUrl).toBe('https://docs.google.com/spreadsheets/d/trackingSheetId/edit#range=A7');
+  });
+
+  it('Verify Hooks call carries sheetId + rowUrl when a sheetRowUrl was captured', async () => {
+    const onCoverLetter = vi.fn().mockResolvedValue(OK_COVER_LETTER);
+    const onVerifyClHooks = vi.fn().mockResolvedValue(OK_VERIFY_HOOKS);
+    const ctrl = await mount(buildHooks({ onCoverLetter, onVerifyClHooks }));
+    setMetaInputs(ctrl, { company: 'Acme', role: 'SWE', jd: 'JD' });
+    toggleFeature(ctrl, 'coverLetter', true);
+    await flush();
+
+    ctrl.showGenerateResult(
+      '# Resume MD',
+      'https://docs.google.com/document/d/docABC/edit',
+      'https://drive.google.com/drive/folders/folderXYZ',
+      'https://docs.google.com/spreadsheets/d/trackingSheetId/edit#range=A7',
+    );
+    await flush();
+
+    const verifyBtn = ctrl.root.querySelector<HTMLButtonElement>(
+      '[data-role="cl-result"] [data-action="verify-hooks"]',
+    );
+    verifyBtn?.click();
+    await flush();
+
+    expect(onVerifyClHooks).toHaveBeenCalledTimes(1);
+    const req = onVerifyClHooks.mock.calls[0][0];
+    expect(req.coverLetterMd).toBe(OK_COVER_LETTER.coverLetterMd);
+    expect(req.sheetId).toBe('trackingSheetId');
+    expect(req.rowUrl).toBe('https://docs.google.com/spreadsheets/d/trackingSheetId/edit#range=A7');
+  });
+
+  it('no sheetRowUrl captured → v2 post-gen calls omit sheetId + rowUrl', async () => {
+    const onCritique = vi.fn().mockResolvedValue(OK_CRITIQUE);
+    const ctrl = await mount(buildHooks({ onCritique }));
+    setMetaInputs(ctrl, { jd: 'JD' });
+    toggleFeature(ctrl, 'critique', true);
+    await flush();
+
+    // No fourth argument → state.sheetRowUrl stays null.
+    ctrl.showGenerateResult(
+      '# Resume MD',
+      'https://docs.google.com/document/d/docABC/edit',
+      'https://drive.google.com/drive/folders/folderXYZ',
+    );
+    await flush();
+
+    expect(onCritique).toHaveBeenCalledTimes(1);
+    const req = onCritique.mock.calls[0][0];
+    expect(req.sheetId).toBeUndefined();
+    expect(req.rowUrl).toBeUndefined();
   });
 
   it('hooks gracefully no-op when undefined (critiqueEnabled=true but no onCritique → console.warn / no throw)', async () => {

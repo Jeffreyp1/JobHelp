@@ -8,7 +8,7 @@
  * unzip the result and assert on the rendered XML.
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import JSZip from 'jszip';
@@ -19,6 +19,7 @@ import {
   parseEducationLines,
   parseExperienceHeader,
   extractLinks,
+  __test,
   type ResumeData,
 } from '../../src/lib/templateFiller';
 
@@ -189,6 +190,46 @@ jane@example.com
       degree: 'BS in CS',
       date: '',
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Silent-failure hardening: dropped lines now leave a structured trace
+// (audit H6 / H7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('parser drops are no longer silent', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('T-log1: parseSkillsLines emits a structured warn when it drops an unrecognised line', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const groups = parseSkillsLines([
+      '**Languages**: Go, Rust',
+      'this line has no colon so it cannot be parsed',
+    ]);
+    expect(groups).toEqual([{ category: 'Languages', items: 'Go, Rust' }]);
+    const logged = warnSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).toMatch(/\[JobHelp\]/);
+    expect(logged).toMatch(/dropped unrecognised Skills line/i);
+  });
+
+  it('T-log2: parseSkillsLines stays quiet when every line parses', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    parseSkillsLines(['**Languages**: Go', 'Tools: NX']);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('T-log3: parseExperienceLines emits a structured warn when it drops continuation prose', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const entries = __test.parseExperienceLines([
+      '**Senior Engineer** Acme | Pasadena, CA | Jun 2022 - Present',
+      '- Led the thermal redesign.',
+      'This is a continuation paragraph that is not a bullet and gets dropped.',
+    ]);
+    expect(entries.length).toBe(1);
+    expect(entries[0].bullets.length).toBe(1);
+    const logged = warnSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).toMatch(/dropped non-bullet\/continuation line/i);
   });
 });
 

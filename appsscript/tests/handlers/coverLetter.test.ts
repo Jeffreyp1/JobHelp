@@ -303,6 +303,53 @@ describe('validateCoverLetter', () => {
     expect(result).not.toBeNull();
     expect(result?.error.type).toBe('validation');
   });
+
+  it('H21: non-string company → validation error', () => {
+    const result = validateCoverLetter({
+      action: 'cover_letter',
+      resumeMd: '# Resume',
+      jd: 'Some JD',
+      jobFolderId: JOB_FOLDER_ID,
+      sourceFolderId: SOURCE_FOLDER_ID,
+      rulesFolderId: RULES_FOLDER_ID,
+      model: MODEL,
+      company: 123,
+      role: null,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.error.type).toBe('validation');
+    expect(result?.error.message).toContain('company');
+  });
+
+  it('H21: non-string role → validation error', () => {
+    const result = validateCoverLetter({
+      action: 'cover_letter',
+      resumeMd: '# Resume',
+      jd: 'Some JD',
+      jobFolderId: JOB_FOLDER_ID,
+      sourceFolderId: SOURCE_FOLDER_ID,
+      rulesFolderId: RULES_FOLDER_ID,
+      model: MODEL,
+      company: null,
+      role: { weird: true },
+    });
+    expect(result).not.toBeNull();
+    expect(result?.error.type).toBe('validation');
+    expect(result?.error.message).toContain('role');
+  });
+
+  it('H21: company/role omitted entirely → still valid', () => {
+    const result = validateCoverLetter({
+      action: 'cover_letter',
+      resumeMd: '# Resume',
+      jd: 'Some JD',
+      jobFolderId: JOB_FOLDER_ID,
+      sourceFolderId: SOURCE_FOLDER_ID,
+      rulesFolderId: RULES_FOLDER_ID,
+      model: MODEL,
+    });
+    expect(result).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

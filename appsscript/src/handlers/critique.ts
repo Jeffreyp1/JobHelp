@@ -27,6 +27,7 @@ import type {
 } from '../types/api-contract.js';
 import { ClaudeApiError } from '../types/claude-api.js';
 import { calculateCost } from '../cost.js';
+import { log } from '../lib/structuredLog.js';
 
 // ---------------------------------------------------------------------------
 // Constants — 8-dimension rubric
@@ -60,22 +61,22 @@ export function validateCritique(
   raw: Record<string, unknown>,
 ): ApiErrorResponse | null {
   if (typeof raw['resumeMd'] !== 'string' || raw['resumeMd'].length === 0) {
-    console.warn('[critique] validate fail: resumeMd missing/empty');
+    log('warn', 'critique validate fail: resumeMd missing/empty');
     return validationError('Missing or invalid required field: resumeMd');
   }
   if (typeof raw['jd'] !== 'string' || raw['jd'].length === 0) {
-    console.warn('[critique] validate fail: jd missing/empty');
+    log('warn', 'critique validate fail: jd missing/empty');
     return validationError('Missing or invalid required field: jd');
   }
   if (typeof raw['model'] !== 'string' || raw['model'].length === 0) {
-    console.warn('[critique] validate fail: model missing/empty');
+    log('warn', 'critique validate fail: model missing/empty');
     return validationError('Missing or invalid required field: model');
   }
   // jobInsights / jobFolderId are optional and either object|null|string|null
   if (raw['jobFolderId'] !== undefined &&
       raw['jobFolderId'] !== null &&
       typeof raw['jobFolderId'] !== 'string') {
-    console.warn('[critique] validate fail: jobFolderId must be string|null');
+    log('warn', 'critique validate fail: jobFolderId must be string|null');
     return validationError('jobFolderId must be a string or null');
   }
   return null;
@@ -118,8 +119,12 @@ function buildUserMessage(req: CritiqueRequest): string {
   if (req.jobInsights) {
     try {
       sections.push(`=== Job Insights ===\n${JSON.stringify(req.jobInsights, null, 2)}`);
-    } catch {
-      // ignore — jobInsights is optional context
+    } catch (err) {
+      // jobInsights is supplementary context — a serialisation failure (cyclic
+      // ref etc.) is non-fatal, but log it so we know the model ran without it.
+      log('warn', 'critique: failed to serialise jobInsights — proceeding without it', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
   sections.push(`=== Resume (Markdown) ===\n${req.resumeMd}`);
@@ -258,7 +263,7 @@ export function handleCritique(
   deps: Deps,
   req: CritiqueRequest,
 ): ApiResult<CritiqueResult> {
-  console.log(`[critique] start model=${req.model} jobFolderId=${req.jobFolderId ?? 'null'}`);
+  log('info', 'critique start', { model: req.model, jobFolderId: req.jobFolderId ?? null });
 
   const system = buildSystemPrompt();
   const userMessage = buildUserMessage(req);
@@ -274,7 +279,12 @@ export function handleCritique(
     });
   } catch (err) {
     if (err instanceof ClaudeApiError) {
-      console.error(`[critique] Claude error type=${err.errorType} status=${err.statusCode}: ${err.message}`);
+      log('error', 'critique Claude API error', {
+        errorType: err.errorType,
+        status: err.statusCode,
+        retryable: err.retryable,
+        error: err.message,
+      });
       return {
         ok: false,
         error: {
@@ -285,7 +295,7 @@ export function handleCritique(
       };
     }
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[critique] unexpected Claude failure: ${msg}`);
+    log('error', 'critique unexpected Claude failure', { error: msg });
     return {
       ok: false,
       error: { type: 'server', message: msg, retryable: true },
@@ -301,7 +311,10 @@ export function handleCritique(
     improvements = parsed.improvements;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[critique] failed to parse Claude JSON: ${msg}`);
+    log('error', 'critique failed to parse Claude JSON', {
+      error: msg,
+      textSnippet: claudeResponse.text.slice(0, 200),
+    });
     return {
       ok: false,
       error: {
@@ -326,7 +339,12 @@ export function handleCritique(
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[critique] sheet update failed (non-fatal): ${msg}`);
+      // M2 (silent-failure-audit): non-fatal, but the "Critique Score" sheet
+      // column will be blank with no signal — make it visible in the log.
+      log('warn', 'critique: sheet column back-fill failed (non-fatal)', {
+        error: msg,
+        rowUrl: req.rowUrl,
+      });
     }
   }
 
@@ -343,7 +361,10 @@ export function handleCritique(
       critiqueDocUrl = docUrl;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[critique] drive write failed (non-fatal): ${msg}`);
+      log('warn', 'critique: critique.md Drive write failed (non-fatal) — returning ok with critiqueDocUrl=null', {
+        error: msg,
+        jobFolderId: req.jobFolderId,
+      });
       // Degraded: keep ok:true, just leave critiqueDocUrl=null
       critiqueDocUrl = null;
     }
@@ -351,7 +372,7 @@ export function handleCritique(
 
   const cost = calculateCost(claudeResponse.usage, claudeResponse.model);
 
-  console.log(`[critique] done score=${totalScore.toFixed(2)} cost=$${cost.totalUsd}`);
+  log('info', 'critique done', { score: totalScore, cost: cost.totalUsd, critiqueDocUrl });
 
   return {
     ok: true,

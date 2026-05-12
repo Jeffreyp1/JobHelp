@@ -24,6 +24,10 @@ import type {
   JobhelpPreferences,
 } from "../types/jobhelp-config.js";
 import { ConfigValidationError } from "../types/jobhelp-config.js";
+import { log } from "./structuredLog.js";
+
+/** Plausible Anthropic API key shape — used only for a non-fatal sanity log. */
+const ANTHROPIC_KEY_PREFIX_RE = /^sk-ant-/;
 
 /** In-memory session cache: fileId -> parsed config. */
 const cache = new Map<string, JobhelpConfig>();
@@ -134,6 +138,15 @@ function validateConfig(parsed: unknown): JobhelpConfig {
   }
 
   const anthropicApiKey = requireString(parsed, "anthropicApiKey", "anthropicApiKey");
+  // Non-fatal: a plausible-but-typoed key (e.g. "sk-ANT-…") passes the
+  // string check but only fails on the first Claude call. Flag it now so the
+  // failure is at least diagnosable upfront (audit M24). The value itself is
+  // redacted by the logger.
+  if (!ANTHROPIC_KEY_PREFIX_RE.test(anthropicApiKey)) {
+    log("warn", "configLoader: anthropicApiKey does not start with 'sk-ant-' — likely a typo", {
+      anthropicApiKey,
+    });
+  }
   const appsScriptUrl = requireString(parsed, "appsScriptUrl", "appsScriptUrl");
 
   const foldersRaw = requireObject(parsed, "folders", "folders");
@@ -203,8 +216,17 @@ export async function loadConfigFromDrive(
   if (!response.ok) {
     // Propagate the underlying transport / Drive error as a plain Error so
     // callers can distinguish it from ConfigValidationError via instanceof.
+    // We preserve the original error type in the message AND log it so the
+    // type ('validation' | 'drive' | 'server') isn't entirely lost (audit
+    // M12 — a fully typed ConfigDownloadError would need a new exported type).
+    log("warn", "configLoader: download of jobhelp-config.json failed", {
+      fileId,
+      errorType: response.error.type,
+      error: response.error.message,
+      retryable: response.error.retryable,
+    });
     throw new Error(
-      `Failed to download jobhelp-config.json (fileId=${fileId}): ${response.error.message}`,
+      `Failed to download jobhelp-config.json (fileId=${fileId}): [${response.error.type}] ${response.error.message}`,
     );
   }
 
@@ -212,6 +234,10 @@ export async function loadConfigFromDrive(
   try {
     jsonText = decodeBase64ToUtf8(response.base64);
   } catch (err) {
+    log("warn", "configLoader: base64 decode of jobhelp-config.json failed", {
+      fileId,
+      error: (err as Error)?.message ?? "unknown error",
+    });
     throw new ConfigValidationError(
       `Could not base64-decode config file: ${(err as Error)?.message ?? "unknown error"}`,
       null,
@@ -222,6 +248,14 @@ export async function loadConfigFromDrive(
   try {
     parsed = JSON.parse(jsonText);
   } catch (err) {
+    // A common cause: the bytes weren't actually UTF-8 JSON (binary file id,
+    // wrong file shared, etc.). TextDecoder replaces invalid bytes with U+FFFD
+    // rather than throwing, so the failure surfaces here as "not valid JSON".
+    log("warn", "configLoader: jobhelp-config.json is not valid JSON", {
+      fileId,
+      error: (err as Error)?.message ?? "unknown error",
+      contentSnippet: jsonText.slice(0, 200),
+    });
     throw new ConfigValidationError(
       `Config file is not valid JSON: ${(err as Error)?.message ?? "unknown error"}`,
       null,

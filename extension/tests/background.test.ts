@@ -96,6 +96,7 @@ describe('apiClient', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
+      text: async () => JSON.stringify(mockResponse),
     });
 
     const client = new ApiClient(APPS_SCRIPT_URL);
@@ -129,6 +130,7 @@ describe('apiClient', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => pingResponse,
+      text: async () => JSON.stringify(pingResponse),
     });
 
     const client = new ApiClient(APPS_SCRIPT_URL);
@@ -146,6 +148,7 @@ describe('apiClient', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => errorResponse,
+      text: async () => JSON.stringify(errorResponse),
     });
 
     const client = new ApiClient(APPS_SCRIPT_URL);
@@ -178,6 +181,7 @@ describe('apiClient', () => {
     const mockOk = (extra: Record<string, unknown>) => ({
       ok: true,
       json: async () => ({ ok: true, ...extra }),
+      text: async () => JSON.stringify({ ok: true, ...extra }),
     });
 
     // listFiles
@@ -318,6 +322,7 @@ describe('integration: generate flow', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => generateResponse,
+      text: async () => JSON.stringify(generateResponse),
     });
 
     // Seed storage with required config
@@ -441,5 +446,81 @@ describe('edit-preservation safeguard', () => {
     expect(call).toBeDefined();
     const msg = call![0] as { type: string; payload: unknown; requiresUserConfirmation: boolean };
     expect(msg).toHaveProperty('requiresUserConfirmation');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Silent-failure hardening: structured logging on swallowed paths
+// (audit H1 / H3 / M20)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('background.ts: structured logging on error paths', () => {
+  const scrapeResult = () => [
+    {
+      result: {
+        jd: 'JD',
+        company: 'C',
+        role: 'R',
+        url: 'https://x.com/j',
+        scrapeStrategy: 'generic' as const,
+        jobInsights: null,
+        scrapedAt: Date.now(),
+      },
+    },
+  ];
+
+  it('B-log1: safeSend swallows "no receiver" errors silently (panel closed) — no warn line', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    chromeMock.runtime.sendMessage.mockRejectedValueOnce(
+      new Error('Could not establish connection. Receiving end does not exist.'),
+    );
+    chromeMock.scripting.executeScript.mockResolvedValue(scrapeResult());
+    chromeMock.tabs.get.mockResolvedValue({ id: 9, url: 'https://x.com/j', status: 'complete' });
+
+    const { handleTabActivated } = await import('../src/background.js');
+    await handleTabActivated({ tabId: 9 });
+
+    const logged = warnSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).not.toMatch(/sendMessage to side panel failed/);
+    warnSpy.mockRestore();
+  });
+
+  it('B-log2: safeSend logs a structured warn for non-"no receiver" send failures', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    chromeMock.runtime.sendMessage.mockRejectedValueOnce(new Error('some other runtime error'));
+    chromeMock.scripting.executeScript.mockResolvedValue(scrapeResult());
+    chromeMock.tabs.get.mockResolvedValue({ id: 10, url: 'https://x.com/j', status: 'complete' });
+
+    const { handleTabActivated } = await import('../src/background.js');
+    await handleTabActivated({ tabId: 10 });
+
+    const logged = warnSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).toMatch(/\[JobHelp\]/);
+    expect(logged).toMatch(/sendMessage to side panel failed/);
+    warnSpy.mockRestore();
+  });
+
+  it('B-log3: handleTabActivated logs a structured warn for an unexpected tabs.get failure', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    chromeMock.tabs.get.mockRejectedValueOnce(new Error('permission revoked'));
+
+    const { handleTabActivated } = await import('../src/background.js');
+    await handleTabActivated({ tabId: 11 });
+
+    const logged = warnSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).toMatch(/tabs\.get failed/);
+    warnSpy.mockRestore();
+  });
+
+  it('B-log4: handleTabActivated stays silent for the benign "no tab with id" tabs.get failure', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    chromeMock.tabs.get.mockRejectedValueOnce(new Error('No tab with id: 999'));
+
+    const { handleTabActivated } = await import('../src/background.js');
+    await handleTabActivated({ tabId: 999 });
+
+    const logged = warnSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).not.toMatch(/tabs\.get failed/);
+    warnSpy.mockRestore();
   });
 });

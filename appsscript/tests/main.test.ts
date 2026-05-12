@@ -262,6 +262,56 @@ describe('doPost router', () => {
     expect(result.error.type).toBe('validation');
   });
 
+  // ── silent-failure-audit regression tests ──────────────────────────────
+
+  it('T4a (H11): generate with BOTH company and role empty is rejected (no "Unknown - Unknown" folder)', () => {
+    const e = makeEvent(
+      makeGenerateRequest({ company: '', role: '   ' }),
+    );
+    const out = doPost(e, { drive, claude, prompt });
+    const result = parseOutput(out) as { ok: boolean; error: { type: string; message: string } };
+    expect(result.ok).toBe(false);
+    expect(result.error.type).toBe('validation');
+    expect(result.error.message.toLowerCase()).toContain('company');
+    // The Claude call must NOT have been made — we reject before any work.
+    expect((claude.call as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
+  });
+
+  it('T4b (H11): generate with company present but role empty is still accepted', () => {
+    const e = makeEvent(makeGenerateRequest({ company: 'Acme', role: '' }));
+    const out = doPost(e, { drive, claude, prompt });
+    const result = parseOutput(out) as { ok: boolean };
+    expect(result.ok).toBe(true);
+  });
+
+  it('T4c (H11): generate with role present but company empty is still accepted', () => {
+    const e = makeEvent(makeGenerateRequest({ company: null, role: 'Engineer' }));
+    const out = doPost(e, { drive, claude, prompt });
+    const result = parseOutput(out) as { ok: boolean };
+    expect(result.ok).toBe(true);
+  });
+
+  it('T4d (H19): generate with a malformed jobInsights (no skillsRequired) is rejected', () => {
+    const e = makeEvent(
+      makeGenerateRequest({
+        // jobInsights is the wrong shape — missing the skillsRequired array
+        jobInsights: { junk: true } as unknown as JobInsights,
+      }),
+    );
+    const out = doPost(e, { drive, claude, prompt });
+    const result = parseOutput(out) as { ok: boolean; error: { type: string; message: string } };
+    expect(result.ok).toBe(false);
+    expect(result.error.type).toBe('validation');
+    expect(result.error.message).toContain('skillsRequired');
+  });
+
+  it('T4e (H19): generate with jobInsights: null is accepted', () => {
+    const e = makeEvent(makeGenerateRequest({ jobInsights: null }));
+    const out = doPost(e, { drive, claude, prompt });
+    const result = parseOutput(out) as { ok: boolean };
+    expect(result.ok).toBe(true);
+  });
+
   it('T5: action "generate" with valid payload calls deps in correct order', () => {
     const callOrder: string[] = [];
 

@@ -20,7 +20,7 @@ import { ApiClient } from '../lib/apiClient.js';
 import { fillResumeTemplate, parseResumeMarkdown } from '../lib/templateFiller.js';
 import type { Message } from '../types/message-bus.js';
 import type { FileSummary, FolderType } from '../types/api-contract.js';
-import { get } from '../lib/storage.js';
+import { get, set } from '../lib/storage.js';
 import { loadConfigFromDrive } from '../lib/configLoader.js';
 import type { JobhelpConfig } from '../types/jobhelp-config.js';
 
@@ -40,9 +40,65 @@ export function getRuntimeConfig(): JobhelpConfig | null {
   return runtimeConfig;
 }
 
-/** Internal: set the cached runtime config after a successful load. */
-function setRuntimeConfig(config: JobhelpConfig | null): void {
+/**
+ * Set the cached runtime config directly.
+ *
+ * Primarily used internally by {@link applyRuntimeConfig} after a successful
+ * Drive load. Also exported so tests can prime the module-scoped config
+ * without going through the async Drive-load path.
+ */
+export function setRuntimeConfig(config: JobhelpConfig | null): void {
   runtimeConfig = config;
+}
+
+/**
+ * Adopt a freshly-loaded `JobhelpConfig` for the rest of the session AND
+ * mirror its resolved values back into the legacy `chrome.storage.local`
+ * keys.
+ *
+ * The mirror-write is a one-way bridge: the Drive-hosted `jobhelp-config.json`
+ * is the source of truth, but the background service worker (`background.ts`)
+ * still reads the individual legacy keys (`appsScriptUrl`, `driveSourceFolderId`,
+ * …). Keeping those keys populated as a derived cache lets the background worker
+ * keep functioning with zero changes — the side panel just refreshes the cache
+ * every time it (re)hydrates the config from Drive.
+ *
+ * Best-effort: storage failures are swallowed so a transient write error never
+ * blocks the UI from using the in-memory config it already has.
+ */
+function applyRuntimeConfig(config: JobhelpConfig): void {
+  setRuntimeConfig(config);
+  // Fire-and-forget mirror write — the in-memory config is already live.
+  void (async () => {
+    try {
+      await Promise.all([
+        set('appsScriptUrl', config.appsScriptUrl),
+        set('driveSourceFolderId', config.folders.source),
+        set('driveRulesFolderId', config.folders.rules),
+        set('driveOutputFolderId', config.folders.output),
+        set('sheetId', config.sheetId),
+        set('driveTemplateDocxId', config.templateDocxId),
+        set('defaultGenerateModel', config.defaults.model),
+      ]);
+    } catch {
+      // Legacy keys are a derived cache; a write failure is non-fatal.
+    }
+  })();
+}
+
+/**
+ * Apps Script /exec URL for the current session — prefers the loaded runtime
+ * config, falling back to the legacy storage key during the migration window
+ * (before the Drive config has finished loading, or if it failed to load).
+ */
+async function resolveAppsScriptUrl(): Promise<string | null> {
+  const cfg = getRuntimeConfig();
+  if (cfg?.appsScriptUrl) return cfg.appsScriptUrl;
+  try {
+    return await get('appsScriptUrl');
+  } catch {
+    return null;
+  }
 }
 
 // ─── Base64 helpers (browser-safe; rely on btoa/atob + binary string) ────
@@ -81,14 +137,9 @@ function getChrome(): typeof chrome | null {
   return null;
 }
 
-/** Resolve the Apps Script /exec URL from storage and return an ApiClient. */
+/** Resolve the Apps Script /exec URL and return an ApiClient (or null). */
 async function getApiClient(): Promise<ApiClient | null> {
-  let url: string | null = null;
-  try {
-    url = await get('appsScriptUrl');
-  } catch {
-    return null;
-  }
+  const url = await resolveAppsScriptUrl();
   if (!url) return null;
   return new ApiClient(url);
 }
@@ -115,15 +166,9 @@ function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: 
       console.info('Resume captured:', md.length, 'chars');
     },
     onFinalize: async ({ format, markdown, docId, jobFolderId }) => {
-      // Resolve the Apps Script URL from storage, same as background worker.
-      let appsScriptUrl: string | null = null;
-      try {
-        appsScriptUrl = await get('appsScriptUrl');
-      } catch {
-        // ignore; will fail below
-      }
+      const appsScriptUrl = await resolveAppsScriptUrl();
       if (!appsScriptUrl) {
-        return { ok: false, message: 'Apps Script URL not configured. Check Settings.' };
+        return { ok: false, message: 'JobHelp config not loaded. Run setup in Settings first.' };
       }
       const client = new ApiClient(appsScriptUrl);
       const resp = await client.finalize({
@@ -142,24 +187,16 @@ function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: 
       return { ok: true, url: file.url, fileName: file.fileName };
     },
     onConvertViaTemplate: async ({ markdown, jobFolderId }) => {
-      let appsScriptUrl: string | null = null;
-      let templateId: string | null = null;
-      try {
-        [appsScriptUrl, templateId] = await Promise.all([
-          get('appsScriptUrl'),
-          get('driveTemplateDocxId'),
-        ]);
-      } catch {
-        // fall through with empty values
-      }
+      const cfg = getRuntimeConfig();
+      const appsScriptUrl = await resolveAppsScriptUrl();
       if (!appsScriptUrl) {
-        return { ok: false, message: 'Apps Script URL not configured. Check Settings.' };
+        return { ok: false, message: 'JobHelp config not loaded. Run setup in Settings first.' };
       }
+      const templateId = cfg?.templateDocxId ?? null;
       if (!templateId) {
         return {
           ok: false,
-          message:
-            'No template configured. Set "Drive: template DOCX file ID" in Settings first.',
+          message: 'No template configured in your jobhelp-config.json. Run setup in Settings first.',
         };
       }
 
@@ -267,10 +304,9 @@ function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: 
 
   const files = renderFilesTab({
     fetchFiles: async (folder: FolderType): Promise<FileSummary[]> => {
-      const folderId =
-        folder === 'source'
-          ? await get('driveSourceFolderId')
-          : await get('driveRulesFolderId');
+      const cfg = getRuntimeConfig();
+      if (!cfg) return [];
+      const folderId = folder === 'source' ? cfg.folders.source : cfg.folders.rules;
       if (!folderId) return [];
       const c = getChrome();
       if (!c) return [];
@@ -292,7 +328,9 @@ function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: 
   const settingsRoot = renderSettingsTab({
     autoOpenWizard: opts.autoOpenWizard,
     onConfigLoaded: (config) => {
-      setRuntimeConfig(config);
+      // Adopt + mirror back into the legacy keys so the background worker
+      // and the Generate/Files tabs immediately see the new values.
+      applyRuntimeConfig(config);
     },
   });
 
@@ -419,7 +457,10 @@ async function hydrateRuntimeConfig(
 
   try {
     const config = await loadConfigFromDrive(fileId, client);
-    setRuntimeConfig(config);
+    // Adopt the config AND mirror its values into the legacy chrome.storage
+    // keys so the background worker keeps working unchanged (it still reads
+    // appsScriptUrl / driveSourceFolderId / … directly).
+    applyRuntimeConfig(config);
   } catch (err) {
     const msg = (err as Error)?.message ?? 'Unknown error';
     showRuntimeConfigError(msg, tabContent, panes, buttons);
@@ -456,6 +497,7 @@ function handleMessage(message: Message, controllers: PanelControllers): void {
           message.payload.resumeMd,
           message.payload.docUrl,
           message.payload.jobFolderUrl,
+          message.payload.sheetRowUrl,
         );
       } else {
         const err = message.payload.error;

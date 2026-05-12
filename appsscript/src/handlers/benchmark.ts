@@ -28,6 +28,7 @@ import type {
 import type { ClaudeRequest } from '../types/claude-api.js';
 import { ClaudeApiError } from '../types/claude-api.js';
 import { calculateCost } from '../cost.js';
+import { log } from '../lib/structuredLog.js';
 
 // ---------------------------------------------------------------------------
 // Apps Script CacheService ambient declaration
@@ -111,16 +112,14 @@ export function handleBenchmarkRole(
   req: BenchmarkRoleRequest,
 ): ApiResult<BenchmarkRoleResult> {
   const forceRefresh = req.forceRefresh === true;
-  console.log(
-    `[benchmark] start company="${req.company}" role="${req.role}" forceRefresh=${forceRefresh}`,
-  );
+  log('info', 'benchmark start', { company: req.company, role: req.role, forceRefresh });
 
   // Defensive validation
   const validationErr = validateBenchmarkRole(
     req as unknown as Record<string, unknown>,
   );
   if (validationErr) {
-    console.error(`[benchmark] validation error: ${validationErr.error.message}`);
+    log('warn', 'benchmark validation error', { message: validationErr.error.message });
     return validationErr;
   }
 
@@ -131,7 +130,7 @@ export function handleBenchmarkRole(
   if (!forceRefresh) {
     const cached = readCache(cacheKey);
     if (cached) {
-      console.log(`[benchmark] cache hit key=${cacheKey}`);
+      log('info', 'benchmark cache hit', { company: req.company, role: req.role, cached: true });
       return {
         ok: true,
         patterns: cached.patterns,
@@ -141,9 +140,9 @@ export function handleBenchmarkRole(
         cost: cached.cost,
       };
     }
-    console.log(`[benchmark] cache miss key=${cacheKey}`);
+    log('debug', 'benchmark cache miss', { company: req.company, role: req.role });
   } else {
-    console.log(`[benchmark] forceRefresh — skipping cache lookup`);
+    log('debug', 'benchmark forceRefresh — skipping cache lookup', { company: req.company, role: req.role });
   }
 
   // 2) Build Claude request
@@ -168,9 +167,12 @@ export function handleBenchmarkRole(
     response = deps.claude.call(claudeReq);
   } catch (err) {
     if (err instanceof ClaudeApiError) {
-      console.error(
-        `[benchmark] Claude API error type=${err.errorType} status=${err.statusCode} retryable=${err.retryable}: ${err.message}`,
-      );
+      log('error', 'benchmark Claude API error', {
+        errorType: err.errorType,
+        status: err.statusCode,
+        retryable: err.retryable,
+        error: err.message,
+      });
       return {
         ok: false,
         error: {
@@ -181,7 +183,7 @@ export function handleBenchmarkRole(
       };
     }
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[benchmark] Claude call failed (non-typed): ${message}`);
+    log('error', 'benchmark Claude call failed (non-typed)', { error: message });
     return {
       ok: false,
       error: { type: 'server', message, retryable: true },
@@ -194,7 +196,10 @@ export function handleBenchmarkRole(
     parsed = JSON.parse(stripJsonFences(response.text)) as typeof parsed;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[benchmark] Claude returned invalid JSON: ${message}`);
+    log('error', 'benchmark Claude returned invalid JSON', {
+      error: message,
+      textSnippet: response.text.slice(0, 200),
+    });
     return {
       ok: false,
       error: {
@@ -208,7 +213,7 @@ export function handleBenchmarkRole(
   // 5) Shape-check
   const shapeError = validateClaudePayload(parsed);
   if (shapeError) {
-    console.error(`[benchmark] Claude payload shape error: ${shapeError}`);
+    log('error', 'benchmark Claude payload shape error', { error: shapeError });
     return {
       ok: false,
       error: {
@@ -230,9 +235,14 @@ export function handleBenchmarkRole(
   const cachePayload: CachedBenchmarkPayload = { patterns, keywords, sources, cost };
   writeCache(cacheKey, cachePayload);
 
-  console.log(
-    `[benchmark] done cost=$${cost.totalUsd} cached=false keywords=${keywords.length} sources=${sources.length}`,
-  );
+  log('info', 'benchmark done', {
+    company: req.company,
+    role: req.role,
+    cached: false,
+    cost: cost.totalUsd,
+    keywords: keywords.length,
+    sources: sources.length,
+  });
   return {
     ok: true,
     patterns,
@@ -255,7 +265,7 @@ function readCache(key: string): CachedBenchmarkPayload | null {
     return JSON.parse(raw) as CachedBenchmarkPayload;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[benchmark] cache read failed key=${key}: ${message}`);
+    log('warn', 'benchmark cache read failed', { key, error: message });
     return null;
   }
 }
@@ -266,7 +276,7 @@ function writeCache(key: string, payload: CachedBenchmarkPayload): void {
     CacheService.getScriptCache().put(key, JSON.stringify(payload), CACHE_TTL_SECONDS);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[benchmark] cache write failed key=${key}: ${message}`);
+    log('warn', 'benchmark cache write failed', { key, error: message });
   }
 }
 

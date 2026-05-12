@@ -5,6 +5,7 @@
 
 import type { ClaudeUsage } from './types/claude-api.js';
 import type { CostBreakdown } from './types/api-contract.js';
+import { log } from './lib/structuredLog.js';
 
 /** Pricing in USD per 1,000,000 tokens */
 interface ModelPricing {
@@ -45,7 +46,18 @@ const DEFAULT_PRICING: ModelPricing = PRICING_TABLE['claude-haiku-4-5-20251001']
  * @returns      CostBreakdown with totalUsd rounded to 4 decimal places
  */
 export function calculateCost(usage: ClaudeUsage, model: string): CostBreakdown {
-  const pricing = PRICING_TABLE[model] ?? DEFAULT_PRICING;
+  const known = PRICING_TABLE[model];
+  if (!known) {
+    // M16 (silent-failure-audit): an unknown / typoed model id silently bills
+    // at Haiku rates, so cost reporting drifts from reality. We can't add a
+    // `modelUnknown` flag without changing the shared CostBreakdown type
+    // (flagged separately) — but we make the drift visible in the log.
+    log('warn', 'calculateCost: unknown model — falling back to Haiku pricing (reported cost may be wrong)', {
+      model,
+      fallback: 'claude-haiku-4-5-20251001',
+    });
+  }
+  const pricing = known ?? DEFAULT_PRICING;
   const M = 1_000_000;
 
   const inputCost = (usage.input_tokens * pricing.input) / M;

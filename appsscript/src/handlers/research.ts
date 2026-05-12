@@ -39,6 +39,7 @@ import type {
 import type { ClaudeRequest } from '../types/claude-api.js';
 import { ClaudeApiError } from '../types/claude-api.js';
 import { calculateCost } from '../cost.js';
+import { log } from '../lib/structuredLog.js';
 
 // ---------------------------------------------------------------------------
 // Apps Script CacheService ambient declaration (for tests + production)
@@ -122,16 +123,14 @@ export function handleResearchCompany(
   req: ResearchCompanyRequest,
 ): ApiResult<ResearchCompanyResult> {
   const forceRefresh = req.forceRefresh === true;
-  console.log(
-    `[research] start company="${req.company}" role="${req.role ?? 'null'}" forceRefresh=${forceRefresh}`,
-  );
+  log('info', 'research start', { company: req.company, role: req.role, forceRefresh });
 
   // Defensive validation in case caller bypassed validateResearchCompany
   const validationErr = validateResearchCompany(
     req as unknown as Record<string, unknown>,
   );
   if (validationErr) {
-    console.error(`[research] validation error: ${validationErr.error.message}`);
+    log('warn', 'research validation error', { message: validationErr.error.message });
     return validationErr;
   }
 
@@ -144,7 +143,7 @@ export function handleResearchCompany(
   if (!forceRefresh) {
     const cached = readCache(cacheKey);
     if (cached) {
-      console.log(`[research] cache hit key=${cacheKey}`);
+      log('info', 'research cache hit', { company: req.company, role: req.role, cached: true });
       return {
         ok: true,
         summary: cached.summary,
@@ -154,9 +153,9 @@ export function handleResearchCompany(
         cost: cached.cost,
       };
     }
-    console.log(`[research] cache miss key=${cacheKey}`);
+    log('debug', 'research cache miss', { company: req.company, role: req.role });
   } else {
-    console.log(`[research] forceRefresh — skipping cache lookup`);
+    log('debug', 'research forceRefresh — skipping cache lookup', { company: req.company, role: req.role });
   }
 
   // 2) Build Claude request
@@ -186,9 +185,12 @@ export function handleResearchCompany(
     response = deps.claude.call(claudeReq);
   } catch (err) {
     if (err instanceof ClaudeApiError) {
-      console.error(
-        `[research] Claude API error type=${err.errorType} status=${err.statusCode} retryable=${err.retryable}: ${err.message}`,
-      );
+      log('error', 'research Claude API error', {
+        errorType: err.errorType,
+        status: err.statusCode,
+        retryable: err.retryable,
+        error: err.message,
+      });
       return {
         ok: false,
         error: {
@@ -199,7 +201,7 @@ export function handleResearchCompany(
       };
     }
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[research] Claude call failed (non-typed): ${message}`);
+    log('error', 'research Claude call failed (non-typed)', { error: message });
     return {
       ok: false,
       error: { type: 'server', message, retryable: true },
@@ -212,7 +214,10 @@ export function handleResearchCompany(
     parsed = JSON.parse(stripJsonFences(response.text)) as typeof parsed;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[research] Claude returned invalid JSON: ${message}`);
+    log('error', 'research Claude returned invalid JSON', {
+      error: message,
+      textSnippet: response.text.slice(0, 200),
+    });
     return {
       ok: false,
       error: {
@@ -226,7 +231,7 @@ export function handleResearchCompany(
   // 5) Shape-check parsed payload
   const shapeError = validateClaudePayload(parsed);
   if (shapeError) {
-    console.error(`[research] Claude payload shape error: ${shapeError}`);
+    log('error', 'research Claude payload shape error', { error: shapeError });
     return {
       ok: false,
       error: {
@@ -248,9 +253,14 @@ export function handleResearchCompany(
   const cachePayload: CachedResearchPayload = { summary, keywords, sources, cost };
   writeCache(cacheKey, cachePayload);
 
-  console.log(
-    `[research] done cost=$${cost.totalUsd} cached=false keywords=${keywords.length} sources=${sources.length}`,
-  );
+  log('info', 'research done', {
+    company: req.company,
+    role: req.role,
+    cached: false,
+    cost: cost.totalUsd,
+    keywords: keywords.length,
+    sources: sources.length,
+  });
   return {
     ok: true,
     summary,
@@ -274,7 +284,7 @@ function readCache(key: string): CachedResearchPayload | null {
   } catch (err) {
     // Cache failures must not fail the request — log and proceed
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[research] cache read failed key=${key}: ${message}`);
+    log('warn', 'research cache read failed', { key, error: message });
     return null;
   }
 }
@@ -285,7 +295,7 @@ function writeCache(key: string, payload: CachedResearchPayload): void {
     CacheService.getScriptCache().put(key, JSON.stringify(payload), CACHE_TTL_SECONDS);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[research] cache write failed key=${key}: ${message}`);
+    log('warn', 'research cache write failed', { key, error: message });
   }
 }
 
