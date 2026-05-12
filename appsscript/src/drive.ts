@@ -12,6 +12,7 @@ import type {
   ConcatenatedSourceMaterials,
   SheetRow,
 } from './types/drive-ops.js';
+import type { JobPipelineRow, JobPipelineStatus, JobSource } from './types/job-discovery.js';
 import { log } from './lib/structuredLog.js';
 
 // ---------------------------------------------------------------------------
@@ -95,6 +96,166 @@ const COLUMN_INDEX: Record<keyof SheetRow, number> = {
   verifyHookUnverifiedCount: 21,
   multiVersionLabel: 22,
 };
+
+// ---------------------------------------------------------------------------
+// Job Pipeline sheet (Phase 1 auto-apply)
+// ---------------------------------------------------------------------------
+
+const JOB_PIPELINE_SHEET_NAME = 'Job Pipeline';
+
+const JOB_PIPELINE_HEADER = [
+  'Job ID',
+  'Discovered',
+  'Posted',
+  'Source',
+  'Company',
+  'Title',
+  'Location',
+  'URL',
+  'Score',
+  'Matched Skills',
+  'Missing Skills',
+  'Status',
+  'Tailored Doc',
+  'Notes',
+];
+
+/** 1-based column indices into JOB_PIPELINE_HEADER. */
+const JP_COL = {
+  jobId: 1,
+  discovered: 2,
+  posted: 3,
+  source: 4,
+  company: 5,
+  title: 6,
+  location: 7,
+  url: 8,
+  score: 9,
+  matchedSkills: 10,
+  missingSkills: 11,
+  status: 12,
+  tailoredDoc: 13,
+  notes: 14,
+} as const;
+
+function isoOrEmpty(epochMs: number | null | undefined): string {
+  if (epochMs === null || epochMs === undefined) return '';
+  const d = new Date(epochMs);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString();
+}
+
+function round3(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 1000) / 1000;
+}
+
+function splitSkills(raw: unknown): string[] {
+  if (raw === null || raw === undefined) return [];
+  return String(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function parseDateCellOrNull(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (raw instanceof Date) {
+    const t = raw.getTime();
+    return Number.isNaN(t) ? null : t;
+  }
+  const parsed = Date.parse(String(raw));
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Build the 14-cell row array from a JobPipelineRow. When `existing` is given
+ * (i.e. an upsert hitting an existing row) the Status and Notes cells are taken
+ * from the existing row and never overwritten — those belong to the user.
+ */
+function jobPipelineRowToCells(row: JobPipelineRow, existing?: unknown[]): unknown[] {
+  // On insert (no `existing`): Status starts at 'new' and Notes at '' — both
+  // belong to the user from then on and are never overwritten by an upsert.
+  const status = existing ? (existing[JP_COL.status - 1] || 'new') : 'new';
+  const notes = existing ? (existing[JP_COL.notes - 1] ?? '') : '';
+  return [
+    row.jobId,
+    isoOrEmpty(row.discoveredAt),
+    isoOrEmpty(row.postedAt),
+    row.source,
+    row.company ?? '',
+    row.title ?? '',
+    row.location ?? '',
+    row.url,
+    round3(row.finalScore),
+    (row.matchedSkills ?? []).join(', '),
+    (row.missingSkills ?? []).join(', '),
+    status,
+    row.tailoredDocUrl ?? '',
+    notes,
+  ];
+}
+
+/**
+ * Open the spreadsheet and return the "Job Pipeline" sheet, creating it (with
+ * a bold + frozen header row) if absent and (re)writing the header row if it's
+ * missing or doesn't match the expected layout. Data rows are never touched.
+ */
+function ensureJobPipelineSheetObj(sheetId: string): {
+  ss: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  sheet: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  sheetUrl: string;
+} {
+  const SpreadsheetApp = getSpreadsheetApp();
+  const ss = SpreadsheetApp.openById(sheetId);
+
+  let sheet = ss.getSheetByName(JOB_PIPELINE_SHEET_NAME);
+  let created = false;
+  if (!sheet) {
+    sheet = ss.insertSheet(JOB_PIPELINE_SHEET_NAME);
+    created = true;
+  }
+
+  const lastColumn: number = typeof sheet.getLastColumn === 'function' ? sheet.getLastColumn() : 0;
+  let headerOk = false;
+  if (!created && lastColumn >= JOB_PIPELINE_HEADER.length) {
+    const headerRange = sheet.getRange(1, 1, 1, JOB_PIPELINE_HEADER.length);
+    const current = headerRange.getValues()[0] ?? [];
+    headerOk = JOB_PIPELINE_HEADER.every((h, i) => String(current[i] ?? '') === h);
+  }
+
+  if (created || !headerOk) {
+    if (!created) {
+      log('warn', 'Job Pipeline header missing or stale — rewriting it', { sheetId });
+    }
+    const headerRange = sheet.getRange(1, 1, 1, JOB_PIPELINE_HEADER.length);
+    headerRange.setValues([JOB_PIPELINE_HEADER.slice()]);
+    if (typeof headerRange.setFontWeight === 'function') headerRange.setFontWeight('bold');
+    if (typeof sheet.setFrozenRows === 'function') sheet.setFrozenRows(1);
+  }
+
+  const gid: number = typeof sheet.getSheetId === 'function' ? sheet.getSheetId() : 0;
+  const ssUrl: string = typeof ss.getUrl === 'function' ? ss.getUrl() : '';
+  const sheetUrl = `${ssUrl}#gid=${gid}`;
+  return { ss, sheet, sheetUrl };
+}
+
+/**
+ * Read every data row (everything below the header) as raw cell arrays, padded
+ * to 14 columns. Returns an empty array when only the header (or nothing) is
+ * present.
+ */
+function readJobPipelineDataRows(sheet: any): unknown[][] {
+  const lastRow: number = typeof sheet.getLastRow === 'function' ? sheet.getLastRow() : 0;
+  if (lastRow < 2) return [];
+  const range = sheet.getRange(2, 1, lastRow - 1, JOB_PIPELINE_HEADER.length);
+  const values: unknown[][] = range.getValues() ?? [];
+  return values.map((r) => {
+    const out = r.slice(0, JOB_PIPELINE_HEADER.length);
+    while (out.length < JOB_PIPELINE_HEADER.length) out.push('');
+    return out;
+  });
+}
 
 /**
  * Format a Date as "May 9, 2026".
@@ -1043,5 +1204,163 @@ export const driveOps: DriveOps = {
       const range = sheet.getRange(rowIndex, col);
       range.setValue(value);
     }
+  },
+
+  // -------------------------------------------------------------------------
+  // ensureJobPipelineSheet
+  // -------------------------------------------------------------------------
+  ensureJobPipelineSheet(sheetId: string): { sheetUrl: string } {
+    log('info', 'ensureJobPipelineSheet: start', { sheetId });
+    const { sheetUrl } = ensureJobPipelineSheetObj(sheetId);
+    log('info', 'ensureJobPipelineSheet: done', { sheetId, sheetUrl });
+    return { sheetUrl };
+  },
+
+  // -------------------------------------------------------------------------
+  // upsertJobPipelineRows
+  //
+  // Keyed by jobId: rows already present are updated in place but their Status
+  // and Notes cells are preserved (the user owns those — only the initial
+  // insert sets Status='new' and Notes=''). Writes are batched: existing rows
+  // are collected into per-row ranges, new rows appended in a single trailing
+  // setValues call.
+  // -------------------------------------------------------------------------
+  upsertJobPipelineRows(
+    sheetId: string,
+    rows: JobPipelineRow[],
+  ): { inserted: number; updated: number; sheetUrl: string } {
+    log('info', 'upsertJobPipelineRows: start', { sheetId, count: rows.length });
+    const { sheet, sheetUrl } = ensureJobPipelineSheetObj(sheetId);
+
+    const existingRows = readJobPipelineDataRows(sheet);
+    const indexByJobId = new Map<string, number>(); // jobId -> 0-based data-row index
+    existingRows.forEach((r, i) => {
+      const id = String(r[JP_COL.jobId - 1] ?? '');
+      if (id && !indexByJobId.has(id)) indexByJobId.set(id, i);
+    });
+
+    let inserted = 0;
+    let updated = 0;
+    const updates: { rowIndex: number; cells: unknown[] }[] = [];
+    const appends: unknown[][] = [];
+
+    for (const row of rows) {
+      const jobId = String(row.jobId ?? '');
+      if (jobId && indexByJobId.has(jobId)) {
+        const dataIdx = indexByJobId.get(jobId)!;
+        const cells = jobPipelineRowToCells(row, existingRows[dataIdx]);
+        updates.push({ rowIndex: dataIdx + 2, cells }); // +2: 1 for header, 1 for 1-based
+        updated++;
+      } else {
+        appends.push(jobPipelineRowToCells(row));
+        inserted++;
+      }
+    }
+
+    for (const u of updates) {
+      sheet.getRange(u.rowIndex, 1, 1, JOB_PIPELINE_HEADER.length).setValues([u.cells]);
+    }
+
+    if (appends.length > 0) {
+      const lastRow: number = typeof sheet.getLastRow === 'function' ? sheet.getLastRow() : 1;
+      const startRow = Math.max(lastRow, 1) + 1;
+      sheet
+        .getRange(startRow, 1, appends.length, JOB_PIPELINE_HEADER.length)
+        .setValues(appends);
+    }
+
+    log('info', 'upsertJobPipelineRows: done', { sheetId, inserted, updated });
+    return { inserted, updated, sheetUrl };
+  },
+
+  // -------------------------------------------------------------------------
+  // updateJobPipelineStatus
+  // -------------------------------------------------------------------------
+  updateJobPipelineStatus(
+    sheetId: string,
+    jobId: string,
+    status: JobPipelineStatus,
+    tailoredDocUrl?: string,
+  ): { updatedAt: number } {
+    log('info', 'updateJobPipelineStatus: start', { sheetId, jobId, status });
+    const { sheet } = ensureJobPipelineSheetObj(sheetId);
+    const existingRows = readJobPipelineDataRows(sheet);
+
+    let dataIdx = -1;
+    for (let i = 0; i < existingRows.length; i++) {
+      if (String(existingRows[i][JP_COL.jobId - 1] ?? '') === String(jobId)) {
+        dataIdx = i;
+        break;
+      }
+    }
+    if (dataIdx === -1) {
+      throw new Error(`No Job Pipeline row with jobId ${jobId}`);
+    }
+
+    const rowIndex = dataIdx + 2;
+    sheet.getRange(rowIndex, JP_COL.status).setValue(status);
+    if (tailoredDocUrl !== undefined) {
+      sheet.getRange(rowIndex, JP_COL.tailoredDoc).setValue(tailoredDocUrl);
+    }
+
+    const updatedAt = Date.now();
+    log('info', 'updateJobPipelineStatus: done', { sheetId, jobId, status, updatedAt });
+    return { updatedAt };
+  },
+
+  // -------------------------------------------------------------------------
+  // readJobPipelineRows
+  // -------------------------------------------------------------------------
+  readJobPipelineRows(sheetId: string): JobPipelineRow[] {
+    log('info', 'readJobPipelineRows: start', { sheetId });
+    const { sheet } = ensureJobPipelineSheetObj(sheetId);
+    const dataRows = readJobPipelineDataRows(sheet);
+
+    const out: JobPipelineRow[] = [];
+    for (let i = 0; i < dataRows.length; i++) {
+      const r = dataRows[i];
+      const jobId = String(r[JP_COL.jobId - 1] ?? '').trim();
+      if (!jobId) {
+        log('warn', 'readJobPipelineRows: skipping row with empty Job ID', { sheetId, rowIndex: i + 2 });
+        continue;
+      }
+      try {
+        const scoreRaw = r[JP_COL.score - 1];
+        const finalScore = typeof scoreRaw === 'number' ? scoreRaw : Number(scoreRaw);
+        const row: JobPipelineRow = {
+          jobId,
+          discoveredAt: parseDateCellOrNull(r[JP_COL.discovered - 1]) ?? 0,
+          postedAt: parseDateCellOrNull(r[JP_COL.posted - 1]),
+          source: String(r[JP_COL.source - 1] ?? 'manual') as JobSource,
+          company: String(r[JP_COL.company - 1] ?? ''),
+          title: String(r[JP_COL.title - 1] ?? ''),
+          location: r[JP_COL.location - 1] ? String(r[JP_COL.location - 1]) : null,
+          url: String(r[JP_COL.url - 1] ?? ''),
+          finalScore: Number.isFinite(finalScore) ? finalScore : 0,
+          matchedSkills: splitSkills(r[JP_COL.matchedSkills - 1]),
+          missingSkills: splitSkills(r[JP_COL.missingSkills - 1]),
+          status: String(r[JP_COL.status - 1] ?? 'new') as JobPipelineStatus,
+          tailoredDocUrl: r[JP_COL.tailoredDoc - 1] ? String(r[JP_COL.tailoredDoc - 1]) : null,
+          notes: String(r[JP_COL.notes - 1] ?? ''),
+        };
+        if (parseDateCellOrNull(r[JP_COL.discovered - 1]) === null && r[JP_COL.discovered - 1]) {
+          log('warn', 'readJobPipelineRows: unparseable Discovered date — treated as 0', {
+            sheetId,
+            rowIndex: i + 2,
+            value: String(r[JP_COL.discovered - 1]),
+          });
+        }
+        out.push(row);
+      } catch (err) {
+        log('warn', 'readJobPipelineRows: skipping malformed row', {
+          sheetId,
+          rowIndex: i + 2,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    log('info', 'readJobPipelineRows: done', { sheetId, count: out.length });
+    return out;
   },
 };

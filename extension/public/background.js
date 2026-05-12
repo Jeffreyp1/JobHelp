@@ -340,6 +340,27 @@ var ApiClient = class {
   async multiVersion(req) {
     return this.post({ action: "multi_version", ...req });
   }
+  // ─── job-pipeline (Phase 1: discovery → ranking → tracking) ──────────────
+  /**
+   * Distil the user's source materials into a JobProfile (titles, skills,
+   * search queries, filters, a ~200-word summary). The result is cached
+   * client-side; regenerate when the source materials change.
+   */
+  async extractProfile(req) {
+    return this.post({ action: "extract_profile", ...req });
+  }
+  /**
+   * Poll the configured job sources, normalise + dedup, rank against the
+   * profile, upsert the ranked list into the Job Pipeline sheet, and return
+   * it. Does NOT tailor resumes — the digest UI calls `generate` on demand.
+   */
+  async discoverAndRank(req) {
+    return this.post({ action: "discover_and_rank", ...req });
+  }
+  /** Change a Job Pipeline row's status (and optionally its tailored-resume link). */
+  async updateJobStatus(req) {
+    return this.post({ action: "update_job_status", ...req });
+  }
 };
 
 // extension/src/background.ts

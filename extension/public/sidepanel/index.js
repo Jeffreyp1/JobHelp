@@ -4118,23 +4118,23 @@ var require_dom = __commonJS({
         i++;
       }
     }
-    function _addNamedNode(el2, list, newAttr, oldAttr) {
+    function _addNamedNode(el3, list, newAttr, oldAttr) {
       if (oldAttr) {
         list[_findNodeIndex(list, oldAttr)] = newAttr;
       } else {
         list[list.length] = newAttr;
         list.length++;
       }
-      if (el2) {
-        newAttr.ownerElement = el2;
-        var doc = el2.ownerDocument;
+      if (el3) {
+        newAttr.ownerElement = el3;
+        var doc = el3.ownerDocument;
         if (doc) {
-          oldAttr && _onRemoveAttribute(doc, el2, oldAttr);
-          _onAddAttribute(doc, el2, newAttr);
+          oldAttr && _onRemoveAttribute(doc, el3, oldAttr);
+          _onAddAttribute(doc, el3, newAttr);
         }
       }
     }
-    function _removeNamedNode(el2, list, attr) {
+    function _removeNamedNode(el3, list, attr) {
       var i = _findNodeIndex(list, attr);
       if (i >= 0) {
         var lastIndex = list.length - 1;
@@ -4142,10 +4142,10 @@ var require_dom = __commonJS({
           list[i] = list[++i];
         }
         list.length = lastIndex;
-        if (el2) {
-          var doc = el2.ownerDocument;
+        if (el3) {
+          var doc = el3.ownerDocument;
           if (doc) {
-            _onRemoveAttribute(doc, el2, attr);
+            _onRemoveAttribute(doc, el3, attr);
           }
           attr.ownerElement = null;
         }
@@ -4193,8 +4193,8 @@ var require_dom = __commonJS({
        * @see https://dom.spec.whatwg.org/#concept-element-attributes-set
        */
       setNamedItem: function(attr) {
-        var el2 = attr.ownerElement;
-        if (el2 && el2 !== this._ownerElement) {
+        var el3 = attr.ownerElement;
+        if (el3 && el3 !== this._ownerElement) {
           throw new DOMException(DOMException.INUSE_ATTRIBUTE_ERR);
         }
         var oldAttr = this.getNamedItemNS(attr.namespaceURI, attr.localName);
@@ -4907,9 +4907,9 @@ var require_dom = __commonJS({
        * @prettierignore
        */
       lookupPrefix: function(namespaceURI) {
-        var el2 = this;
-        while (el2) {
-          var map = el2._nsMap;
+        var el3 = this;
+        while (el3) {
+          var map = el3._nsMap;
           if (map) {
             for (var n in map) {
               if (hasOwn(map, n) && map[n] === namespaceURI) {
@@ -4917,7 +4917,7 @@ var require_dom = __commonJS({
               }
             }
           }
-          el2 = el2.nodeType == ATTRIBUTE_NODE ? el2.ownerDocument : el2.parentNode;
+          el3 = el3.nodeType == ATTRIBUTE_NODE ? el3.ownerDocument : el3.parentNode;
         }
         return null;
       },
@@ -4939,15 +4939,15 @@ var require_dom = __commonJS({
        * @prettierignore
        */
       lookupNamespaceURI: function(prefix) {
-        var el2 = this;
-        while (el2) {
-          var map = el2._nsMap;
+        var el3 = this;
+        while (el3) {
+          var map = el3._nsMap;
           if (map) {
             if (hasOwn(map, prefix)) {
               return map[prefix];
             }
           }
-          el2 = el2.nodeType == ATTRIBUTE_NODE ? el2.ownerDocument : el2.parentNode;
+          el3 = el3.nodeType == ATTRIBUTE_NODE ? el3.ownerDocument : el3.parentNode;
         }
         return null;
       },
@@ -5100,18 +5100,18 @@ var require_dom = __commonJS({
       this.contentType = opt.contentType || MIME_TYPE.XML_APPLICATION;
       this.type = isHTMLMimeType(this.contentType) ? "html" : "xml";
     }
-    function _onAddAttribute(doc, el2, newAttr) {
+    function _onAddAttribute(doc, el3, newAttr) {
       doc && doc._inc++;
       var ns = newAttr.namespaceURI;
       if (ns === NAMESPACE.XMLNS) {
-        el2._nsMap[newAttr.prefix ? newAttr.localName : ""] = newAttr.value;
+        el3._nsMap[newAttr.prefix ? newAttr.localName : ""] = newAttr.value;
       }
     }
-    function _onRemoveAttribute(doc, el2, newAttr, remove) {
+    function _onRemoveAttribute(doc, el3, newAttr, remove) {
       doc && doc._inc++;
       var ns = newAttr.namespaceURI;
       if (ns === NAMESPACE.XMLNS) {
-        delete el2._nsMap[newAttr.prefix ? newAttr.localName : ""];
+        delete el3._nsMap[newAttr.prefix ? newAttr.localName : ""];
       }
     }
     function _onUpdateChild(doc, parent, newChild) {
@@ -8705,36 +8705,36 @@ var require_sax = __commonJS({
               break;
             default:
               locator && position(tagStart);
-              var el2 = new ElementAttributes();
+              var el3 = new ElementAttributes();
               var currentNSMap = parseStack[parseStack.length - 1].currentNSMap;
-              var end = parseElementStartPart(source, tagStart, el2, currentNSMap, entityReplacer, errorHandler, isHTML);
-              var len = el2.length;
-              if (!el2.closed) {
-                if (isHTML && conventions.isHTMLVoidElement(el2.tagName)) {
-                  el2.closed = true;
+              var end = parseElementStartPart(source, tagStart, el3, currentNSMap, entityReplacer, errorHandler, isHTML);
+              var len = el3.length;
+              if (!el3.closed) {
+                if (isHTML && conventions.isHTMLVoidElement(el3.tagName)) {
+                  el3.closed = true;
                 } else {
-                  unclosedTags.push(el2.tagName);
+                  unclosedTags.push(el3.tagName);
                 }
               }
               if (locator && len) {
                 var locator2 = copyLocator(locator, {});
                 for (var i = 0; i < len; i++) {
-                  var a = el2[i];
+                  var a = el3[i];
                   position(a.offset);
                   a.locator = copyLocator(locator, {});
                 }
                 domBuilder.locator = locator2;
-                if (appendElement(el2, domBuilder, currentNSMap)) {
-                  parseStack.push(el2);
+                if (appendElement(el3, domBuilder, currentNSMap)) {
+                  parseStack.push(el3);
                 }
                 domBuilder.locator = locator;
               } else {
-                if (appendElement(el2, domBuilder, currentNSMap)) {
-                  parseStack.push(el2);
+                if (appendElement(el3, domBuilder, currentNSMap)) {
+                  parseStack.push(el3);
                 }
               }
-              if (isHTML && !el2.closed) {
-                end = parseHtmlSpecialContent(source, end, el2.tagName, entityReplacer, domBuilder);
+              if (isHTML && !el3.closed) {
+                end = parseHtmlSpecialContent(source, end, el3.tagName, entityReplacer, domBuilder);
               } else {
                 end++;
               }
@@ -8760,15 +8760,15 @@ var require_sax = __commonJS({
       t.columnNumber = f.columnNumber;
       return t;
     }
-    function parseElementStartPart(source, start, el2, currentNSMap, entityReplacer, errorHandler, isHTML) {
+    function parseElementStartPart(source, start, el3, currentNSMap, entityReplacer, errorHandler, isHTML) {
       function addAttribute(qname, value2, startIndex) {
-        if (hasOwn(el2.attributeNames, qname)) {
+        if (hasOwn(el3.attributeNames, qname)) {
           return errorHandler.fatalError("Attribute " + qname + " redefined");
         }
         if (!isHTML && value2.indexOf("<") >= 0) {
           return errorHandler.fatalError("Unescaped '<' not allowed in attributes values");
         }
-        el2.addValue(
+        el3.addValue(
           qname,
           // @see https://www.w3.org/TR/xml/#AVNormalize
           // since the xmldom sax parser does not "interpret" DTD the following is not implemented:
@@ -8824,17 +8824,17 @@ var require_sax = __commonJS({
           case "/":
             switch (s) {
               case S_TAG:
-                el2.setTagName(source.slice(start, p));
+                el3.setTagName(source.slice(start, p));
               case S_ATTR_END:
               case S_TAG_SPACE:
               case S_TAG_CLOSE:
                 s = S_TAG_CLOSE;
-                el2.closed = true;
+                el3.closed = true;
               case S_ATTR_NOQUOT_VALUE:
               case S_ATTR:
                 break;
               case S_ATTR_SPACE:
-                el2.closed = true;
+                el3.closed = true;
                 break;
               default:
                 throw new Error("attribute invalid close char('/')");
@@ -8843,13 +8843,13 @@ var require_sax = __commonJS({
           case "":
             errorHandler.error("unexpected end of input");
             if (s == S_TAG) {
-              el2.setTagName(source.slice(start, p));
+              el3.setTagName(source.slice(start, p));
             }
             return p;
           case ">":
             switch (s) {
               case S_TAG:
-                el2.setTagName(source.slice(start, p));
+                el3.setTagName(source.slice(start, p));
               case S_ATTR_END:
               case S_TAG_SPACE:
               case S_TAG_CLOSE:
@@ -8858,7 +8858,7 @@ var require_sax = __commonJS({
               case S_ATTR:
                 value = source.slice(start, p);
                 if (value.slice(-1) === "/") {
-                  el2.closed = true;
+                  el3.closed = true;
                   value = value.slice(0, -1);
                 }
               case S_ATTR_SPACE:
@@ -8887,7 +8887,7 @@ var require_sax = __commonJS({
             if (c <= " ") {
               switch (s) {
                 case S_TAG:
-                  el2.setTagName(source.slice(start, p));
+                  el3.setTagName(source.slice(start, p));
                   s = S_TAG_SPACE;
                   break;
                 case S_ATTR:
@@ -8930,12 +8930,12 @@ var require_sax = __commonJS({
         p++;
       }
     }
-    function appendElement(el2, domBuilder, currentNSMap) {
-      var tagName = el2.tagName;
+    function appendElement(el3, domBuilder, currentNSMap) {
+      var tagName = el3.tagName;
       var localNSMap = null;
-      var i = el2.length;
+      var i = el3.length;
       while (i--) {
-        var a = el2[i];
+        var a = el3[i];
         var qName = a.qName;
         var value = a.value;
         var nsp = qName.indexOf(":");
@@ -8959,9 +8959,9 @@ var require_sax = __commonJS({
           domBuilder.startPrefixMapping(nsPrefix, value);
         }
       }
-      var i = el2.length;
+      var i = el3.length;
       while (i--) {
-        a = el2[i];
+        a = el3[i];
         if (a.prefix) {
           if (a.prefix === "xml") {
             a.uri = NAMESPACE.XML;
@@ -8973,15 +8973,15 @@ var require_sax = __commonJS({
       }
       var nsp = tagName.indexOf(":");
       if (nsp > 0) {
-        prefix = el2.prefix = tagName.slice(0, nsp);
-        localName = el2.localName = tagName.slice(nsp + 1);
+        prefix = el3.prefix = tagName.slice(0, nsp);
+        localName = el3.localName = tagName.slice(nsp + 1);
       } else {
         prefix = null;
-        localName = el2.localName = tagName;
+        localName = el3.localName = tagName;
       }
-      var ns = el2.uri = currentNSMap[prefix || ""];
-      domBuilder.startElement(ns, localName, tagName, el2);
-      if (el2.closed) {
+      var ns = el3.uri = currentNSMap[prefix || ""];
+      domBuilder.startElement(ns, localName, tagName, el3);
+      if (el3.closed) {
         domBuilder.endElement(ns, localName, tagName);
         if (localNSMap) {
           for (prefix in localNSMap) {
@@ -8991,8 +8991,8 @@ var require_sax = __commonJS({
           }
         }
       } else {
-        el2.currentNSMap = currentNSMap;
-        el2.localNSMap = localNSMap;
+        el3.currentNSMap = currentNSMap;
+        el3.localNSMap = localNSMap;
         return true;
       }
     }
@@ -9394,11 +9394,11 @@ var require_dom_parser = __commonJS({
       },
       startElement: function(namespaceURI, localName, qName, attrs) {
         var doc = this.doc;
-        var el2 = doc.createElementNS(namespaceURI, qName || localName);
+        var el3 = doc.createElementNS(namespaceURI, qName || localName);
         var len = attrs.length;
-        appendElement(this, el2);
-        this.currentElement = el2;
-        this.locator && position(this.locator, el2);
+        appendElement(this, el3);
+        this.currentElement = el3;
+        this.locator && position(this.locator, el3);
         for (var i = 0; i < len; i++) {
           var namespaceURI = attrs.getURI(i);
           var value = attrs.getValue(i);
@@ -9406,7 +9406,7 @@ var require_dom_parser = __commonJS({
           var attr = doc.createAttributeNS(namespaceURI, qName);
           this.locator && position(attrs.getLocator(i), attr);
           attr.value = attr.nodeValue = value;
-          el2.setAttributeNode(attr);
+          el3.setAttributeNode(attr);
         }
       },
       endElement: function(namespaceURI, localName, qName) {
@@ -10304,8 +10304,8 @@ var require_doc_utils = __commonJS({
       for (var _i8 = 0; _i8 < arrays.length; _i8++) {
         var array = arrays[_i8];
         for (var _i0 = 0; _i0 < array.length; _i0++) {
-          var el2 = array[_i0];
-          result.push(el2);
+          var el3 = array[_i0];
+          result.push(el3);
         }
       }
       return result;
@@ -11231,9 +11231,9 @@ var require_traits = __commonJS({
     function getStructuredTagPositions(xmlElements) {
       var result = [];
       for (var _i0 = 0; _i0 < xmlElements.length; _i0++) {
-        var el2 = xmlElements[_i0];
-        var tag = getTagName(el2);
-        var position = /^\s*<\//.test(el2) ? "end" : "start";
+        var el3 = xmlElements[_i0];
+        var tag = getTagName(el3);
+        var position = /^\s*<\//.test(el3) ? "end" : "start";
         result.push({
           tag,
           position
@@ -13840,8 +13840,8 @@ var require_loop = __commonJS({
     }
     function hasImage(chunk) {
       for (var _i12 = 0; _i12 < chunk.length; _i12++) {
-        var el2 = chunk[_i12];
-        if (el2.tag === "w:drawing") {
+        var el3 = chunk[_i12];
+        if (el3.tag === "w:drawing") {
           return true;
         }
       }
@@ -19263,6 +19263,314 @@ function renderFileRow(f) {
   return li;
 }
 
+// extension/src/sidepanel/tabs/jobs.ts
+var HAIKU2 = "claude-haiku-4-5-20251001";
+var SONNET2 = "claude-sonnet-4-6";
+var OPUS2 = "claude-opus-4-7";
+var FIT_MODELS = [HAIKU2, SONNET2, OPUS2];
+var DAYS_OPTIONS = [
+  { value: 1, label: "past 24h" },
+  { value: 3, label: "past 3 days" },
+  { value: 7, label: "past 7 days" },
+  { value: 14, label: "past 14 days" },
+  { value: 30, label: "past 30 days" },
+  { value: 0, label: "any age" }
+];
+var TOPN_OPTIONS = [5, 10, 20, 40];
+function el2(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== void 0) node.textContent = text;
+  return node;
+}
+function formatPostedAge(postedAt) {
+  if (postedAt === null || !Number.isFinite(postedAt)) return "posting date unknown";
+  const diffDays = Math.floor((Date.now() - postedAt) / (1e3 * 60 * 60 * 24));
+  if (diffDays < 0) return "posting date unknown";
+  if (diffDays === 0) return "posted today";
+  if (diffDays === 1) return "posted 1 day ago";
+  return `posted ${diffDays} days ago`;
+}
+function formatScore(n) {
+  const pct = Math.round(Math.max(0, Math.min(1, n)) * 100);
+  return `${pct}%`;
+}
+function buildChip(text, muted = false) {
+  const chip = el2("span", `jobs-chip${muted ? " jobs-chip--muted" : ""}`, text);
+  return chip;
+}
+function renderJobsTab(hooks = {}) {
+  const root = el2("section", "tab-pane tab-pane--jobs");
+  let profile = null;
+  const state = {
+    maxDaysOld: 7,
+    topN: 10,
+    useFitScore: false,
+    fitScoreModel: HAIKU2
+  };
+  const header = el2("div", "jobs__header");
+  const refreshBtn = el2("button", "btn btn-primary jobs__refresh", "Refresh digest");
+  refreshBtn.type = "button";
+  header.appendChild(refreshBtn);
+  const statusEl = el2("span", "jobs__status");
+  header.appendChild(statusEl);
+  const daysSelect = document.createElement("select");
+  daysSelect.className = "jobs__days-select";
+  daysSelect.setAttribute("aria-label", "Maximum posting age");
+  for (const opt of DAYS_OPTIONS) {
+    const o = document.createElement("option");
+    o.value = String(opt.value);
+    o.textContent = opt.label;
+    if (opt.value === state.maxDaysOld) o.selected = true;
+    daysSelect.appendChild(o);
+  }
+  daysSelect.addEventListener("change", () => {
+    state.maxDaysOld = Number(daysSelect.value);
+  });
+  header.appendChild(daysSelect);
+  const topNSelect = document.createElement("select");
+  topNSelect.className = "jobs__topn-select";
+  topNSelect.setAttribute("aria-label", "How many jobs to show");
+  for (const n of TOPN_OPTIONS) {
+    const o = document.createElement("option");
+    o.value = String(n);
+    o.textContent = `top ${n}`;
+    if (n === state.topN) o.selected = true;
+    topNSelect.appendChild(o);
+  }
+  topNSelect.addEventListener("change", () => {
+    state.topN = Number(topNSelect.value);
+  });
+  header.appendChild(topNSelect);
+  const fitWrap = el2("label", "jobs__fit");
+  const fitCheckbox = document.createElement("input");
+  fitCheckbox.type = "checkbox";
+  fitCheckbox.className = "jobs__fit-checkbox";
+  fitCheckbox.checked = state.useFitScore;
+  fitWrap.appendChild(fitCheckbox);
+  fitWrap.appendChild(document.createTextNode(" AI fit-score"));
+  const fitModelSelect = document.createElement("select");
+  fitModelSelect.className = "jobs__fit-model";
+  fitModelSelect.setAttribute("aria-label", "Fit-score model");
+  for (const m2 of FIT_MODELS) {
+    const o = document.createElement("option");
+    o.value = m2;
+    o.textContent = m2;
+    if (m2 === state.fitScoreModel) o.selected = true;
+    fitModelSelect.appendChild(o);
+  }
+  fitModelSelect.disabled = !state.useFitScore;
+  fitCheckbox.addEventListener("change", () => {
+    state.useFitScore = fitCheckbox.checked;
+    fitModelSelect.disabled = !state.useFitScore;
+  });
+  fitModelSelect.addEventListener("change", () => {
+    state.fitScoreModel = fitModelSelect.value;
+  });
+  fitWrap.appendChild(fitModelSelect);
+  header.appendChild(fitWrap);
+  const reExtractLink = el2("button", "btn btn-ghost jobs__reextract", "Re-extract profile");
+  reExtractLink.type = "button";
+  header.appendChild(reExtractLink);
+  root.appendChild(header);
+  const listEl = el2("ul", "jobs__list");
+  root.appendChild(listEl);
+  const emptyEl = el2(
+    "p",
+    "jobs__empty",
+    "No jobs yet \u2014 click Refresh digest."
+  );
+  root.appendChild(emptyEl);
+  const footerEl = el2("div", "jobs__footer");
+  footerEl.hidden = true;
+  root.appendChild(footerEl);
+  function setBusy(busy, label) {
+    refreshBtn.disabled = busy;
+    reExtractLink.disabled = busy;
+    if (busy) {
+      statusEl.textContent = label ?? "Working\u2026";
+      statusEl.className = "jobs__status jobs__status--working";
+    } else if (statusEl.classList.contains("jobs__status--working")) {
+      statusEl.textContent = "";
+      statusEl.className = "jobs__status";
+    }
+  }
+  function showError(message) {
+    statusEl.textContent = message;
+    statusEl.className = "jobs__status jobs__status--error";
+  }
+  function showInfo(message) {
+    statusEl.textContent = message;
+    statusEl.className = "jobs__status";
+  }
+  async function runDigest() {
+    if (!hooks.onRunDigest) {
+      showError("Discovery sources not configured \u2014 set them in Settings.");
+      return;
+    }
+    setBusy(true, "Fetching digest\u2026");
+    try {
+      const outcome = await hooks.onRunDigest({
+        maxDaysOld: state.maxDaysOld,
+        topN: state.topN,
+        fitScoreModel: state.useFitScore ? state.fitScoreModel : void 0
+      });
+      if (!outcome.ok) {
+        showError(outcome.message);
+        return;
+      }
+      applyDigestResult(outcome.result);
+      showInfo("");
+    } catch (e) {
+      showError(`Digest failed: ${e.message ?? e}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function reExtractProfile() {
+    if (!hooks.onExtractProfile) {
+      showError("Discovery sources not configured \u2014 set them in Settings.");
+      return;
+    }
+    setBusy(true, "Extracting profile\u2026");
+    try {
+      const outcome = await hooks.onExtractProfile();
+      if (!outcome.ok) {
+        showError(outcome.message);
+        return;
+      }
+      profile = outcome.profile;
+      showInfo("Profile extracted.");
+    } catch (e) {
+      showError(`Profile extraction failed: ${e.message ?? e}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+  refreshBtn.addEventListener("click", () => void runDigest());
+  reExtractLink.addEventListener("click", () => void reExtractProfile());
+  function applyDigestResult(result) {
+    listEl.replaceChildren();
+    const jobs = result.jobs ?? [];
+    if (jobs.length === 0) {
+      emptyEl.hidden = false;
+      emptyEl.textContent = "No matching jobs in this digest.";
+    } else {
+      emptyEl.hidden = true;
+      for (const job of jobs) {
+        listEl.appendChild(renderJobRow(job));
+      }
+    }
+    footerEl.hidden = false;
+    const cost = result.cost?.totalUsd ?? 0;
+    footerEl.textContent = `Last digest: ${result.discoveredCount} found, ${jobs.length} shown \xB7 cost $${cost.toFixed(4)}`;
+  }
+  function renderJobRow(job) {
+    const li = el2("li", "jobs-row");
+    li.dataset.jobId = job.id;
+    const summary = el2("div", "jobs-row__summary");
+    summary.setAttribute("role", "button");
+    summary.tabIndex = 0;
+    const titleParts = [];
+    if (job.company) titleParts.push(job.company);
+    if (job.title) titleParts.push(job.title);
+    if (job.location) titleParts.push(job.location);
+    summary.appendChild(el2("span", "jobs-row__title", titleParts.join(" \xB7 ")));
+    summary.appendChild(el2("span", "jobs-row__age", formatPostedAge(job.postedAt)));
+    const badge = el2("span", "jobs-row__score", formatScore(job.finalScore));
+    badge.setAttribute("aria-label", `fit score ${formatScore(job.finalScore)}`);
+    summary.appendChild(badge);
+    summary.appendChild(el2("span", "jobs-row__source", job.source));
+    li.appendChild(summary);
+    const detail = el2("div", "jobs-row__detail");
+    detail.hidden = true;
+    if (job.matchedSkills && job.matchedSkills.length) {
+      const matchedWrap = el2("div", "jobs-row__skills jobs-row__skills--matched");
+      matchedWrap.appendChild(el2("span", "jobs-row__skills-label", "Matched: "));
+      for (const s of job.matchedSkills) matchedWrap.appendChild(buildChip(s, false));
+      detail.appendChild(matchedWrap);
+    }
+    if (job.missingSkills && job.missingSkills.length) {
+      const missingWrap = el2("div", "jobs-row__skills jobs-row__skills--missing");
+      missingWrap.appendChild(el2("span", "jobs-row__skills-label", "Missing: "));
+      for (const s of job.missingSkills) missingWrap.appendChild(buildChip(s, true));
+      detail.appendChild(missingWrap);
+    }
+    const snippet = (job.descriptionText ?? "").slice(0, 400);
+    if (snippet) {
+      const snippetEl = el2("p", "jobs-row__snippet");
+      snippetEl.textContent = snippet + (job.descriptionText && job.descriptionText.length > 400 ? "\u2026" : "");
+      detail.appendChild(snippetEl);
+    }
+    const actions = el2("div", "jobs-row__actions");
+    const openLink = el2("a", "btn btn-ghost jobs-row__open", "Open posting");
+    openLink.href = job.url;
+    openLink.target = "_blank";
+    openLink.rel = "noopener noreferrer";
+    actions.appendChild(openLink);
+    const tailorBtn = el2("button", "btn btn-secondary jobs-row__tailor", "Tailor resume");
+    tailorBtn.type = "button";
+    tailorBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (!hooks.onTailorJob) {
+        showError("Generate not available \u2014 run setup in Settings first.");
+        return;
+      }
+      void hooks.onTailorJob(job);
+    });
+    actions.appendChild(tailorBtn);
+    const appliedBtn = el2("button", "btn btn-secondary jobs-row__applied", "Mark applied");
+    appliedBtn.type = "button";
+    appliedBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (!hooks.onMarkStatus) {
+        showError("Pipeline sheet not configured \u2014 run setup in Settings first.");
+        return;
+      }
+      void hooks.onMarkStatus(job.id, "applied");
+      appliedBtn.textContent = "Applied \u2713";
+      appliedBtn.disabled = true;
+    });
+    actions.appendChild(appliedBtn);
+    const dismissBtn = el2("button", "btn btn-ghost jobs-row__dismiss", "Dismiss");
+    dismissBtn.type = "button";
+    dismissBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (hooks.onMarkStatus) void hooks.onMarkStatus(job.id, "rejected");
+      li.remove();
+      if (!listEl.querySelector(".jobs-row")) {
+        emptyEl.hidden = false;
+        emptyEl.textContent = "No jobs left in this digest.";
+      }
+    });
+    actions.appendChild(dismissBtn);
+    detail.appendChild(actions);
+    li.appendChild(detail);
+    function toggleExpand() {
+      const willExpand = detail.hidden;
+      detail.hidden = !willExpand;
+      li.classList.toggle("jobs-row--expanded", willExpand);
+    }
+    summary.addEventListener("click", toggleExpand);
+    summary.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        toggleExpand();
+      }
+    });
+    return li;
+  }
+  return {
+    root,
+    applyDigestResult,
+    setBusy,
+    getProfile: () => profile,
+    setProfile: (p) => {
+      profile = p;
+    }
+  };
+}
+
 // extension/src/lib/apiClient.ts
 function networkError(message) {
   return {
@@ -19445,6 +19753,27 @@ var ApiClient = class {
    */
   async multiVersion(req) {
     return this.post({ action: "multi_version", ...req });
+  }
+  // ─── job-pipeline (Phase 1: discovery → ranking → tracking) ──────────────
+  /**
+   * Distil the user's source materials into a JobProfile (titles, skills,
+   * search queries, filters, a ~200-word summary). The result is cached
+   * client-side; regenerate when the source materials change.
+   */
+  async extractProfile(req) {
+    return this.post({ action: "extract_profile", ...req });
+  }
+  /**
+   * Poll the configured job sources, normalise + dedup, rank against the
+   * profile, upsert the ranked list into the Job Pipeline sheet, and return
+   * it. Does NOT tailor resumes — the digest UI calls `generate` on demand.
+   */
+  async discoverAndRank(req) {
+    return this.post({ action: "discover_and_rank", ...req });
+  }
+  /** Change a Job Pipeline row's status (and optionally its tailored-resume link). */
+  async updateJobStatus(req) {
+    return this.post({ action: "update_job_status", ...req });
   }
 };
 
@@ -20563,6 +20892,63 @@ async function blobToBase64(blob) {
   }
   return btoa(bin);
 }
+var JOB_PROFILE_KEY = "jobProfile";
+var DISCOVERY_KEYS = {
+  adzunaAppId: "adzunaAppId",
+  adzunaAppKey: "adzunaAppKey",
+  jsearchRapidApiKey: "jsearchRapidApiKey",
+  greenhouseBoards: "greenhouseBoards",
+  leverClients: "leverClients",
+  usajobs: "usajobs",
+  country: "country"
+};
+async function rawStorageGet(keys) {
+  const c = getChrome();
+  if (!c?.storage?.local) return {};
+  try {
+    return await c.storage.local.get(keys);
+  } catch {
+    return {};
+  }
+}
+async function rawStorageSet(items) {
+  const c = getChrome();
+  if (!c?.storage?.local) return;
+  try {
+    await c.storage.local.set(items);
+  } catch {
+  }
+}
+function parseJsonArray(value) {
+  if (Array.isArray(value)) return value.filter((v2) => typeof v2 === "string");
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.filter((v2) => typeof v2 === "string");
+    } catch {
+      return value.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  return void 0;
+}
+async function loadDiscoveryConfig() {
+  const raw = await rawStorageGet(Object.values(DISCOVERY_KEYS));
+  const config = {};
+  const adzunaAppId = raw[DISCOVERY_KEYS.adzunaAppId];
+  const adzunaAppKey = raw[DISCOVERY_KEYS.adzunaAppKey];
+  if (typeof adzunaAppId === "string" && adzunaAppId) config.adzunaAppId = adzunaAppId;
+  if (typeof adzunaAppKey === "string" && adzunaAppKey) config.adzunaAppKey = adzunaAppKey;
+  const jsearch = raw[DISCOVERY_KEYS.jsearchRapidApiKey];
+  if (typeof jsearch === "string" && jsearch) config.jsearchRapidApiKey = jsearch;
+  const gh = parseJsonArray(raw[DISCOVERY_KEYS.greenhouseBoards]);
+  if (gh && gh.length) config.greenhouseBoards = gh;
+  const lever = parseJsonArray(raw[DISCOVERY_KEYS.leverClients]);
+  if (lever && lever.length) config.leverClients = lever;
+  if (raw[DISCOVERY_KEYS.usajobs] === true || raw[DISCOVERY_KEYS.usajobs] === "true") config.usajobs = true;
+  const country = raw[DISCOVERY_KEYS.country];
+  if (typeof country === "string" && country) config.country = country;
+  return config;
+}
 function getChrome() {
   const c = globalThis.chrome;
   if (c?.runtime?.sendMessage) return c;
@@ -20737,13 +21123,102 @@ function buildControllers(opts = { autoOpenWizard: false }) {
       }
     }
   });
+  const jobs = renderJobsTab({
+    onExtractProfile: async () => {
+      const client = await getApiClient();
+      const cfg = getRuntimeConfig();
+      if (!client || !cfg) {
+        return { ok: false, message: "JobHelp config not loaded. Run setup in Settings first." };
+      }
+      const resp = await client.extractProfile({
+        sourceFolderId: cfg.folders.source,
+        model: cfg.defaults.model
+      });
+      if (!resp.ok) return { ok: false, message: resp.error.message };
+      jobs.setProfile(resp.profile);
+      await rawStorageSet({ [JOB_PROFILE_KEY]: resp.profile });
+      return { ok: true, profile: resp.profile };
+    },
+    onRunDigest: async ({ maxDaysOld, topN, fitScoreModel }) => {
+      const client = await getApiClient();
+      const cfg = getRuntimeConfig();
+      if (!client || !cfg) {
+        return { ok: false, message: "JobHelp config not loaded. Run setup in Settings first." };
+      }
+      let profile = jobs.getProfile();
+      if (!profile) {
+        const cached = await rawStorageGet([JOB_PROFILE_KEY]);
+        const stored = cached[JOB_PROFILE_KEY];
+        if (stored && typeof stored === "object") {
+          profile = stored;
+          jobs.setProfile(profile);
+        }
+      }
+      if (!profile) {
+        const extracted = await client.extractProfile({
+          sourceFolderId: cfg.folders.source,
+          model: cfg.defaults.model
+        });
+        if (!extracted.ok) return { ok: false, message: extracted.error.message };
+        profile = extracted.profile;
+        jobs.setProfile(profile);
+        await rawStorageSet({ [JOB_PROFILE_KEY]: profile });
+      }
+      if (!cfg.sheetId) {
+        return { ok: false, message: "No tracking sheet configured. Run setup in Settings first." };
+      }
+      const discoveryConfig = await loadDiscoveryConfig();
+      const resp = await client.discoverAndRank({
+        profile,
+        config: discoveryConfig,
+        maxDaysOld,
+        topN,
+        fitScoreModel,
+        sheetId: cfg.sheetId
+      });
+      if (!resp.ok) return { ok: false, message: resp.error.message };
+      return { ok: true, result: resp };
+    },
+    onTailorJob: (job) => {
+      try {
+        generate.applyScraperOutput({
+          jd: job.descriptionText ?? "",
+          company: job.company || null,
+          role: job.title || null,
+          url: job.url,
+          scrapeStrategy: "generic",
+          jobInsights: null,
+          scrapedAt: Date.now()
+        });
+      } catch (e) {
+        console.warn("[jobs] could not prefill Generate tab:", e);
+      }
+    },
+    onMarkStatus: async (jobId, status, tailoredDocUrl) => {
+      const client = await getApiClient();
+      const cfg = getRuntimeConfig();
+      if (!client || !cfg?.sheetId) {
+        console.warn("[jobs] cannot update status \u2014 config or sheetId missing.");
+        return;
+      }
+      const resp = await client.updateJobStatus({
+        sheetId: cfg.sheetId,
+        jobId,
+        status,
+        tailoredDocUrl
+      });
+      if (!resp.ok) {
+        console.warn("[jobs] updateJobStatus failed:", resp.error.message);
+      }
+    }
+  });
   const settingsRoot = renderSettingsTab({
     autoOpenWizard: opts.autoOpenWizard,
     onConfigLoaded: (config) => {
       applyRuntimeConfig(config);
     }
   });
-  return { generate, files, settingsRoot };
+  return { generate, files, jobs, settingsRoot };
 }
 function setActiveTab(name, panes, buttons, container) {
   container.replaceChildren(panes[name]);
@@ -20752,9 +21227,26 @@ function setActiveTab(name, panes, buttons, container) {
     buttons[k].setAttribute("aria-selected", k === name ? "true" : "false");
   }
 }
+function ensureNavButton(tab, label) {
+  const existing = document.querySelector(`nav.tabs button[data-tab="${tab}"]`);
+  if (existing) return existing;
+  const nav = document.querySelector("nav.tabs");
+  if (!nav) return null;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.dataset.tab = tab;
+  btn.setAttribute("role", "tab");
+  btn.setAttribute("aria-selected", "false");
+  btn.textContent = label;
+  const settingsBtn = nav.querySelector('button[data-tab="settings"]');
+  if (settingsBtn) nav.insertBefore(btn, settingsBtn);
+  else nav.appendChild(btn);
+  return btn;
+}
 function init() {
   const tabContent = document.getElementById("tab-content");
   if (!tabContent) return;
+  ensureNavButton("jobs", "Jobs");
   const navButtons = document.querySelectorAll("nav.tabs button[data-tab]");
   void (async () => {
     let fileId = null;
@@ -20767,6 +21259,7 @@ function init() {
     const panes = {
       generate: controllers.generate.root,
       files: controllers.files.root,
+      jobs: controllers.jobs.root,
       settings: controllers.settingsRoot
     };
     const buttons = {
@@ -20774,6 +21267,8 @@ function init() {
       generate: document.querySelector('nav.tabs button[data-tab="generate"]'),
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       files: document.querySelector('nav.tabs button[data-tab="files"]'),
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      jobs: document.querySelector('nav.tabs button[data-tab="jobs"]'),
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       settings: document.querySelector('nav.tabs button[data-tab="settings"]')
     };
