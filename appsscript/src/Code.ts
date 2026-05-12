@@ -36,6 +36,9 @@ import type {
   CoverLetterRequest,
   VerifyClHooksRequest,
   MultiVersionRequest,
+  ExtractProfileRequest,
+  DiscoverAndRankRequest,
+  UpdateJobStatusRequest,
 } from './types/api-contract.js';
 
 import { handleCreateDriveFile, validateCreateDriveFile } from './handlers/createDriveFile.js';
@@ -48,6 +51,11 @@ import { handleAutoRevise, validateAutoRevise } from './handlers/autoRevise.js';
 import { handleCoverLetter, validateCoverLetter } from './handlers/coverLetter.js';
 import { handleVerifyClHooks, validateVerifyClHooks } from './handlers/verifyHooks.js';
 import { handleMultiVersion, validateMultiVersion } from './handlers/multiVersion.js';
+
+// Phase 1 job-pipeline handler imports
+import { handleExtractProfile, validateExtractProfile } from './handlers/extractProfile.js';
+import { handleDiscoverAndRank, validateDiscoverAndRank } from './handlers/discoverAndRank.js';
+import { handleUpdateJobStatus, validateUpdateJobStatus } from './handlers/updateJobStatus.js';
 import type { DriveOps, FileEntry } from './types/drive-ops.js';
 import type { ClaudeClient, SystemBlock } from './types/claude-api.js';
 import { ClaudeApiError } from './types/claude-api.js';
@@ -256,11 +264,25 @@ function route(body: unknown, deps: Deps): ApiResult<unknown> {
       return handleMultiVersion(deps, raw as unknown as MultiVersionRequest);
     }
 
-    // ── Phase 1 job-pipeline routes (handlers wired by the J4 agent) ────────
-    case 'extract_profile':
-    case 'discover_and_rank':
-    case 'update_job_status':
-      return validationError(`Action "${action}" is not yet implemented`);
+    // ── Phase 1 job-pipeline routes ─────────────────────────────────────────
+
+    case 'extract_profile': {
+      const validateErr = validateExtractProfile(raw);
+      if (validateErr) return validateErr;
+      return handleExtractProfile(deps, raw as unknown as ExtractProfileRequest);
+    }
+
+    case 'discover_and_rank': {
+      const validateErr = validateDiscoverAndRank(raw);
+      if (validateErr) return validateErr;
+      return handleDiscoverAndRank(deps, raw as unknown as DiscoverAndRankRequest);
+    }
+
+    case 'update_job_status': {
+      const validateErr = validateUpdateJobStatus(raw);
+      if (validateErr) return validateErr;
+      return handleUpdateJobStatus(deps, raw as unknown as UpdateJobStatusRequest);
+    }
   }
 }
 

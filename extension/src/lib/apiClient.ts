@@ -40,6 +40,12 @@ import type {
   VerifyClHooksResponse,
   MultiVersionRequest,
   MultiVersionResponse,
+  ExtractProfileRequest,
+  ExtractProfileResponse,
+  DiscoverAndRankRequest,
+  DiscoverAndRankResponse,
+  UpdateJobStatusRequest,
+  UpdateJobStatusResponse,
 } from '../types/api-contract.js';
 
 /** Build a typed network-failure error response. */
@@ -286,5 +292,36 @@ export class ApiClient {
     req: Omit<MultiVersionRequest, 'action'>,
   ): Promise<MultiVersionResponse> {
     return this.post<MultiVersionResponse>({ action: 'multi_version', ...req });
+  }
+
+  // ─── job-pipeline (Phase 1: discovery → ranking → tracking) ──────────────
+
+  /**
+   * Distil the user's source materials into a JobProfile (titles, skills,
+   * search queries, filters, a ~200-word summary). The result is cached
+   * client-side; regenerate when the source materials change.
+   */
+  async extractProfile(
+    req: Omit<ExtractProfileRequest, 'action'>,
+  ): Promise<ExtractProfileResponse> {
+    return this.post<ExtractProfileResponse>({ action: 'extract_profile', ...req });
+  }
+
+  /**
+   * Poll the configured job sources, normalise + dedup, rank against the
+   * profile, upsert the ranked list into the Job Pipeline sheet, and return
+   * it. Does NOT tailor resumes — the digest UI calls `generate` on demand.
+   */
+  async discoverAndRank(
+    req: Omit<DiscoverAndRankRequest, 'action'>,
+  ): Promise<DiscoverAndRankResponse> {
+    return this.post<DiscoverAndRankResponse>({ action: 'discover_and_rank', ...req });
+  }
+
+  /** Change a Job Pipeline row's status (and optionally its tailored-resume link). */
+  async updateJobStatus(
+    req: Omit<UpdateJobStatusRequest, 'action'>,
+  ): Promise<UpdateJobStatusResponse> {
+    return this.post<UpdateJobStatusResponse>({ action: 'update_job_status', ...req });
   }
 }

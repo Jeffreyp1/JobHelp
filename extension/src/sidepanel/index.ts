@@ -15,11 +15,13 @@
 
 import { renderGenerateTab, type GenerateTabController } from './tabs/generate.js';
 import { renderFilesTab, type FilesTabController } from './tabs/files.js';
+import { renderJobsTab, type JobsTabController } from './tabs/jobs.js';
 import { renderSettingsTab } from './tabs/settings.js';
 import { ApiClient } from '../lib/apiClient.js';
 import { fillResumeTemplate, parseResumeMarkdown } from '../lib/templateFiller.js';
 import type { Message } from '../types/message-bus.js';
 import type { FileSummary, FolderType } from '../types/api-contract.js';
+import type { JobProfile, DiscoveryConfig, RankedJob, JobPipelineStatus } from '../types/job-discovery.js';
 import { get, set } from '../lib/storage.js';
 import { loadConfigFromDrive } from '../lib/configLoader.js';
 import type { JobhelpConfig } from '../types/jobhelp-config.js';
@@ -122,12 +124,86 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(bin);
 }
 
-type TabName = 'generate' | 'files' | 'settings';
+type TabName = 'generate' | 'files' | 'jobs' | 'settings';
 
 interface PanelControllers {
   generate: GenerateTabController;
   files: FilesTabController;
+  jobs: JobsTabController;
   settingsRoot: HTMLElement;
+}
+
+// ─── Job-pipeline discovery config (not yet in JobhelpConfig) ─────────────
+// `JobhelpConfig` currently carries no `discovery` block, so the Jobs tab
+// reads the discovery-source credentials/targets from these raw
+// chrome.storage.local keys. They're flat scalars / JSON strings written by
+// (eventually) a Settings panel section. Treated as optional — an empty set
+// just yields an empty digest.
+const JOB_PROFILE_KEY = 'jobProfile';
+const DISCOVERY_KEYS = {
+  adzunaAppId: 'adzunaAppId',
+  adzunaAppKey: 'adzunaAppKey',
+  jsearchRapidApiKey: 'jsearchRapidApiKey',
+  greenhouseBoards: 'greenhouseBoards',
+  leverClients: 'leverClients',
+  usajobs: 'usajobs',
+  country: 'country',
+} as const;
+
+/** Raw chrome.storage.local read for keys outside the typed StorageSchema. */
+async function rawStorageGet(keys: string[]): Promise<Record<string, unknown>> {
+  const c = getChrome();
+  if (!c?.storage?.local) return {};
+  try {
+    return await c.storage.local.get(keys);
+  } catch {
+    return {};
+  }
+}
+
+/** Raw chrome.storage.local write for keys outside the typed StorageSchema. */
+async function rawStorageSet(items: Record<string, unknown>): Promise<void> {
+  const c = getChrome();
+  if (!c?.storage?.local) return;
+  try {
+    await c.storage.local.set(items);
+  } catch {
+    // best-effort cache write
+  }
+}
+
+function parseJsonArray(value: unknown): string[] | undefined {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string');
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.filter((v): v is string => typeof v === 'string');
+    } catch {
+      // not JSON — fall back to comma-split
+      return value.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  return undefined;
+}
+
+/** Assemble a DiscoveryConfig from the raw storage keys (all fields optional). */
+async function loadDiscoveryConfig(): Promise<DiscoveryConfig> {
+  const raw = await rawStorageGet(Object.values(DISCOVERY_KEYS));
+  const config: DiscoveryConfig = {};
+  const adzunaAppId = raw[DISCOVERY_KEYS.adzunaAppId];
+  const adzunaAppKey = raw[DISCOVERY_KEYS.adzunaAppKey];
+  if (typeof adzunaAppId === 'string' && adzunaAppId) config.adzunaAppId = adzunaAppId;
+  if (typeof adzunaAppKey === 'string' && adzunaAppKey) config.adzunaAppKey = adzunaAppKey;
+  const jsearch = raw[DISCOVERY_KEYS.jsearchRapidApiKey];
+  if (typeof jsearch === 'string' && jsearch) config.jsearchRapidApiKey = jsearch;
+  const gh = parseJsonArray(raw[DISCOVERY_KEYS.greenhouseBoards]);
+  if (gh && gh.length) config.greenhouseBoards = gh;
+  const lever = parseJsonArray(raw[DISCOVERY_KEYS.leverClients]);
+  if (lever && lever.length) config.leverClients = lever;
+  if (raw[DISCOVERY_KEYS.usajobs] === true || raw[DISCOVERY_KEYS.usajobs] === 'true') config.usajobs = true;
+  const country = raw[DISCOVERY_KEYS.country];
+  if (typeof country === 'string' && country) config.country = country;
+  return config;
 }
 
 function getChrome(): typeof chrome | null {
@@ -325,6 +401,101 @@ function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: 
     },
   });
 
+  const jobs = renderJobsTab({
+    onExtractProfile: async () => {
+      const client = await getApiClient();
+      const cfg = getRuntimeConfig();
+      if (!client || !cfg) {
+        return { ok: false as const, message: 'JobHelp config not loaded. Run setup in Settings first.' };
+      }
+      const resp = await client.extractProfile({
+        sourceFolderId: cfg.folders.source,
+        model: cfg.defaults.model,
+      });
+      if (!resp.ok) return { ok: false as const, message: resp.error.message };
+      jobs.setProfile(resp.profile);
+      await rawStorageSet({ [JOB_PROFILE_KEY]: resp.profile });
+      return { ok: true as const, profile: resp.profile };
+    },
+    onRunDigest: async ({ maxDaysOld, topN, fitScoreModel }) => {
+      const client = await getApiClient();
+      const cfg = getRuntimeConfig();
+      if (!client || !cfg) {
+        return { ok: false as const, message: 'JobHelp config not loaded. Run setup in Settings first.' };
+      }
+      // Profile: prefer the in-memory cache, then chrome.storage, then extract.
+      let profile: JobProfile | null = jobs.getProfile();
+      if (!profile) {
+        const cached = await rawStorageGet([JOB_PROFILE_KEY]);
+        const stored = cached[JOB_PROFILE_KEY];
+        if (stored && typeof stored === 'object') {
+          profile = stored as JobProfile;
+          jobs.setProfile(profile);
+        }
+      }
+      if (!profile) {
+        const extracted = await client.extractProfile({
+          sourceFolderId: cfg.folders.source,
+          model: cfg.defaults.model,
+        });
+        if (!extracted.ok) return { ok: false as const, message: extracted.error.message };
+        profile = extracted.profile;
+        jobs.setProfile(profile);
+        await rawStorageSet({ [JOB_PROFILE_KEY]: profile });
+      }
+      if (!cfg.sheetId) {
+        return { ok: false as const, message: 'No tracking sheet configured. Run setup in Settings first.' };
+      }
+      const discoveryConfig = await loadDiscoveryConfig();
+      const resp = await client.discoverAndRank({
+        profile,
+        config: discoveryConfig,
+        maxDaysOld,
+        topN,
+        fitScoreModel,
+        sheetId: cfg.sheetId,
+      });
+      if (!resp.ok) return { ok: false as const, message: resp.error.message };
+      return { ok: true as const, result: resp };
+    },
+    onTailorJob: (job: RankedJob) => {
+      // Prefill the Generate tab with this job's JD/company/role, then switch
+      // to it. We reuse the Generate tab's existing scraper-output ingestion
+      // path rather than wiring a dedicated message-bus event — the user then
+      // clicks Generate. (See CROSS-IMPACT note for the richer integration.)
+      try {
+        generate.applyScraperOutput({
+          jd: job.descriptionText ?? '',
+          company: job.company || null,
+          role: job.title || null,
+          url: job.url,
+          scrapeStrategy: 'generic',
+          jobInsights: null,
+          scrapedAt: Date.now(),
+        });
+      } catch (e) {
+        console.warn('[jobs] could not prefill Generate tab:', e);
+      }
+    },
+    onMarkStatus: async (jobId: string, status: JobPipelineStatus, tailoredDocUrl?: string) => {
+      const client = await getApiClient();
+      const cfg = getRuntimeConfig();
+      if (!client || !cfg?.sheetId) {
+        console.warn('[jobs] cannot update status — config or sheetId missing.');
+        return;
+      }
+      const resp = await client.updateJobStatus({
+        sheetId: cfg.sheetId,
+        jobId,
+        status,
+        tailoredDocUrl,
+      });
+      if (!resp.ok) {
+        console.warn('[jobs] updateJobStatus failed:', resp.error.message);
+      }
+    },
+  });
+
   const settingsRoot = renderSettingsTab({
     autoOpenWizard: opts.autoOpenWizard,
     onConfigLoaded: (config) => {
@@ -334,7 +505,7 @@ function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: 
     },
   });
 
-  return { generate, files, settingsRoot };
+  return { generate, files, jobs, settingsRoot };
 }
 
 function setActiveTab(
@@ -350,9 +521,34 @@ function setActiveTab(
   }
 }
 
+/**
+ * Ensure a nav button exists for the given tab. The static index.html ships
+ * Generate/Files/Settings; the Jobs tab is injected here so the HTML asset
+ * stays untouched (see CROSS-IMPACT note). Returns the button element.
+ */
+function ensureNavButton(tab: TabName, label: string): HTMLButtonElement | null {
+  const existing = document.querySelector<HTMLButtonElement>(`nav.tabs button[data-tab="${tab}"]`);
+  if (existing) return existing;
+  const nav = document.querySelector('nav.tabs');
+  if (!nav) return null;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.dataset.tab = tab;
+  btn.setAttribute('role', 'tab');
+  btn.setAttribute('aria-selected', 'false');
+  btn.textContent = label;
+  // Insert before the Settings button so Jobs sits next to Files.
+  const settingsBtn = nav.querySelector('button[data-tab="settings"]');
+  if (settingsBtn) nav.insertBefore(btn, settingsBtn);
+  else nav.appendChild(btn);
+  return btn;
+}
+
 function init(): void {
   const tabContent = document.getElementById('tab-content');
   if (!tabContent) return;
+  // Inject the Jobs nav button (idempotent) before we snapshot the node list.
+  ensureNavButton('jobs', 'Jobs');
   const navButtons = document.querySelectorAll<HTMLButtonElement>('nav.tabs button[data-tab]');
 
   // ── Step 1: peek at chrome.storage to decide first-run vs. resumed-run. ──
@@ -372,6 +568,7 @@ function init(): void {
     const panes: Record<TabName, HTMLElement> = {
       generate: controllers.generate.root,
       files: controllers.files.root,
+      jobs: controllers.jobs.root,
       settings: controllers.settingsRoot,
     };
     const buttons: Record<TabName, HTMLButtonElement> = {
@@ -379,6 +576,8 @@ function init(): void {
       generate: document.querySelector('nav.tabs button[data-tab="generate"]')!,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       files: document.querySelector('nav.tabs button[data-tab="files"]')!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      jobs: document.querySelector('nav.tabs button[data-tab="jobs"]')!,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       settings: document.querySelector('nav.tabs button[data-tab="settings"]')!,
     };

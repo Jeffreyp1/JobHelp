@@ -4,6 +4,37 @@ All notable changes to JobHelp are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-12
+
+Job pipeline — Phase 1 of the auto-apply architecture (see [docs/research/auto-apply-architecture.md](docs/research/auto-apply-architecture.md)): discover relevant postings, rank them against your resume, track them in a sheet, one-click "tailor resume" reusing the existing engine. No auto-submit — per the research that's the part with no API / ToS violations / LinkedIn perma-bans; the flow is discover → tailor → you click apply & submit.
+
+### Added — backend (Apps Script)
+
+- **`extract_profile` action** ([handlers/extractProfile.ts](appsscript/src/handlers/extractProfile.ts)) — reads your source materials and distils them into a `JobProfile` (candidate titles, seniority, a canonical skill list, domains, search queries, filters, and a ~200-word summary) via one Claude call. Robust JSON parse with per-field type checks and sane backfilling. ([lib/jobProfile.ts](appsscript/src/lib/jobProfile.ts))
+- **`discover_and_rank` action** ([handlers/discoverAndRank.ts](appsscript/src/handlers/discoverAndRank.ts)) — polls the configured job sources, dedups, ranks against the profile, upserts the top N into the Job Pipeline sheet, returns the ranked list. Discovery sources ([lib/jobDiscovery.ts](appsscript/src/lib/jobDiscovery.ts)): Adzuna API (free dev tier), Greenhouse public job boards (`boards-api.greenhouse.io/v1/boards/{token}/jobs`), Lever public boards (`api.lever.co/v0/postings/{client}?mode=json`), JSearch on RapidAPI (optional paid wide-net), USAJOBS (no-op stub until an API key is wired). Each source is fault-isolated — one source failing logs a warning and the rest still run. Ranking ([lib/jobRanking.ts](appsscript/src/lib/jobRanking.ts)): Stage A = weighted keyword overlap between the JD and `profile.skills` (with a `topN` floor so a sparse day still returns something); recency boost `max(0.5, 1 - daysOld/30)` plus an optional hard "posted within N days" filter; Stage B (optional) = a batched Claude fit-score on the top survivors (5 jobs per call, falls back to the keyword score on a parse failure); `finalScore = (fitScore ?? keywordScore) × recencyBoost`.
+- **`update_job_status` action** ([handlers/updateJobStatus.ts](appsscript/src/handlers/updateJobStatus.ts)) — sets a Job Pipeline row's status (`new` → `tailored` → `applied` / `rejected` / `closed`) and optionally its tailored-resume Drive link.
+- **Job Pipeline sheet ops** ([drive.ts](appsscript/src/drive.ts)) — `ensureJobPipelineSheet` (creates a "Job Pipeline" tab with a 14-column header), `upsertJobPipelineRows` (keyed by `jobId` — re-discovering a job updates its data cells but never overwrites the Status or Notes you've set), `updateJobPipelineStatus`, `readJobPipelineRows`. Added as optional methods on the `DriveOps` interface so existing typed mocks keep compiling.
+- **Daily digest cron** ([triggers.ts](appsscript/src/triggers.ts)) — `installDailyJobDigest()` registers a time-driven trigger; `runDailyJobDigest()` reads a `JOBHELP_DIGEST_CONFIG` Script Property (`{ profile, config, maxDaysOld, topN, fitScoreModel?, sheetId }`), runs `discover_and_rank`, logs the outcome. Never throws (a thrown error in a trigger emails the owner).
+- New shared types ([types/job-discovery.ts](appsscript/src/types/job-discovery.ts), mirrored to the extension): `JobSource`, `JobPipelineStatus`, `DiscoveredJob`, `JobProfile`, `RankedJob`, `DiscoveryConfig`, `JobPipelineRow`. New request/response shapes in both `api-contract.ts` copies for the 3 actions.
+
+### Added — extension (side panel)
+
+- **"Jobs" tab** ([sidepanel/tabs/jobs.ts](extension/src/sidepanel/tabs/jobs.ts)) — the daily-digest UI. Header controls: Refresh digest, "posted within N days", "show top N", an "use AI fit-score" checkbox + model dropdown, and Re-extract profile. Ranked job list: one expandable row per job (company · title · location · "posted N days ago" · a `finalScore`% badge · the source name); expanding shows matched-skill chips, missing-skill chips, a ~400-char JD snippet, and an action bar — Open posting / Tailor resume / Mark applied / Dismiss. Footer summary line after each refresh ("X found, Y shown · cost $Z"). All hooks degrade gracefully when discovery sources or the runtime config aren't set ("…configure in Settings"), never throwing.
+- `apiClient` gained `extractProfile`, `discoverAndRank`, `updateJobStatus` (mirroring the existing v2-method style); `sidepanel/index.ts` wires the Jobs-tab hooks (extract profile → cache it; run digest → assemble the request from the cached profile + `getRuntimeConfig()` + discovery keys read from `chrome.storage.local` → call the backend → render; tailor → prefill the Generate tab via its existing scraper-ingestion path; mark status → call `update_job_status`). The "Jobs" nav button is injected at runtime so `index.html` stays untouched.
+
+### Internal
+
+- 844 tests passing (up from 688 at v0.2.3; +156 across the scaffold + J1-J5: jobDiscovery 27, jobProfile 15, jobRanking 20, jobPipelineSheet 20, extractProfile/discoverAndRank/updateJobStatus/triggers 55, jobs-tab 19). tsc clean both packages. Bundles: Apps Script `Code.gs` ~148 KB, extension/public/sidepanel/index.js ~796 KB. verify-bundle 12/12.
+- 5 parallel opus-4.7 agents (J1 discovery lib · J2 profile + ranking libs · J3 sheet ops · J4 handlers + cron + router wiring · J5 UI tab + apiClient) on a pre-scaffolded contract; CLAUDE.md's parallel-agent file-ownership rules held — agents flagged cross-impacts in sibling-owned files rather than editing them.
+
+### Not done (Phase 1 follow-ups, all flagged in agent reports)
+
+- `JobhelpConfig` doesn't carry a `discovery` block yet — the Jobs tab reads Adzuna keys / Greenhouse-Lever target lists from `chrome.storage.local` keys (`adzunaAppId`, `adzunaAppKey`, `jsearchRapidApiKey`, `greenhouseBoards`, `leverClients`, `usajobs`, `country`) directly; a Settings section to populate them and a `JobhelpConfig.discovery` field are the natural next step.
+- USAJOBS is a no-op stub — wiring it needs optional `usajobsApiKey?` / `usajobsEmail?` on `DiscoveryConfig`.
+- "Tailor resume" only prefills the Generate tab; it doesn't auto-switch tabs or auto-trigger generate (would need a public `triggerGenerate()` on the Generate controller or a new message-bus event).
+- `triggers.ts` duplicates `Code.ts`'s private `resolveDeps()` rather than importing it (kept Code.ts changes minimal).
+- The daily-digest config (`JOBHELP_DIGEST_CONFIG` Script Property) has no UI to populate it yet — it's set manually in the Apps Script editor for now.
+
 ## [0.2.3] - 2026-05-11
 
 Wires the v2.1 single-file config into the runtime, adopts the structured logger across both packages, and clears the highest-priority silent-failure findings from the v0.2.2 audit.
