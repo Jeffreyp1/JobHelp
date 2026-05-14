@@ -277,4 +277,26 @@ describe('runDigest', () => {
     const alpha = result.sourceResults.find((s) => s.source === 'alpha');
     expect(alpha?.error?.type).toBe('parse');
   });
+
+  it('preserves the original throwable as Error.cause when pipeline rejects with a non-Error', async () => {
+    setHandler('alpha', async () => [makeJob('a1', 'alpha')]);
+    const originalErr: { kind: string; detail: string } = {
+      kind: 'pipeline-broke',
+      detail: 'something went wrong',
+    };
+    mocks.runPipelineMock.mockImplementation(async (): Promise<readonly RankedJob[]> => {
+      throw originalErr;
+    });
+
+    let caught: unknown;
+    try {
+      await runDigest(makeConfig(tmpDir, 10));
+    } catch (e: unknown) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    if (caught instanceof Error) {
+      expect(caught.cause).toBe(originalErr);
+    }
+  });
 });

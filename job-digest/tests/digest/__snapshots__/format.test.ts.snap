@@ -33,7 +33,7 @@ exports[`formatDigestMarkdown > falls back to first sentence of description when
 
 ## #1 Software Engineer I - Stripe (score 0.60)
 - **Source:** greenhouse
-- **Location:** Remote (US) · $130k-$180k
+- **Location:** Remote (US) - $130k-$180k
 - **Posted:** 2026-05-13 (1 day ago)
 - **Why this match:** Greenfield service in Go.
 - **Apply:** https://stripe.com/jobs/listing/123
@@ -63,7 +63,7 @@ exports[`formatDigestMarkdown > renders a multi-job digest 1`] = `
 
 ## #1 Software Engineer I - Stripe (score 0.87)
 - **Source:** greenhouse
-- **Location:** Remote (US) · $130k-$180k
+- **Location:** Remote (US) - $130k-$180k
 - **Posted:** 2026-05-13 (1 day ago)
 - **Why this match:** Strong TypeScript and distributed systems match.
 - **Apply:** https://stripe.com/jobs/listing/123
@@ -71,7 +71,7 @@ exports[`formatDigestMarkdown > renders a multi-job digest 1`] = `
 
 ## #2 Backend Engineer - Plaid (score 0.74)
 - **Source:** lever
-- **Location:** San Francisco, CA · $140k-$200k
+- **Location:** San Francisco, CA - $140k-$200k
 - **Posted:** 2026-05-10 (4 days ago)
 - **Why this match:** Backend Python and Postgres expertise aligns.
 - **Apply:** https://jobs.lever.co/plaid/abc
@@ -114,7 +114,7 @@ exports[`formatDigestMarkdown > renders salaryMin only / salaryMax only 1`] = `
 
 ## #1 Software Engineer I - Stripe (score 0.60)
 - **Source:** greenhouse
-- **Location:** Remote (US) · $120k+
+- **Location:** Remote (US) - $120k+
 - **Posted:** 2026-05-13 (1 day ago)
 - **Why this match:** Strong TypeScript and distributed systems match.
 - **Apply:** https://stripe.com/jobs/listing/123
@@ -122,7 +122,7 @@ exports[`formatDigestMarkdown > renders salaryMin only / salaryMax only 1`] = `
 
 ## #2 Software Engineer I - Stripe (score 0.55)
 - **Source:** greenhouse
-- **Location:** Remote (US) · up to $220k
+- **Location:** Remote (US) - up to $220k
 - **Posted:** 2026-05-13 (1 day ago)
 - **Why this match:** Strong TypeScript and distributed systems match.
 - **Apply:** https://stripe.com/jobs/listing/123

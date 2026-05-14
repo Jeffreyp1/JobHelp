@@ -114,7 +114,7 @@ export async function runDigest(config: JobDigestConfig): Promise<DigestRunResul
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log('error', 'pipeline failed', { error: message });
-    throw err instanceof Error ? err : new Error(message);
+    throw err instanceof Error ? err : new Error(message, { cause: err });
   }
 
   const topK = ranked.slice(0, config.ranking.digestK);
