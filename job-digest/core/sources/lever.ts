@@ -1,24 +1,16 @@
 import { log } from '../lib/log.js';
-import type { JobDigestConfig } from '../types/config.js';
 import type { NormalizedJob, RemoteMode } from '../types/job.js';
-import type { SourceAdapter, SourceErrorType } from '../types/source.js';
+import type { SourceAdapter } from '../types/source.js';
+import {
+  SourceFetchError,
+  asNumber,
+  asString,
+  classifyHttpStatus,
+  detectRemoteMode as detectRemoteFromText,
+  isRecord,
+} from './_shared.js';
 
-/** Typed transport error every source adapter raises. */
-export class SourceFetchError extends Error {
-  readonly type: SourceErrorType;
-  constructor(type: SourceErrorType, message: string) {
-    super(message);
-    this.name = 'SourceFetchError';
-    this.type = type;
-  }
-}
-
-function classifyHttpStatus(status: number): SourceErrorType {
-  if (status === 401 || status === 403) return 'auth';
-  if (status === 429) return 'rate_limit';
-  if (status >= 400) return 'network';
-  return 'unknown';
-}
+export { SourceFetchError };
 
 function detectRemoteMode(text: string, workplaceType: string | undefined): RemoteMode {
   if (workplaceType !== undefined) {
@@ -27,24 +19,7 @@ function detectRemoteMode(text: string, workplaceType: string | undefined): Remo
     if (w === 'hybrid') return 'hybrid';
     if (w === 'on-site' || w === 'onsite') return 'onsite';
   }
-  const t = text.toLowerCase();
-  if (/\bhybrid\b/.test(t)) return 'hybrid';
-  if (/\b(remote|wfh|work[- ]from[- ]home)\b/.test(t)) return 'remote';
-  if (/\b(on[- ]?site|in[- ]office)\b/.test(t)) return 'onsite';
-  return 'unknown';
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
-function asString(v: unknown): string | undefined {
-  return typeof v === 'string' ? v : undefined;
-}
-
-function asNumber(v: unknown): number | undefined {
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
-  return undefined;
+  return detectRemoteFromText(text);
 }
 
 function epochMsToIso(v: unknown): string | undefined {
@@ -53,6 +28,7 @@ function epochMsToIso(v: unknown): string | undefined {
   const d = new Date(n);
   return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
 }
+
 interface LeverPosting {
   readonly id: string;
   readonly title: string;
@@ -99,6 +75,7 @@ function parseLeverPosting(raw: unknown): LeverPosting | undefined {
     salaryCurrency,
   };
 }
+
 function normalize(slug: string, p: LeverPosting, raw: unknown): NormalizedJob {
   const remote = detectRemoteMode(`${p.title} ${p.location} ${p.description}`, p.workplaceType);
   const norm: NormalizedJob = {
@@ -142,6 +119,18 @@ async function fetchPostings(slug: string): Promise<unknown> {
   }
 }
 
+async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void> {
+  const body = await fetchPostings(slug);
+  if (!Array.isArray(body)) {
+    throw new SourceFetchError('parse', 'lever response was not an array');
+  }
+  for (const rawPosting of body) {
+    const parsed = parseLeverPosting(rawPosting);
+    if (parsed === undefined) continue;
+    out.push(normalize(slug, parsed, rawPosting));
+  }
+}
+
 export const lever: SourceAdapter = {
   name: 'lever',
   enabled: (config): boolean => {
@@ -154,22 +143,22 @@ export const lever: SourceAdapter = {
       throw new SourceFetchError('auth', 'lever config missing');
     }
     const all: NormalizedJob[] = [];
+    let attempts = 0;
+    let failures = 0;
+    let lastError: unknown;
     for (const slug of c.slugs) {
-      let body: unknown;
+      attempts += 1;
       try {
-        body = await fetchPostings(slug);
+        await fetchAndCollect(slug, all);
       } catch (err: unknown) {
+        failures += 1;
+        lastError = err;
         log('warn', 'lever fetch failed', { slug, error: err instanceof Error ? err.message : 'unknown' });
-        throw err;
       }
-      if (!Array.isArray(body)) {
-        throw new SourceFetchError('parse', 'lever response was not an array');
-      }
-      for (const rawPosting of body) {
-        const parsed = parseLeverPosting(rawPosting);
-        if (parsed === undefined) continue;
-        all.push(normalize(slug, parsed, rawPosting));
-      }
+    }
+    if (attempts > 0 && failures === attempts) {
+      if (lastError instanceof Error) throw lastError;
+      throw new SourceFetchError('unknown', 'lever: all slugs failed');
     }
     return all;
   },
