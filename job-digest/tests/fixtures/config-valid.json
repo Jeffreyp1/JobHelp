@@ -1,0 +1,33 @@
+{
+  "profile": {
+    "resumeDumpPath": "~/Documents/resume-dump.md",
+    "skills": ["typescript", "go", "python"],
+    "location": "Irvine, CA",
+    "remoteOk": true,
+    "salaryFloor": 100000,
+    "seniority": "entry",
+    "roleFamily": ["backend", "fullstack"]
+  },
+  "sources": {
+    "adzuna": {
+      "appId": "test-app-id",
+      "appKey": "test-app-key",
+      "country": "us",
+      "queries": ["software engineer entry level"]
+    },
+    "greenhouse": { "tokens": ["doordash", "stripe"] },
+    "lever": { "slugs": ["plaid", "anthropic"] }
+  },
+  "ranking": {
+    "useLlmFitScore": true,
+    "llmModel": "claude-haiku-4-5",
+    "topN": 20,
+    "digestK": 10
+  },
+  "output": {
+    "dir": "~/jobhelp/digests"
+  },
+  "anthropic": {
+    "apiKey": "${JOBHELP_TEST_ANTHROPIC_KEY}"
+  }
+}
