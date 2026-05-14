@@ -1,52 +1,18 @@
 import { log } from '../lib/log.js';
-import type { JobDigestConfig } from '../types/config.js';
-import type { NormalizedJob, RemoteMode } from '../types/job.js';
-import type { SourceAdapter, SourceErrorType } from '../types/source.js';
+import type { NormalizedJob } from '../types/job.js';
+import type { SourceAdapter } from '../types/source.js';
+import {
+  SourceFetchError,
+  asIsoString,
+  asNumber,
+  asString,
+  classifyHttpStatus,
+  detectRemoteMode,
+  isRecord,
+} from './_shared.js';
 
-/** Typed transport error every source adapter raises through {@link httpFail}. */
-export class SourceFetchError extends Error {
-  readonly type: SourceErrorType;
-  constructor(type: SourceErrorType, message: string) {
-    super(message);
-    this.name = 'SourceFetchError';
-    this.type = type;
-  }
-}
+export { SourceFetchError };
 
-function classifyHttpStatus(status: number): SourceErrorType {
-  if (status === 401 || status === 403) return 'auth';
-  if (status === 429) return 'rate_limit';
-  if (status >= 500) return 'network';
-  if (status >= 400) return 'network';
-  return 'unknown';
-}
-
-function detectRemoteMode(text: string): RemoteMode {
-  const t = text.toLowerCase();
-  if (/\bhybrid\b/.test(t)) return 'hybrid';
-  if (/\b(remote|wfh|work[- ]from[- ]home)\b/.test(t)) return 'remote';
-  if (/\b(on[- ]?site|in[- ]office)\b/.test(t)) return 'onsite';
-  return 'unknown';
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
-function asString(v: unknown): string | undefined {
-  return typeof v === 'string' ? v : undefined;
-}
-
-function asNumber(v: unknown): number | undefined {
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
-  return undefined;
-}
-
-function asIsoString(v: unknown): string | undefined {
-  if (typeof v !== 'string') return undefined;
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
-}
 interface AdzunaResult {
   readonly id: string;
   readonly title: string;
@@ -57,6 +23,20 @@ interface AdzunaResult {
   readonly salaryMin: number | undefined;
   readonly salaryMax: number | undefined;
   readonly created: string | undefined;
+}
+
+const COUNTRY_TO_CURRENCY: Readonly<Record<string, string>> = {
+  us: 'USD',
+  gb: 'GBP',
+  au: 'AUD',
+  ca: 'CAD',
+  de: 'EUR',
+  fr: 'EUR',
+  nl: 'EUR',
+};
+
+function currencyForCountry(country: string): string | undefined {
+  return COUNTRY_TO_CURRENCY[country.toLowerCase()];
 }
 
 function parseAdzunaResult(raw: unknown): AdzunaResult | undefined {
@@ -83,9 +63,11 @@ function parseAdzunaResult(raw: unknown): AdzunaResult | undefined {
   };
 }
 
-function normalize(result: AdzunaResult, raw: unknown): NormalizedJob {
+function normalize(result: AdzunaResult, raw: unknown, country: string): NormalizedJob {
   const remoteText = `${result.title} ${result.description} ${result.location}`;
   const remote = detectRemoteMode(remoteText);
+  const hasSalary = result.salaryMin !== undefined || result.salaryMax !== undefined;
+  const currency = hasSalary ? currencyForCountry(country) : undefined;
   const job: NormalizedJob = {
     id: `adzuna:${result.id}`,
     source: 'adzuna',
@@ -98,7 +80,7 @@ function normalize(result: AdzunaResult, raw: unknown): NormalizedJob {
     rawSourceData: raw,
     ...(result.salaryMin !== undefined ? { salaryMin: result.salaryMin } : {}),
     ...(result.salaryMax !== undefined ? { salaryMax: result.salaryMax } : {}),
-    ...((result.salaryMin !== undefined || result.salaryMax !== undefined) ? { salaryCurrency: 'USD' } : {}),
+    ...(currency !== undefined ? { salaryCurrency: currency } : {}),
     ...((): { postedAt: string } | object => {
       const iso = asIsoString(result.created);
       return iso !== undefined ? { postedAt: iso } : {};
@@ -106,6 +88,7 @@ function normalize(result: AdzunaResult, raw: unknown): NormalizedJob {
   };
   return job;
 }
+
 function buildUrl(country: string, query: string, appId: string, appKey: string): string {
   const params = new URLSearchParams({
     app_id: appId,
@@ -141,6 +124,26 @@ async function fetchOnePage(url: string): Promise<unknown> {
   }
 }
 
+async function fetchAndCollect(
+  url: string,
+  country: string,
+  out: NormalizedJob[],
+): Promise<void> {
+  const body = await fetchOnePage(url);
+  if (!isRecord(body)) {
+    throw new SourceFetchError('parse', 'adzuna response was not an object');
+  }
+  const results = body['results'];
+  if (!Array.isArray(results)) {
+    throw new SourceFetchError('parse', 'adzuna response.results was not an array');
+  }
+  for (const rawResult of results) {
+    const parsed = parseAdzunaResult(rawResult);
+    if (parsed === undefined) continue;
+    out.push(normalize(parsed, rawResult, country));
+  }
+}
+
 export const adzuna: SourceAdapter = {
   name: 'adzuna',
   enabled: (config): boolean => {
@@ -153,27 +156,23 @@ export const adzuna: SourceAdapter = {
       throw new SourceFetchError('auth', 'adzuna config missing');
     }
     const all: NormalizedJob[] = [];
+    let attempts = 0;
+    let failures = 0;
+    let lastError: unknown;
     for (const query of c.queries) {
+      attempts += 1;
       const url = buildUrl(c.country, query, c.appId, c.appKey);
-      let body: unknown;
       try {
-        body = await fetchOnePage(url);
+        await fetchAndCollect(url, c.country, all);
       } catch (err: unknown) {
+        failures += 1;
+        lastError = err;
         log('warn', 'adzuna fetch failed', { query, error: err instanceof Error ? err.message : 'unknown' });
-        throw err;
       }
-      if (!isRecord(body)) {
-        throw new SourceFetchError('parse', 'adzuna response was not an object');
-      }
-      const results = body['results'];
-      if (!Array.isArray(results)) {
-        throw new SourceFetchError('parse', 'adzuna response.results was not an array');
-      }
-      for (const rawResult of results) {
-        const parsed = parseAdzunaResult(rawResult);
-        if (parsed === undefined) continue;
-        all.push(normalize(parsed, rawResult));
-      }
+    }
+    if (attempts > 0 && failures === attempts) {
+      if (lastError instanceof Error) throw lastError;
+      throw new SourceFetchError('unknown', 'adzuna: all queries failed');
     }
     return all;
   },

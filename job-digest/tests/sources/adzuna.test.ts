@@ -210,5 +210,86 @@ describe('adzuna adapter', () => {
       if (!job) throw new Error('expected one job');
       expect(job.id).toBe('adzuna:good');
     });
+
+    it('derives salaryCurrency=USD for country=us', async () => {
+      const body = {
+        results: [
+          {
+            id: 'p1',
+            title: 'Engineer',
+            description: 'desc',
+            redirect_url: 'http://x',
+            company: { display_name: 'C' },
+            location: { display_name: 'L' },
+            salary_min: 100000,
+            salary_max: 150000,
+          },
+        ],
+      };
+      const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+      vi.stubGlobal('fetch', fetchMock);
+      const jobs = await adzuna.fetch(makeConfig({ country: 'us' }));
+      const job = jobs[0];
+      if (!job) throw new Error('expected one job');
+      expect(job.salaryCurrency).toBe('USD');
+    });
+
+    it('derives salaryCurrency=GBP for country=gb', async () => {
+      const body = {
+        results: [
+          {
+            id: 'p2',
+            title: 'Engineer',
+            description: 'desc',
+            redirect_url: 'http://x',
+            company: { display_name: 'C' },
+            location: { display_name: 'L' },
+            salary_min: 50000,
+            salary_max: 80000,
+          },
+        ],
+      };
+      const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+      vi.stubGlobal('fetch', fetchMock);
+      const jobs = await adzuna.fetch(makeConfig({ country: 'gb' }));
+      const job = jobs[0];
+      if (!job) throw new Error('expected one job');
+      expect(job.salaryCurrency).toBe('GBP');
+    });
+
+    it('omits salaryCurrency when country is unknown', async () => {
+      const body = {
+        results: [
+          {
+            id: 'p3',
+            title: 'Engineer',
+            description: 'desc',
+            redirect_url: 'http://x',
+            company: { display_name: 'C' },
+            location: { display_name: 'L' },
+            salary_min: 50000,
+            salary_max: 80000,
+          },
+        ],
+      };
+      const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+      vi.stubGlobal('fetch', fetchMock);
+      const jobs = await adzuna.fetch(makeConfig({ country: 'zz' }));
+      const job = jobs[0];
+      if (!job) throw new Error('expected one job');
+      expect(job.salaryCurrency).toBeUndefined();
+    });
+
+    it('continues to next query when first query fails (partial-failure recovery)', async () => {
+      const fixture = loadFixture();
+      const fetchMock = vi.fn()
+        .mockImplementationOnce(() => Promise.resolve(new Response('boom', { status: 500 })))
+        .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(fixture), { status: 200 })));
+      vi.stubGlobal('fetch', fetchMock);
+      const cfg = makeConfig({ queries: ['fails', 'succeeds'] });
+      const jobs = await adzuna.fetch(cfg);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(jobs.length).toBeGreaterThan(0);
+    });
   });
 });
