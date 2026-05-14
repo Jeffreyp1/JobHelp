@@ -2,11 +2,21 @@ import type { JobDigestConfig, NormalizedJob, RankedJob, ScoreBreakdown } from '
 import { callClaude } from '../lib/claude.js';
 import { log } from '../lib/log.js';
 
-const RECENCY_FLOOR = 0.5;
-const RECENCY_WINDOW_DAYS = 30;
+/*
+ * Ranking thresholds are deliberate defaults, not config-driven.
+ *
+ * Making them user-tunable requires extending JobDigestConfig.ranking with
+ * { recencyFloor, recencyWindowDays, llmBatchSize, llmMaxTokens }. The config
+ * schema in core/types/config.ts is currently locked for this slice, so the
+ * values live here as DEFAULT_* constants.
+ *
+ * TODO_FUTURE: surface these via config.ranking once the schema can change.
+ */
+const DEFAULT_RECENCY_FLOOR = 0.5;
+const DEFAULT_RECENCY_WINDOW_DAYS = 30;
+const DEFAULT_LLM_BATCH_SIZE = 5;
+const DEFAULT_LLM_MAX_TOKENS = 1024;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const LLM_BATCH_SIZE = 5;
-const LLM_MAX_TOKENS = 1024;
 
 interface LlmFitEntry {
   readonly id: string;
@@ -37,7 +47,7 @@ function recencyBoostScore(postedAt: string | undefined): number {
   if (Number.isNaN(ts)) return 1.0;
   const daysOld = (Date.now() - ts) / MS_PER_DAY;
   if (daysOld <= 0) return 1.0;
-  return Math.max(RECENCY_FLOOR, 1 - daysOld / RECENCY_WINDOW_DAYS);
+  return Math.max(DEFAULT_RECENCY_FLOOR, 1 - daysOld / DEFAULT_RECENCY_WINDOW_DAYS);
 }
 function isLlmFitEntry(v: unknown): v is LlmFitEntry {
   if (typeof v !== "object" || v === null) return false;
@@ -92,7 +102,7 @@ async function fetchLlmFitScores(
   const result = await callClaude({
     model: config.ranking.llmModel,
     apiKey: config.anthropic.apiKey,
-    maxTokens: LLM_MAX_TOKENS,
+    maxTokens: DEFAULT_LLM_MAX_TOKENS,
     messages: [{ role: 'user', content: buildLlmPrompt(batch) }],
   });
   if (!result.ok) {
@@ -132,8 +142,8 @@ export async function rank(
       (a, b) => b.keywordOverlap * b.recencyBoost - a.keywordOverlap * a.recencyBoost,
     );
     const survivors = sortedForLlm.slice(0, config.ranking.topN).map((p) => p.job);
-    for (let i = 0; i < survivors.length; i += LLM_BATCH_SIZE) {
-      const batch = survivors.slice(i, i + LLM_BATCH_SIZE);
+    for (let i = 0; i < survivors.length; i += DEFAULT_LLM_BATCH_SIZE) {
+      const batch = survivors.slice(i, i + DEFAULT_LLM_BATCH_SIZE);
       const batchScores = await fetchLlmFitScores(batch, config);
       for (const [id, entry] of batchScores) llmScores.set(id, entry);
     }

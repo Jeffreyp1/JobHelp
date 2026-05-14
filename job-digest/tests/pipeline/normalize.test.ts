@@ -53,6 +53,27 @@ describe('normalize', () => {
     expect(out).toHaveLength(0);
   });
 
+  it('drops a job with undefined location', async () => {
+    const laundered: NormalizedJob = {
+      id: 'adzuna:no-loc',
+      source: 'adzuna',
+      url: 'https://example.com/job',
+      title: 'Software Engineer',
+      company: 'Acme',
+      // @ts-expect-error simulating type-laundered runtime where location is undefined
+      location: undefined,
+      remote: 'remote',
+      description: 'Build software',
+    };
+    const out = await normalize([laundered]);
+    expect(out).toHaveLength(0);
+  });
+
+  it('drops a job with empty-string location', async () => {
+    const out = await normalize([makeJob({ location: '' })]);
+    expect(out).toHaveLength(0);
+  });
+
   it('trims whitespace in title, company, location', async () => {
     const out = await normalize([
       makeJob({ title: '  Senior Eng  ', company: '	Acme ', location: '  NY  ' }),

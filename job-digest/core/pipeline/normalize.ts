@@ -14,13 +14,14 @@ function hasRequiredFields(job: NormalizedJob): boolean {
     isNonEmptyString(job.url) &&
     isNonEmptyString(job.title) &&
     isNonEmptyString(job.company) &&
+    isNonEmptyString(job.location) &&
     isNonEmptyString(job.description)
   );
 }
 
 /**
  * Normalize a raw pool of jobs:
- *   - drop entries missing any required field (id, source, url, title, company, description)
+ *   - drop entries missing any required field (id, source, url, title, company, location, description)
  *   - trim whitespace on title/company/location
  *   - cap description at 8000 chars
  *
