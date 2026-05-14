@@ -1,55 +1,17 @@
 import { log } from '../lib/log.js';
-import type { JobDigestConfig } from '../types/config.js';
-import type { NormalizedJob, RemoteMode } from '../types/job.js';
-import type { SourceAdapter, SourceErrorType } from '../types/source.js';
+import type { NormalizedJob } from '../types/job.js';
+import type { SourceAdapter } from '../types/source.js';
+import {
+  SourceFetchError,
+  asIsoString,
+  asNumber,
+  asString,
+  classifyHttpStatus,
+  detectRemoteMode,
+  isRecord,
+} from './_shared.js';
 
-/** Typed transport error every source adapter raises. */
-export class SourceFetchError extends Error {
-  readonly type: SourceErrorType;
-  constructor(type: SourceErrorType, message: string) {
-    super(message);
-    this.name = 'SourceFetchError';
-    this.type = type;
-  }
-}
-
-function classifyHttpStatus(status: number): SourceErrorType {
-  if (status === 401 || status === 403) return 'auth';
-  if (status === 429) return 'rate_limit';
-  if (status >= 400) return 'network';
-  return 'unknown';
-}
-
-function detectRemoteMode(text: string): RemoteMode {
-  const t = text.toLowerCase();
-  if (/\bhybrid\b/.test(t)) return 'hybrid';
-  if (/\b(remote|wfh|work[- ]from[- ]home)\b/.test(t)) return 'remote';
-  if (/\b(on[- ]?site|in[- ]office)\b/.test(t)) return 'onsite';
-  return 'unknown';
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
-function asString(v: unknown): string | undefined {
-  return typeof v === 'string' ? v : undefined;
-}
-
-function asNumber(v: unknown): number | undefined {
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
-  if (typeof v === 'string') {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : undefined;
-  }
-  return undefined;
-}
-
-function asIsoString(v: unknown): string | undefined {
-  if (typeof v !== 'string') return undefined;
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
-}
+export { SourceFetchError };
 
 function stripHtml(html: string): string {
   return html
@@ -64,6 +26,7 @@ function stripHtml(html: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
 interface GreenhouseJob {
   readonly id: number;
   readonly title: string;
@@ -120,6 +83,7 @@ function parseGreenhouseJob(raw: unknown): GreenhouseJob | undefined {
     salaryCurrency: salary.currency,
   };
 }
+
 function normalize(token: string, job: GreenhouseJob, raw: unknown): NormalizedJob {
   const description = stripHtml(job.contentHtml);
   const remoteText = `${job.title} ${job.location} ${description}`;
@@ -164,6 +128,23 @@ async function fetchBoard(token: string): Promise<unknown> {
     throw new SourceFetchError('parse', 'greenhouse response was not valid JSON');
   }
 }
+
+async function fetchAndCollect(token: string, out: NormalizedJob[]): Promise<void> {
+  const body = await fetchBoard(token);
+  if (!isRecord(body)) {
+    throw new SourceFetchError('parse', 'greenhouse response was not an object');
+  }
+  const jobs = body['jobs'];
+  if (!Array.isArray(jobs)) {
+    throw new SourceFetchError('parse', 'greenhouse response.jobs was not an array');
+  }
+  for (const rawJob of jobs) {
+    const parsed = parseGreenhouseJob(rawJob);
+    if (parsed === undefined) continue;
+    out.push(normalize(token, parsed, rawJob));
+  }
+}
+
 export const greenhouse: SourceAdapter = {
   name: 'greenhouse',
   enabled: (config): boolean => {
@@ -176,26 +157,22 @@ export const greenhouse: SourceAdapter = {
       throw new SourceFetchError('auth', 'greenhouse config missing');
     }
     const all: NormalizedJob[] = [];
+    let attempts = 0;
+    let failures = 0;
+    let lastError: unknown;
     for (const token of c.tokens) {
-      let body: unknown;
+      attempts += 1;
       try {
-        body = await fetchBoard(token);
+        await fetchAndCollect(token, all);
       } catch (err: unknown) {
+        failures += 1;
+        lastError = err;
         log('warn', 'greenhouse fetch failed', { token, error: err instanceof Error ? err.message : 'unknown' });
-        throw err;
       }
-      if (!isRecord(body)) {
-        throw new SourceFetchError('parse', 'greenhouse response was not an object');
-      }
-      const jobs = body['jobs'];
-      if (!Array.isArray(jobs)) {
-        throw new SourceFetchError('parse', 'greenhouse response.jobs was not an array');
-      }
-      for (const rawJob of jobs) {
-        const parsed = parseGreenhouseJob(rawJob);
-        if (parsed === undefined) continue;
-        all.push(normalize(token, parsed, rawJob));
-      }
+    }
+    if (attempts > 0 && failures === attempts) {
+      if (lastError instanceof Error) throw lastError;
+      throw new SourceFetchError('unknown', 'greenhouse: all tokens failed');
     }
     return all;
   },

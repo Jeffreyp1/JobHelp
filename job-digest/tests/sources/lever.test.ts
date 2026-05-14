@@ -161,5 +161,17 @@ describe('lever adapter', () => {
       const jobs = await lever.fetch(makeConfig(['examplecorp']));
       expect(jobs).toHaveLength(1);
     });
+
+    it('continues to next slug when first slug fails (partial-failure recovery)', async () => {
+      const fixture = loadFixture();
+      const fetchMock = vi.fn()
+        .mockImplementationOnce(() => Promise.resolve(new Response('boom', { status: 500 })))
+        .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(fixture), { status: 200 })));
+      vi.stubGlobal('fetch', fetchMock);
+      const jobs = await lever.fetch(makeConfig(['fails', 'examplecorp']));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(jobs.length).toBeGreaterThan(0);
+      for (const j of jobs) expect(j.company).toBe('examplecorp');
+    });
   });
 });

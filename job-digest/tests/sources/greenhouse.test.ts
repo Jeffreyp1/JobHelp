@@ -125,7 +125,7 @@ describe('greenhouse adapter', () => {
       await expect(greenhouse.fetch(makeConfig(['acmecorp']))).rejects.toMatchObject({ type: 'rate_limit' });
     });
 
-    it('throws SourceFetchError with type=auth on 404 (board not found surfaces as auth)', async () => {
+    it('throws SourceFetchError with type=network on 404 (board not found)', async () => {
       const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
         new Response('not found', { status: 404 }),
       ));
@@ -153,6 +153,26 @@ describe('greenhouse adapter', () => {
       vi.stubGlobal('fetch', fetchMock);
       const jobs = await greenhouse.fetch(makeConfig(['acmecorp']));
       expect(jobs).toHaveLength(1);
+    });
+
+    it('continues to next token when first token fails (partial-failure recovery)', async () => {
+      const fixture = loadFixture();
+      const fetchMock = vi.fn()
+        .mockImplementationOnce(() => Promise.resolve(new Response('boom', { status: 500 })))
+        .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(fixture), { status: 200 })));
+      vi.stubGlobal('fetch', fetchMock);
+      const jobs = await greenhouse.fetch(makeConfig(['broken', 'acmecorp']));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(jobs.length).toBeGreaterThan(0);
+      for (const j of jobs) expect(j.company).toBe('acmecorp');
+    });
+
+    it('throws when ALL tokens fail', async () => {
+      const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+        new Response('boom', { status: 500 }),
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(greenhouse.fetch(makeConfig(['a', 'b']))).rejects.toMatchObject({ type: 'network' });
     });
   });
 });
