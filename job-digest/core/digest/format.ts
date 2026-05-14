@@ -50,7 +50,6 @@ function formatRelativeTime(postedAt: string | undefined, now: Date): string | n
   const parsed = Date.parse(postedAt);
   if (Number.isNaN(parsed)) return null;
   const diffMs = now.getTime() - parsed;
-  if (diffMs < 0) return 'just now';
   if (diffMs < MS_PER_MINUTE) return 'just now';
   if (diffMs < MS_PER_HOUR) {
     const m = Math.floor(diffMs / MS_PER_MINUTE);
@@ -93,7 +92,7 @@ function renderJobBlock(rj: RankedJob, now: Date): string {
   const salary = formatSalary(job.salaryMin, job.salaryMax);
   const locParts = [job.location];
   if (salary !== null) locParts.push(salary);
-  lines.push(`- **Location:** ${locParts.join(' · ')}`);
+  lines.push(`- **Location:** ${locParts.join(' - ')}`);
 
   const posted = postedDateLabel(job.postedAt, now);
   if (posted !== null) lines.push(`- **Posted:** ${posted}`);
