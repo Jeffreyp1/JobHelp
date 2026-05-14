@@ -1,0 +1,29 @@
+{
+  "name": "@jeffreyp1/jobhelp-job-digest",
+  "version": "0.1.0-alpha.0",
+  "description": "JobHelp /job-digest core library: discover, normalize, rank, and digest job postings",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./core/index.ts",
+    "./types": "./core/types/index.ts",
+    "./lib/log": "./core/lib/log.ts",
+    "./lib/config": "./core/lib/config.ts",
+    "./lib/claude": "./core/lib/claude.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^1.4.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0"
+  }
+}
