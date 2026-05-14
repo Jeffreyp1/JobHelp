@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   callClaude,
-  __setClientFactoryForTests,
   type ClaudeMessage,
 } from '../../core/lib/claude.js';
+import { __setClientFactoryForTests } from '../../core/lib/claude.testing.js';
 import { isErr, isOk } from '../../core/types/result.js';
 
 function okResponse(text: string, inputTokens = 10, outputTokens = 20): Record<string, unknown> {
