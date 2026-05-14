@@ -128,7 +128,7 @@ describe('loadConfig', () => {
   });
 
   it('returns validation error when a field has wrong type', async () => {
-    const result = await loadConfig(join(FIXTURES, 'config-invalid-env-interp.json'));
+    const result = await loadConfig(join(FIXTURES, 'config-invalid-wrong-type.json'));
     if (!isErr(result)) throw new Error('expected err');
     expect(result.error.type).toBe('validation');
     expect(result.error.message.toLowerCase()).toContain('string');

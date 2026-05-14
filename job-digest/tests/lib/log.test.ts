@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   log,
   getRecentLogs,
-  __resetForTests,
   type LogEntry,
   type LogLevel,
 } from '../../core/lib/log.js';
+import { __resetForTests } from '../../core/lib/log.testing.js';
 
 interface StderrCapture {
   readonly lines: string[];
