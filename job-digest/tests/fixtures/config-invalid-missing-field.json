@@ -1,16 +1,13 @@
 {
-  "profile": {
-    "resumeDumpPath": "~/Documents/resume-dump.md",
-    "skills": ["typescript"],
-    "location": "Austin, TX",
-    "remoteOk": true,
-    "salaryFloor": 100000,
-    "seniority": "entry",
-    "roleFamily": ["backend"]
+  "sources": {
+    "adzuna": {
+      "appId": "test-app-id",
+      "appKey": "test-app-key",
+      "country": "us",
+      "queries": ["software engineer entry level"]
+    }
   },
   "ranking": {
-    "useLlmFitScore": true,
-    "llmModel": "claude-haiku-4-5",
     "topN": 20,
     "digestK": 10
   },
