@@ -1,11 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { JobDigestConfig, NormalizedJob } from '../../core/types/index.js';
 
-vi.mock('../../core/lib/claude.js', () => {
-  return { callClaude: vi.fn() };
-});
-
-import { callClaude } from '../../core/lib/claude.js';
 import { rank } from '../../core/pipeline/rank.js';
 
 function makeConfig(overrides: Partial<JobDigestConfig> = {}): JobDigestConfig {
@@ -22,7 +17,7 @@ function makeConfig(overrides: Partial<JobDigestConfig> = {}): JobDigestConfig {
     sources: {},
     ranking: { useLlmFitScore: false, llmModel: 'claude-haiku-4-5', topN: 20, digestK: 10 },
     output: { dir: '/tmp/digests' },
-    anthropic: { apiKey: 'sk-ant-test' },
+    anthropic: { apiKey: '' },
   };
   return { ...base, ...overrides };
 }
@@ -41,7 +36,6 @@ function makeJob(overrides: Partial<NormalizedJob> = {}): NormalizedJob {
   };
 }
 
-beforeEach(() => { vi.mocked(callClaude).mockReset(); });
 describe('rank — keywordOverlap', () => {
   it('counts skills appearing as whole words in title+description', async () => {
     const job = makeJob({ id: 'a', title: 'TypeScript Engineer', description: 'You will write Go and Python code daily.' });
@@ -66,6 +60,7 @@ describe('rank — keywordOverlap', () => {
     expect(out[0]?.breakdown.keywordOverlap).toBe(0);
   });
 });
+
 describe('rank — recencyBoost', () => {
   it('returns 1.0 when postedAt is undefined', async () => {
     const job = makeJob({ id: 'a', title: 'TypeScript', description: 'go python' });
@@ -92,6 +87,7 @@ describe('rank — recencyBoost', () => {
     expect(out[0]?.breakdown.recencyBoost).toBe(1.0);
   });
 });
+
 describe('rank — ranking and sort', () => {
   it('assigns 1-indexed rank in descending score order', async () => {
     const high = makeJob({ id: 'high', title: 'TypeScript Go Python', description: 'kubernetes' });
@@ -102,77 +98,28 @@ describe('rank — ranking and sort', () => {
     expect(out[1]?.job.id).toBe('low');
     expect(out[1]?.rank).toBe(2);
   });
-  it('keeps llmFitScore undefined when ranking.useLlmFitScore is false', async () => {
+  it('llmFitScore is always undefined (Design B: no LLM calls)', async () => {
     const job = makeJob({ title: 'TypeScript' });
     const out = await rank([job], makeConfig());
     expect(out[0]?.breakdown.llmFitScore).toBeUndefined();
     expect(out[0]?.llmRationale).toBeUndefined();
-    expect(vi.mocked(callClaude)).not.toHaveBeenCalled();
+  });
+  it('llmFitScore is always undefined even when useLlmFitScore: true is passed', async () => {
+    const cfg = makeConfig({ ranking: { useLlmFitScore: true, llmModel: 'claude-haiku-4-5', topN: 20, digestK: 10 } });
+    const job = makeJob({ title: 'TypeScript' });
+    const out = await rank([job], cfg);
+    expect(out[0]?.breakdown.llmFitScore).toBeUndefined();
+    expect(out[0]?.llmRationale).toBeUndefined();
   });
   it('handles an empty input', async () => {
     const out = await rank([], makeConfig());
     expect(out).toEqual([]);
   });
-});
-describe('rank — LLM fit-score', () => {
-  it('calls Claude for top-N when useLlmFitScore is true', async () => {
-    const cfg = makeConfig({ ranking: { useLlmFitScore: true, llmModel: 'claude-haiku-4-5', topN: 2, digestK: 10 } });
-    vi.mocked(callClaude).mockResolvedValue({
-      ok: true,
-      value: {
-        text: JSON.stringify([{ id: 'a', fitScore: 80, rationale: 'good match' }, { id: 'b', fitScore: 50, rationale: 'okay match' }]),
-        inputTokens: 100,
-        outputTokens: 20,
-      },
-    });
-    const jobs = [makeJob({ id: 'a', title: 'TypeScript' }), makeJob({ id: 'b', title: 'Go' })];
-    const out = await rank(jobs, cfg);
-    expect(vi.mocked(callClaude)).toHaveBeenCalledTimes(1);
-    const a = out.find((r) => r.job.id === 'a');
-    const b = out.find((r) => r.job.id === 'b');
-    expect(a?.breakdown.llmFitScore).toBeCloseTo(0.8, 5);
-    expect(a?.llmRationale).toBe('good match');
-    expect(b?.breakdown.llmFitScore).toBeCloseTo(0.5, 5);
-  });
-  it('batches LLM calls 5-per-call', async () => {
-    const cfg = makeConfig({ ranking: { useLlmFitScore: true, llmModel: 'claude-haiku-4-5', topN: 12, digestK: 10 } });
-    vi.mocked(callClaude).mockResolvedValue({
-      ok: true,
-      value: { text: JSON.stringify([{ id: 'x', fitScore: 70, rationale: 'ok' }]), inputTokens: 1, outputTokens: 1 },
-    });
-    const jobs: NormalizedJob[] = [];
-    for (let i = 0; i < 12; i += 1) {
-      jobs.push(makeJob({ id: 'job-' + i, title: 'TypeScript' }));
-    }
-    await rank(jobs, cfg);
-    expect(vi.mocked(callClaude)).toHaveBeenCalledTimes(3);
-  });
-});
-describe('rank — LLM fit-score error handling', () => {
-  it('leaves llmFitScore undefined when Claude returns an error', async () => {
-    const cfg = makeConfig({ ranking: { useLlmFitScore: true, llmModel: 'claude-haiku-4-5', topN: 5, digestK: 10 } });
-    vi.mocked(callClaude).mockResolvedValue({ ok: false, error: { type: 'server', message: 'boom', retryable: true } });
-    const out = await rank([makeJob({ title: 'TypeScript' })], cfg);
-    expect(out[0]?.breakdown.llmFitScore).toBeUndefined();
-    expect(out[0]?.llmRationale).toBeUndefined();
-  });
-  it('leaves llmFitScore undefined when Claude response is unparseable JSON', async () => {
-    const cfg = makeConfig({ ranking: { useLlmFitScore: true, llmModel: 'claude-haiku-4-5', topN: 5, digestK: 10 } });
-    vi.mocked(callClaude).mockResolvedValue({ ok: true, value: { text: 'not json at all', inputTokens: 1, outputTokens: 1 } });
-    const out = await rank([makeJob({ id: 'a', title: 'TypeScript' })], cfg);
-    expect(out[0]?.breakdown.llmFitScore).toBeUndefined();
-  });
-  it('final score multiplies all three signals', async () => {
-    const cfg = makeConfig({ ranking: { useLlmFitScore: true, llmModel: 'claude-haiku-4-5', topN: 5, digestK: 10 } });
-    vi.mocked(callClaude).mockResolvedValue({
-      ok: true,
-      value: { text: JSON.stringify([{ id: 'a', fitScore: 50, rationale: 'mid' }]), inputTokens: 1, outputTokens: 1 },
-    });
-    const job = makeJob({ id: 'a', title: 'TypeScript', description: 'go python kubernetes' });
-    const out = await rank([job], cfg);
+  it('score equals keywordOverlap * recencyBoost', async () => {
+    const job = makeJob({ id: 'a', title: 'TypeScript', description: 'go python' });
+    const out = await rank([job], makeConfig());
     const k = out[0]?.breakdown.keywordOverlap ?? 0;
     const r = out[0]?.breakdown.recencyBoost ?? 0;
-    const l = out[0]?.breakdown.llmFitScore ?? 0;
-    expect(out[0]?.score).toBeCloseTo(k * r * l, 5);
+    expect(out[0]?.score).toBeCloseTo(k * r, 5);
   });
 });
