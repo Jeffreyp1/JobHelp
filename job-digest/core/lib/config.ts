@@ -4,36 +4,21 @@ import { join } from 'node:path';
 import type {
   AdzunaConfig,
   GreenhouseConfig,
+  JobDigestConfig,
   JSearchConfig,
   LeverConfig,
   OutputConfig,
   ProfileConfig,
+  RankingConfig,
+  RulesConfig,
+  RulesMode,
   Seniority,
   SourcesConfig,
   UsaJobsConfig,
 } from '../types/config.js';
 import { err, ok, type Result } from '../types/result.js';
 
-export type RulesMode = 'defaults_only' | 'additive' | 'replace';
-
-export interface RulesConfig {
-  readonly userRulesDir: string;
-  readonly mode: RulesMode;
-}
-
-export interface RankingConfigV2 {
-  readonly useLlmFitScore: false;
-  readonly topN: number;
-  readonly digestK: number;
-}
-
-export interface JobDigestConfigV2 {
-  readonly profile: ProfileConfig;
-  readonly sources: SourcesConfig;
-  readonly ranking: RankingConfigV2;
-  readonly output: OutputConfig;
-  readonly rules: RulesConfig;
-}
+export type { RulesMode, RulesConfig };
 
 export interface ConfigError {
   readonly type: 'not_found' | 'parse' | 'validation';
@@ -140,7 +125,7 @@ function validateProfile(raw: unknown): ProfileConfig {
   };
 }
 
-function validateRanking(raw: unknown): RankingConfigV2 {
+function validateRanking(raw: unknown): RankingConfig {
   if (raw === undefined) {
     return { useLlmFitScore: false, topN: 20, digestK: 10 };
   }
@@ -167,7 +152,7 @@ function validateRules(raw: unknown): RulesConfig {
   }
   const obj = requireRecord(raw, 'rules');
   const rawMode = obj['mode'];
-  let mode: 'defaults_only' | 'additive' | 'replace' = 'additive';
+  let mode: RulesMode = 'additive';
   if (rawMode !== undefined) {
     if (rawMode !== 'defaults_only' && rawMode !== 'additive' && rawMode !== 'replace') {
       fail(`expected one of defaults_only,additive,replace at field rules.mode`);
@@ -233,7 +218,7 @@ function validateSources(raw: unknown): SourcesConfig {
   return out;
 }
 
-function validate(raw: unknown): JobDigestConfigV2 {
+function validate(raw: unknown): JobDigestConfig {
   const obj = requireRecord(raw, '<root>');
   return {
     profile: validateProfile(obj['profile']),
@@ -252,7 +237,7 @@ function getStringCode(e: unknown): string | undefined {
 
 export async function loadConfig(
   path: string,
-): Promise<Result<JobDigestConfigV2, ConfigError>> {
+): Promise<Result<JobDigestConfig, ConfigError>> {
   const resolved = expandHome(path);
   let raw: string;
   try {
