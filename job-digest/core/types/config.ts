@@ -36,6 +36,8 @@ export interface SourcesConfig {
   readonly lever?: LeverConfig;
   readonly usajobs?: UsaJobsConfig;
   readonly jsearch?: JSearchConfig;
+  readonly remotive?: RemotiveConfig;
+  readonly remoteok?: RemoteOkConfig;
 }
 
 export interface AdzunaConfig {
@@ -63,6 +65,18 @@ export interface UsaJobsConfig {
 
 export interface JSearchConfig {
   readonly rapidApiKey: string;
+}
+
+export interface RemotiveConfig {
+  /** Optional list of search keywords; if empty/missing, fetches general feed (limit 100). */
+  readonly queries?: readonly string[];
+  /** Per-call result cap. Default 100. */
+  readonly limit?: number;
+}
+
+export interface RemoteOkConfig {
+  /** Optional tag filters (e.g., ["python", "backend"]). */
+  readonly tags?: readonly string[];
 }
 
 export interface RankingConfig {
