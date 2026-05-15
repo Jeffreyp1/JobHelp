@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "bin": {
-    "jobhelp-mcp": "./mcp/dist/bin.js"
+    "jobhelp-mcp": "./mcp/dist/mcp/src/bin.js"
   },
   "exports": {
     ".": "./core/index.ts",

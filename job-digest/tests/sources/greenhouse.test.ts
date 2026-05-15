@@ -26,9 +26,9 @@ function makeConfig(tokens: readonly string[] = ['acmecorp']): JobDigestConfig {
       roleFamily: ['backend'],
     },
     sources: { greenhouse: { tokens } },
-    ranking: { useLlmFitScore: false, llmModel: 'claude-haiku-4-5', topN: 20, digestK: 10 },
+    ranking: { useLlmFitScore: false, topN: 20, digestK: 10 },
+    rules: { userRulesDir: '/tmp/rules-test', mode: 'additive' },
     output: { dir: '/tmp/jobhelp' },
-    anthropic: { apiKey: 'test-key' },
   };
 }
 describe('greenhouse adapter', () => {

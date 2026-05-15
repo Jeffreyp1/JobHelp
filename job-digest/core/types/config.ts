@@ -1,13 +1,17 @@
 /**
  * User-supplied configuration loaded from `~/.config/jobhelp/config.json` (or env override).
  * Validated at startup; all fields immutable after load.
+ *
+ * Design B (zero-API-key): no `anthropic` block. The MCP server never calls Claude.
+ * `useLlmFitScore` retained for backward-compat with Phase 1's rank.ts shape but is
+ * always forced to `false` by `loadConfig`.
  */
 export interface JobDigestConfig {
   readonly profile: ProfileConfig;
   readonly sources: SourcesConfig;
   readonly ranking: RankingConfig;
+  readonly rules: RulesConfig;
   readonly output: OutputConfig;
-  readonly anthropic: AnthropicConfig;
 }
 
 export interface ProfileConfig {
@@ -62,21 +66,23 @@ export interface JSearchConfig {
 }
 
 export interface RankingConfig {
+  /** Always coerced to `false` by `loadConfig` in Design B. Field retained for shape compat. */
   readonly useLlmFitScore: boolean;
-  /** Anthropic model id, e.g. "claude-haiku-4-5". */
-  readonly llmModel: string;
-  /** Top-N survivors to send to LLM fit-score. */
+  /** Top-N survivors to send through expensive scoring. (LLM path disabled in Design B.) */
   readonly topN: number;
   /** Number of jobs in the final digest. */
   readonly digestK: number;
 }
 
+export type RulesMode = 'defaults_only' | 'additive' | 'replace';
+
+export interface RulesConfig {
+  /** Filesystem dir holding user-supplied rule overrides (supports ~ expansion). */
+  readonly userRulesDir: string;
+  readonly mode: RulesMode;
+}
+
 export interface OutputConfig {
   /** Filesystem directory for digest files (supports ~ expansion). */
   readonly dir: string;
-}
-
-export interface AnthropicConfig {
-  /** Anthropic API key. Supports ${ENV_VAR} interpolation. */
-  readonly apiKey: string;
 }
