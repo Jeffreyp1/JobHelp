@@ -221,6 +221,27 @@ describe('writeApplicationOutput', () => {
     const after = stateAfter.value.applications[0]?.updatedAt ?? '';
     expect(after.localeCompare(before)).toBeGreaterThanOrEqual(0);
   });
+
+  it('serializes concurrent writes — 5 parallel resume writes produce v1..v5', async () => {
+    const writes = Array.from({ length: 5 }, (_, i) =>
+      writeApplicationOutput({ jobId: 'j-1', kind: 'resume', content: `concurrent-${i}` }),
+    );
+    const results = await Promise.all(writes);
+    for (const r of results) {
+      expect(isOk(r)).toBe(true);
+    }
+    const versions = results
+      .map((r) => (isOk(r) ? r.value.version : undefined))
+      .filter((v): v is number => typeof v === 'number')
+      .sort((a, b) => a - b);
+    expect(versions).toEqual([1, 2, 3, 4, 5]);
+
+    const listed = await listApplicationVersions('j-1', 'resume');
+    expect(isOk(listed)).toBe(true);
+    if (isOk(listed)) {
+      expect(listed.value.map((v) => v.version)).toEqual([1, 2, 3, 4, 5]);
+    }
+  });
 });
 
 describe('listApplicationVersions', () => {

@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getStateRoot } from './store.js';
 import { type DigestError, type PersistedDigest } from './index.js';
@@ -9,10 +9,10 @@ import {
   parseRankedJob,
   parseSourceRunResult,
 } from './digestSchema.js';
+import { atomicWriteFile as atomicWriteFileImpl } from '../lib/atomicWrite.js';
 
 const DIGESTS_DIR_NAME = 'digests';
 const LATEST_POINTER_NAME = 'latest.json';
-const TMP_SUFFIX = '.tmp';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function getDigestsDir(): string {
@@ -76,24 +76,15 @@ function validateDigestShape(raw: unknown): Result<PersistedDigest, DigestError>
   return ok({ date, generatedAt, totalDurationMs, sourceResults, jobs });
 }
 
-async function atomicWriteFile(
+async function atomicWriteDigest(
   filePath: string,
   contents: string,
 ): Promise<Result<void, DigestError>> {
-  const tmp = `${filePath}${TMP_SUFFIX}.${process.pid}.${Date.now()}`;
-  try {
-    await writeFile(tmp, contents, { encoding: 'utf8', flag: 'w' });
-    await rename(tmp, filePath);
-    return ok(undefined);
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'write failed';
-    try {
-      await rm(tmp, { force: true });
-    } catch {
-      // best-effort
-    }
-    return err({ type: 'io', path: filePath, message });
+  const r = await atomicWriteFileImpl(filePath, contents);
+  if (!r.ok) {
+    return err({ type: 'io', path: r.error.path, message: r.error.message });
   }
+  return ok(undefined);
 }
 
 export async function persistDigest(
@@ -112,9 +103,13 @@ export async function persistDigest(
   const filePath = getDigestPath(digest.date);
   const latestPath = getLatestPointerPath();
   const contents = `${JSON.stringify(digest, null, 2)}\n`;
-  const write = await atomicWriteFile(filePath, contents);
+  // Two-step write invariant: dated digest is the source of truth; latest.json
+  // is a derived pointer. A crash between the two writes leaves a stale latest
+  // (still valid JSON, just pointing to the prior day); readers must tolerate
+  // latest pointing at a different date than the most recently produced digest.
+  const write = await atomicWriteDigest(filePath, contents);
   if (!write.ok) return err(write.error);
-  const latestWrite = await atomicWriteFile(latestPath, contents);
+  const latestWrite = await atomicWriteDigest(latestPath, contents);
   if (!latestWrite.ok) return err(latestWrite.error);
   return ok({ path: filePath, latestPath });
 }

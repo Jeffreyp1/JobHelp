@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -209,5 +209,27 @@ describe('updateState', () => {
   it('releases the lock after a successful update', async () => {
     await updateState((s) => s);
     expect(existsSync(join(sandbox, 'state.json.lock'))).toBe(false);
+  });
+
+  it('auto-recovers from a stale lock (mtime > 2x lockTimeoutMs)', async () => {
+    mkdirSync(sandbox, { recursive: true });
+    const lockPath = join(sandbox, 'state.json.lock');
+    writeFileSync(lockPath, JSON.stringify({ pid: 999999, mtime: Date.now() - 30000 }));
+    const stale = new Date(Date.now() - 30000);
+    utimesSync(lockPath, stale, stale);
+    const result = await updateState((s) => s, { lockTimeoutMs: 100 });
+    expect(isOk(result)).toBe(true);
+  });
+
+  it('does not treat a fresh lock as stale', async () => {
+    mkdirSync(sandbox, { recursive: true });
+    const lockPath = join(sandbox, 'state.json.lock');
+    writeFileSync(lockPath, JSON.stringify({ pid: 999999, mtime: Date.now() }));
+    const result = await updateState((s) => s, { lockTimeoutMs: 50 });
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error.type).toBe('lock_timeout');
+    }
+    rmSync(lockPath, { force: true });
   });
 });
