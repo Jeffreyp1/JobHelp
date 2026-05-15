@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, writeFile, open } from 'node:fs/promises';
+import { mkdir, readFile, rm, open, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
@@ -11,10 +11,10 @@ import {
   type StateError,
 } from './index.js';
 import { err, ok, type Result } from '../types/result.js';
+import { atomicWriteFile } from '../lib/atomicWrite.js';
 
 const STATE_FILE_NAME = 'state.json';
 const LOCK_SUFFIX = '.lock';
-const TMP_SUFFIX = '.tmp';
 const DEFAULT_LOCK_TIMEOUT_MS = 5000;
 const LOCK_RETRY_INTERVAL_MS = 25;
 
@@ -194,33 +194,33 @@ export async function readState(): Promise<Result<JobHelpState, StateError>> {
   return result;
 }
 
-async function atomicWrite(filePath: string, contents: string): Promise<Result<void, StateError>> {
+export async function writeState(state: JobHelpState): Promise<Result<void, StateError>> {
+  const filePath = getStateFilePath();
+  const contents = `${JSON.stringify(state, null, 2)}\n`;
   try {
     await mkdir(dirname(filePath), { recursive: true });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'mkdir failed';
     return err({ type: 'io', path: filePath, message });
   }
-  const tmp = `${filePath}${TMP_SUFFIX}.${process.pid}.${Date.now()}`;
-  try {
-    await writeFile(tmp, contents, { encoding: 'utf8', flag: 'w' });
-    await rename(tmp, filePath);
-    return ok(undefined);
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'write failed';
-    try {
-      await rm(tmp, { force: true });
-    } catch {
-      // best-effort cleanup
-    }
-    return err({ type: 'io', path: filePath, message });
+  const result = await atomicWriteFile(filePath, contents);
+  if (!result.ok) {
+    return err({ type: 'io', path: result.error.path, message: result.error.message });
   }
+  return ok(undefined);
 }
 
-export async function writeState(state: JobHelpState): Promise<Result<void, StateError>> {
-  const filePath = getStateFilePath();
-  const contents = `${JSON.stringify(state, null, 2)}\n`;
-  return atomicWrite(filePath, contents);
+async function tryRemoveStaleLock(lockPath: string, staleAfterMs: number): Promise<boolean> {
+  try {
+    const s = await stat(lockPath);
+    if (Date.now() - s.mtimeMs > staleAfterMs) {
+      await rm(lockPath, { force: true });
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 async function acquireLock(
@@ -228,6 +228,7 @@ async function acquireLock(
   timeoutMs: number,
 ): Promise<Result<() => Promise<void>, StateError>> {
   const deadline = Date.now() + timeoutMs;
+  const staleAfterMs = timeoutMs * 2;
   try {
     await mkdir(dirname(lockPath), { recursive: true });
   } catch (e: unknown) {
@@ -237,6 +238,9 @@ async function acquireLock(
   for (;;) {
     try {
       const handle = await open(lockPath, 'wx');
+      await handle.writeFile(JSON.stringify({ pid: process.pid, mtime: Date.now() }), {
+        encoding: 'utf8',
+      });
       await handle.close();
       const release = async (): Promise<void> => {
         try {
@@ -251,6 +255,8 @@ async function acquireLock(
         const message = e instanceof Error ? e.message : 'lock create failed';
         return err({ type: 'io', path: lockPath, message });
       }
+      // EEXIST: if mtime > 2x timeout, treat as orphaned crash and clear.
+      if (await tryRemoveStaleLock(lockPath, staleAfterMs)) continue;
       if (Date.now() >= deadline) {
         return err({
           type: 'lock_timeout',

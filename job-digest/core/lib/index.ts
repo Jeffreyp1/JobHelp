@@ -12,3 +12,6 @@ export type {
   ClaudeError,
   ClaudeErrorType,
 } from './claude.js';
+
+export { atomicWriteFile } from './atomicWrite.js';
+export type { IoError } from './atomicWrite.js';
