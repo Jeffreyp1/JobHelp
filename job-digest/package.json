@@ -1,21 +1,23 @@
 {
-  "name": "@jeffreyp1/jobhelp-job-digest",
-  "version": "0.1.0-alpha.0",
-  "description": "JobHelp /job-digest core library: discover, normalize, rank, and digest job postings",
+  "name": "@jeffreyp1/jobhelp-mcp",
+  "version": "0.2.0-alpha.0",
+  "description": "JobHelp MCP server: zero-API-key job discovery, ranking, and tailoring context for any MCP-compatible client",
   "type": "module",
   "private": true,
+  "bin": {
+    "jobhelp-mcp": "./mcp/dist/bin.js"
+  },
   "exports": {
     ".": "./core/index.ts",
     "./types": "./core/types/index.ts",
-    "./lib/log": "./core/lib/log.ts",
-    "./lib/config": "./core/lib/config.ts",
-    "./lib/claude": "./core/lib/claude.ts"
+    "./mcp": "./mcp/src/index.ts"
   },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
@@ -24,6 +26,7 @@
     "vitest": "^1.4.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.27.0"
+    "@anthropic-ai/sdk": "^0.27.0",
+    "@modelcontextprotocol/sdk": "^0.5.0"
   }
 }
