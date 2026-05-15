@@ -3,19 +3,37 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AdzunaConfig,
-  AnthropicConfig,
   GreenhouseConfig,
-  JobDigestConfig,
   JSearchConfig,
   LeverConfig,
   OutputConfig,
   ProfileConfig,
-  RankingConfig,
   Seniority,
   SourcesConfig,
   UsaJobsConfig,
 } from '../types/config.js';
 import { err, ok, type Result } from '../types/result.js';
+
+export type RulesMode = 'defaults_only' | 'additive' | 'replace';
+
+export interface RulesConfig {
+  readonly userRulesDir: string;
+  readonly mode: RulesMode;
+}
+
+export interface RankingConfigV2 {
+  readonly useLlmFitScore: false;
+  readonly topN: number;
+  readonly digestK: number;
+}
+
+export interface JobDigestConfigV2 {
+  readonly profile: ProfileConfig;
+  readonly sources: SourcesConfig;
+  readonly ranking: RankingConfigV2;
+  readonly output: OutputConfig;
+  readonly rules: RulesConfig;
+}
 
 export interface ConfigError {
   readonly type: 'not_found' | 'parse' | 'validation';
@@ -80,6 +98,7 @@ function requireNumber(v: unknown, field: string): number {
   return v;
 }
 
+
 function requireBoolean(v: unknown, field: string): boolean {
   if (typeof v !== 'boolean') fail(`expected boolean at field ${field}`);
   return v;
@@ -121,24 +140,46 @@ function validateProfile(raw: unknown): ProfileConfig {
   };
 }
 
-function validateRanking(raw: unknown): RankingConfig {
+function validateRanking(raw: unknown): RankingConfigV2 {
+  if (raw === undefined) {
+    return { useLlmFitScore: false, topN: 20, digestK: 10 };
+  }
   const obj = requireRecord(raw, 'ranking');
   return {
-    useLlmFitScore: requireBoolean(obj['useLlmFitScore'], 'ranking.useLlmFitScore'),
-    llmModel: requireString(obj['llmModel'], 'ranking.llmModel'),
-    topN: requireNumber(obj['topN'], 'ranking.topN'),
-    digestK: requireNumber(obj['digestK'], 'ranking.digestK'),
+    useLlmFitScore: false,
+    topN: obj['topN'] !== undefined ? requireNumber(obj['topN'], 'ranking.topN') : 20,
+    digestK: obj['digestK'] !== undefined ? requireNumber(obj['digestK'], 'ranking.digestK') : 10,
   };
 }
 
 function validateOutput(raw: unknown): OutputConfig {
+  if (raw === undefined) {
+    return { dir: expandHome(join('~', 'jobhelp', 'digests')) };
+  }
   const obj = requireRecord(raw, 'output');
   return { dir: expandHome(requireString(obj['dir'], 'output.dir')) };
 }
 
-function validateAnthropic(raw: unknown): AnthropicConfig {
-  const obj = requireRecord(raw, 'anthropic');
-  return { apiKey: requireString(obj['apiKey'], 'anthropic.apiKey') };
+function validateRules(raw: unknown): RulesConfig {
+  const defaultUserRulesDir = expandHome(join('~', 'jobhelp', 'rules'));
+  if (raw === undefined) {
+    return { userRulesDir: defaultUserRulesDir, mode: 'additive' };
+  }
+  const obj = requireRecord(raw, 'rules');
+  const rawMode = obj['mode'];
+  let mode: 'defaults_only' | 'additive' | 'replace' = 'additive';
+  if (rawMode !== undefined) {
+    if (rawMode !== 'defaults_only' && rawMode !== 'additive' && rawMode !== 'replace') {
+      fail(`expected one of defaults_only,additive,replace at field rules.mode`);
+    }
+    mode = rawMode;
+  }
+  const rawDir = obj['userRulesDir'];
+  const userRulesDir =
+    rawDir !== undefined
+      ? expandHome(requireString(rawDir, 'rules.userRulesDir'))
+      : defaultUserRulesDir;
+  return { userRulesDir, mode };
 }
 
 function validateAdzuna(raw: unknown): AdzunaConfig {
@@ -192,14 +233,14 @@ function validateSources(raw: unknown): SourcesConfig {
   return out;
 }
 
-function validate(raw: unknown): JobDigestConfig {
+function validate(raw: unknown): JobDigestConfigV2 {
   const obj = requireRecord(raw, '<root>');
   return {
     profile: validateProfile(obj['profile']),
     sources: validateSources(obj['sources']),
     ranking: validateRanking(obj['ranking']),
     output: validateOutput(obj['output']),
-    anthropic: validateAnthropic(obj['anthropic']),
+    rules: validateRules(obj['rules']),
   };
 }
 
@@ -211,7 +252,7 @@ function getStringCode(e: unknown): string | undefined {
 
 export async function loadConfig(
   path: string,
-): Promise<Result<JobDigestConfig, ConfigError>> {
+): Promise<Result<JobDigestConfigV2, ConfigError>> {
   const resolved = expandHome(path);
   let raw: string;
   try {

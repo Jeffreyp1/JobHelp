@@ -2,22 +2,17 @@
   "profile": {
     "resumeDumpPath": "${JOBHELP_TEST_UNSET_VAR}/Documents/resume-dump.md",
     "skills": ["typescript"],
-    "location": "Irvine, CA",
+    "location": 12345,
     "remoteOk": true,
     "salaryFloor": 100000,
     "seniority": "entry",
     "roleFamily": ["backend"]
   },
   "ranking": {
-    "useLlmFitScore": true,
-    "llmModel": "claude-haiku-4-5",
     "topN": 20,
     "digestK": 10
   },
   "output": {
     "dir": "~/jobhelp/digests"
-  },
-  "anthropic": {
-    "apiKey": 12345
   }
 }
