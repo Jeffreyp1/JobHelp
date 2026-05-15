@@ -7,6 +7,8 @@ export type {
   LeverConfig,
   UsaJobsConfig,
   JSearchConfig,
+  RemotiveConfig,
+  RemoteOkConfig,
   RankingConfig,
   RulesConfig,
   RulesMode,
