@@ -18,6 +18,9 @@ export interface ApplyResult {
   readonly path: string;
 }
 
+export const DEFAULT_RULES_MODE = 'additive' as const;
+export const DEFAULT_USER_RULES_DIR_HOME_RELATIVE = 'jobhelp/rules' as const;
+
 type RulesMode = 'defaults_only' | 'additive' | 'replace';
 
 interface SourcesBlock {
@@ -62,8 +65,8 @@ function buildConfig(answers: Record<string, unknown>): Record<string, unknown> 
     sources.lever = { slugs: leverSlugs };
   }
 
-  const rulesMode = answers['rules.mode'] ?? 'additive';
-  const rulesUserDir = answers['rules.userRulesDir'] ?? '~/jobhelp/rules';
+  const rulesMode = answers['rules.mode'] ?? DEFAULT_RULES_MODE;
+  const rulesUserDir = answers['rules.userRulesDir'] ?? `~/${DEFAULT_USER_RULES_DIR_HOME_RELATIVE}`;
 
   return {
     profile: {
@@ -72,6 +75,8 @@ function buildConfig(answers: Record<string, unknown>): Record<string, unknown> 
       salaryFloor: answers['profile.salaryFloor'],
       seniority: answers['profile.seniority'],
       roleFamily: answers['profile.roleFamily'],
+      resumeDumpPath: answers['profile.resumeDumpPath'],
+      remoteOk: answers['profile.remoteOk'],
     },
     sources,
     ranking: {

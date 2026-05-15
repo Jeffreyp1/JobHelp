@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { initConfig } from '../../core/init/wizard.js';
+import { applyConfigAnswers } from '../../core/init/applyAnswers.js';
+import { loadConfig } from '../../core/lib/config.js';
 import { isOk } from '../../core/types/result.js';
 
 describe('initConfig', () => {
@@ -103,6 +108,24 @@ describe('initConfig', () => {
       const p = result.value.prompts.find((pr) => pr.key === 'profile.salaryFloor');
       expect(p?.type).toBe('number');
     });
+
+    it('includes profile.resumeDumpPath prompt (string, required)', () => {
+      const result = initConfig({ interactive: true });
+      if (!isOk(result)) throw new Error('expected ok');
+      const p = result.value.prompts.find((pr) => pr.key === 'profile.resumeDumpPath');
+      expect(p).toBeDefined();
+      expect(p?.type).toBe('string');
+      expect(p?.optional).toBeFalsy();
+    });
+
+    it('includes profile.remoteOk prompt (boolean, required)', () => {
+      const result = initConfig({ interactive: true });
+      if (!isOk(result)) throw new Error('expected ok');
+      const p = result.value.prompts.find((pr) => pr.key === 'profile.remoteOk');
+      expect(p).toBeDefined();
+      expect(p?.type).toBe('boolean');
+      expect(p?.optional).toBeFalsy();
+    });
   });
 
   describe('non-interactive mode', () => {
@@ -125,5 +148,34 @@ describe('initConfig', () => {
       if (!isOk(result)) throw new Error('expected ok');
       expect(result.value.nextStep).toBe('ask_user');
     });
+  });
+});
+
+describe('wizard → applyConfigAnswers → loadConfig round-trip', () => {
+  it('config written with all wizard answers passes loadConfig validation', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jobhelp-wizard-rt-'));
+    try {
+      const configPath = join(dir, 'config.json');
+      const answers: Record<string, unknown> = {
+        'profile.location': 'Austin, TX',
+        'profile.skills': ['typescript', 'go'],
+        'profile.salaryFloor': 100000,
+        'profile.seniority': 'entry',
+        'profile.roleFamily': ['backend'],
+        'profile.resumeDumpPath': '~/Documents/resume.md',
+        'profile.remoteOk': true,
+        'output.dir': '~/jobhelp/digests',
+        'rules.mode': 'additive',
+        'rules.userRulesDir': '~/jobhelp/rules',
+      };
+      const applyResult = await applyConfigAnswers({ answers, outputPath: configPath });
+      if (!isOk(applyResult)) throw new Error(`applyConfigAnswers failed: ${JSON.stringify(applyResult)}`);
+      const loadResult = await loadConfig(configPath);
+      if (!isOk(loadResult)) throw new Error(`loadConfig failed: ${JSON.stringify(loadResult)}`);
+      expect(loadResult.value.profile.resumeDumpPath).toContain('Documents/resume.md');
+      expect(loadResult.value.profile.remoteOk).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

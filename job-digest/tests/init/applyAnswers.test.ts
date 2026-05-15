@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { applyConfigAnswers } from '../../core/init/applyAnswers.js';
 import { isOk, isErr } from '../../core/types/result.js';
@@ -15,6 +15,8 @@ const MINIMAL_ANSWERS: Record<string, unknown> = {
   'profile.salaryFloor': 100000,
   'profile.seniority': 'entry',
   'profile.roleFamily': ['backend'],
+  'profile.resumeDumpPath': '~/Documents/resume.md',
+  'profile.remoteOk': true,
   'output.dir': '~/jobhelp/digests',
   'rules.mode': 'additive',
   'rules.userRulesDir': '~/jobhelp/rules',
@@ -47,6 +49,8 @@ describe('applyConfigAnswers', () => {
           salaryFloor: 100000,
           seniority: 'entry',
           roleFamily: ['backend'],
+          resumeDumpPath: '~/Documents/resume.md',
+          remoteOk: true,
         },
       });
     } finally {

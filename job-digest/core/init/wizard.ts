@@ -1,4 +1,5 @@
 import { ok, type Result } from '../types/result.js';
+import { DEFAULT_RULES_MODE, DEFAULT_USER_RULES_DIR_HOME_RELATIVE } from './applyAnswers.js';
 
 export type PromptType = 'string' | 'number' | 'boolean' | 'array';
 
@@ -17,9 +18,21 @@ export interface WizardResult {
 
 const INTERACTIVE_PROMPTS: readonly WizardPrompt[] = [
   {
+    key: 'profile.resumeDumpPath',
+    question: 'Path to your resume dump markdown file (supports ~ expansion)',
+    type: 'string',
+    default: '~/Documents/resume.md',
+  },
+  {
     key: 'profile.location',
     question: 'What is your preferred job location? (e.g. "Austin, TX" or "Remote (US)")',
     type: 'string',
+  },
+  {
+    key: 'profile.remoteOk',
+    question: 'Are you open to remote roles?',
+    type: 'boolean',
+    default: true,
   },
   {
     key: 'profile.skills',
@@ -51,13 +64,13 @@ const INTERACTIVE_PROMPTS: readonly WizardPrompt[] = [
     key: 'rules.mode',
     question: 'Rules mode — how to combine bundled + user rules? One of: defaults_only, additive, replace',
     type: 'string',
-    default: 'additive',
+    default: DEFAULT_RULES_MODE,
   },
   {
     key: 'rules.userRulesDir',
     question: 'Directory for your custom rule files (markdown files here override/extend bundled rules)',
     type: 'string',
-    default: '~/jobhelp/rules',
+    default: `~/${DEFAULT_USER_RULES_DIR_HOME_RELATIVE}`,
   },
   {
     key: 'sources.adzuna.appId',
