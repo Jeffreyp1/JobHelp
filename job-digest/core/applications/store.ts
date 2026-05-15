@@ -1,4 +1,4 @@
-import { access, mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, open, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   type ApplicationError,
@@ -15,9 +15,12 @@ import type { ApplicationVersion } from './index.js';
 import { updateState, readState } from '../state/store.js';
 import type { ApplicationEntry, JobHelpState } from '../state/index.js';
 import { err, ok, type Result } from '../types/result.js';
+import { atomicWriteFile as atomicWriteFileImpl } from '../lib/atomicWrite.js';
 
-const TMP_SUFFIX = '.tmp';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const APP_LOCK_FILE = '.write.lock';
+const APP_LOCK_DEFAULT_TIMEOUT_MS = 5000;
+const APP_LOCK_RETRY_INTERVAL_MS = 25;
 
 function getStringCode(e: unknown): string | undefined {
   if (typeof e !== 'object' || e === null) return undefined;
@@ -121,23 +124,51 @@ export async function startApplication(
   return ok({ dir, created: !existedBefore });
 }
 
-async function atomicWriteFile(
+async function atomicWriteApp(
   filePath: string,
   contents: string,
 ): Promise<Result<void, ApplicationError>> {
-  const tmp = `${filePath}${TMP_SUFFIX}.${process.pid}.${Date.now()}`;
-  try {
-    await writeFile(tmp, contents, { encoding: 'utf8', flag: 'w' });
-    await rename(tmp, filePath);
-    return ok(undefined);
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'write failed';
+  const r = await atomicWriteFileImpl(filePath, contents);
+  if (!r.ok) return err({ type: 'io', path: r.error.path, message: r.error.message });
+  return ok(undefined);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function acquireAppLock(
+  applicationDir: string,
+  timeoutMs: number,
+): Promise<Result<() => Promise<void>, ApplicationError>> {
+  const lockPath = join(applicationDir, APP_LOCK_FILE);
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
     try {
-      await rm(tmp, { force: true });
-    } catch {
-      // best-effort
+      const handle = await open(lockPath, 'wx');
+      await handle.close();
+      const release = async (): Promise<void> => {
+        try {
+          await rm(lockPath, { force: true });
+        } catch {
+          // best-effort
+        }
+      };
+      return ok(release);
+    } catch (e: unknown) {
+      if (getStringCode(e) !== 'EEXIST') {
+        const message = e instanceof Error ? e.message : 'lock create failed';
+        return err({ type: 'io', path: lockPath, message });
+      }
+      if (Date.now() >= deadline) {
+        return err({
+          type: 'io',
+          path: lockPath,
+          message: `timed out acquiring application lock after ${timeoutMs}ms`,
+        });
+      }
+      await sleep(APP_LOCK_RETRY_INTERVAL_MS);
     }
-    return err({ type: 'io', path: filePath, message });
   }
 }
 
@@ -177,17 +208,26 @@ export async function writeApplicationOutput(
     }
   }
 
+  const lockResult = await acquireAppLock(dir, APP_LOCK_DEFAULT_TIMEOUT_MS);
+  if (!lockResult.ok) return err(lockResult.error);
+  const release = lockResult.value;
+
+  let filePath: string;
   let version: number;
   try {
-    version = await nextVersion(dir, input.kind);
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'unable to compute next version';
-    return err({ type: 'io', path: dir, message });
+    try {
+      version = await nextVersion(dir, input.kind);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'unable to compute next version';
+      return err({ type: 'io', path: dir, message });
+    }
+    const fileName = fileNameForKind(input.kind, version);
+    filePath = join(dir, fileName);
+    const write = await atomicWriteApp(filePath, input.content);
+    if (!write.ok) return err(write.error);
+  } finally {
+    await release();
   }
-  const fileName = fileNameForKind(input.kind, version);
-  const filePath = join(dir, fileName);
-  const write = await atomicWriteFile(filePath, input.content);
-  if (!write.ok) return err(write.error);
 
   const nowIso = new Date().toISOString();
   const updated = await updateState((state: JobHelpState) => {
