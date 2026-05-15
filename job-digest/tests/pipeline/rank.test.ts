@@ -15,9 +15,9 @@ function makeConfig(overrides: Partial<JobDigestConfig> = {}): JobDigestConfig {
       roleFamily: ['backend'],
     },
     sources: {},
-    ranking: { useLlmFitScore: false, llmModel: 'claude-haiku-4-5', topN: 20, digestK: 10 },
+    ranking: { useLlmFitScore: false, topN: 20, digestK: 10 },
+    rules: { userRulesDir: '/tmp/rules-test', mode: 'additive' },
     output: { dir: '/tmp/digests' },
-    anthropic: { apiKey: '' },
   };
   return { ...base, ...overrides };
 }
@@ -105,7 +105,7 @@ describe('rank — ranking and sort', () => {
     expect(out[0]?.llmRationale).toBeUndefined();
   });
   it('llmFitScore is always undefined even when useLlmFitScore: true is passed', async () => {
-    const cfg = makeConfig({ ranking: { useLlmFitScore: true, llmModel: 'claude-haiku-4-5', topN: 20, digestK: 10 } });
+    const cfg = makeConfig({ ranking: { useLlmFitScore: true, topN: 20, digestK: 10 } });
     const job = makeJob({ title: 'TypeScript' });
     const out = await rank([job], cfg);
     expect(out[0]?.breakdown.llmFitScore).toBeUndefined();

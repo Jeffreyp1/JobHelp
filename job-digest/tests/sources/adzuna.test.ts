@@ -37,12 +37,11 @@ function makeConfig(overrides?: Partial<AdzunaCfg>): JobDigestConfig {
     },
     ranking: {
       useLlmFitScore: false,
-      llmModel: 'claude-haiku-4-5',
       topN: 20,
       digestK: 10,
     },
+    rules: { userRulesDir: '/tmp/rules-test', mode: 'additive' },
     output: { dir: '/tmp/jobhelp' },
-    anthropic: { apiKey: 'test-anthropic-key' },
   };
 }
 describe('adzuna adapter', () => {
