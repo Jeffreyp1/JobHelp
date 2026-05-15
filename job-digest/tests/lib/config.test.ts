@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { loadConfig, interpolateEnv } from '../../core/lib/config.js';
@@ -67,19 +68,7 @@ describe('interpolateEnv', () => {
 });
 
 describe('loadConfig', () => {
-  let prevApiKey: string | undefined;
-
-  beforeEach(() => {
-    prevApiKey = process.env['JOBHELP_TEST_ANTHROPIC_KEY'];
-    process.env['JOBHELP_TEST_ANTHROPIC_KEY'] = 'test-key-value';
-  });
-
-  afterEach(() => {
-    if (prevApiKey === undefined) delete process.env['JOBHELP_TEST_ANTHROPIC_KEY'];
-    else process.env['JOBHELP_TEST_ANTHROPIC_KEY'] = prevApiKey;
-  });
-
-  it('loads + validates a well-formed config and interpolates env vars', async () => {
+  it('loads + validates a well-formed config', async () => {
     const result = await loadConfig(join(FIXTURES, 'config-valid.json'));
     if (!isOk(result)) {
       throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
@@ -90,20 +79,97 @@ describe('loadConfig', () => {
     expect(c.profile.salaryFloor).toBe(100000);
     expect(c.profile.seniority).toBe('entry');
     expect(c.profile.roleFamily).toEqual(['backend', 'fullstack']);
-    expect(c.ranking.useLlmFitScore).toBe(true);
     expect(c.ranking.topN).toBe(20);
     expect(c.ranking.digestK).toBe(10);
-    expect(c.anthropic.apiKey).toBe('test-key-value');
     expect(c.sources.adzuna?.country).toBe('us');
     expect(c.sources.greenhouse?.tokens).toEqual(['doordash', 'stripe']);
     expect(c.sources.lever?.slugs).toEqual(['plaid', 'anthropic']);
   });
 
-  it('expands ~ in resumeDumpPath and output.dir', async () => {
+  it('always returns useLlmFitScore: false regardless of file contents', async () => {
+    const result = await loadConfig(join(FIXTURES, 'config-valid.json'));
+    if (!isOk(result)) throw new Error('expected ok');
+    expect(result.value.ranking.useLlmFitScore).toBe(false);
+  });
+
+  it('loads rules block with mode and userRulesDir', async () => {
+    const result = await loadConfig(join(FIXTURES, 'config-valid.json'));
+    if (!isOk(result)) throw new Error('expected ok');
+    expect(result.value.rules.mode).toBe('additive');
+    expect(result.value.rules.userRulesDir).not.toContain('~');
+    expect(result.value.rules.userRulesDir).toContain('jobhelp');
+  });
+
+  it('expands ~ in resumeDumpPath, output.dir, and rules.userRulesDir', async () => {
     const result = await loadConfig(join(FIXTURES, 'config-valid.json'));
     if (!isOk(result)) throw new Error('expected ok');
     expect(result.value.profile.resumeDumpPath.startsWith('~')).toBe(false);
     expect(result.value.output.dir.startsWith('~')).toBe(false);
+    expect(result.value.rules.userRulesDir.startsWith('~')).toBe(false);
+  });
+
+  it('does not include an anthropic block', async () => {
+    const result = await loadConfig(join(FIXTURES, 'config-valid.json'));
+    if (!isOk(result)) throw new Error('expected ok');
+    expect(Object.prototype.hasOwnProperty.call(result.value, 'anthropic')).toBe(false);
+  });
+
+  it('defaults rules block when omitted from file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jobhelp-cfg-test-'));
+    try {
+      const p = join(dir, 'no-rules.json');
+      writeFileSync(
+        p,
+        JSON.stringify({
+          profile: {
+            resumeDumpPath: '/tmp/r.md',
+            skills: ['ts'],
+            location: 'X',
+            remoteOk: true,
+            salaryFloor: 1,
+            seniority: 'entry',
+            roleFamily: ['backend'],
+          },
+          ranking: { topN: 1, digestK: 1 },
+          output: { dir: '/tmp' },
+        }),
+      );
+      const result = await loadConfig(p);
+      if (!isOk(result)) throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
+      expect(result.value.rules.mode).toBe('additive');
+      expect(result.value.rules.userRulesDir).toBe(join(homedir(), 'jobhelp', 'rules'));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('defaults ranking block when omitted from file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jobhelp-cfg-test-'));
+    try {
+      const p = join(dir, 'no-ranking.json');
+      writeFileSync(
+        p,
+        JSON.stringify({
+          profile: {
+            resumeDumpPath: '/tmp/r.md',
+            skills: ['ts'],
+            location: 'X',
+            remoteOk: true,
+            salaryFloor: 1,
+            seniority: 'entry',
+            roleFamily: ['backend'],
+          },
+          output: { dir: '/tmp' },
+        }),
+      );
+      const result = await loadConfig(p);
+      if (!isOk(result)) throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
+      expect(result.value.ranking.useLlmFitScore).toBe(false);
+      expect(result.value.ranking.topN).toBe(20);
+      expect(result.value.ranking.digestK).toBe(10);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('returns not_found error when file is missing', async () => {
@@ -120,11 +186,11 @@ describe('loadConfig', () => {
     expect(result.error.message.toLowerCase()).toContain('parse');
   });
 
-  it('returns validation error when a required field is missing', async () => {
+  it('returns validation error when profile block is missing', async () => {
     const result = await loadConfig(join(FIXTURES, 'config-invalid-missing-field.json'));
     if (!isErr(result)) throw new Error('expected err');
     expect(result.error.type).toBe('validation');
-    expect(result.error.message).toContain('anthropic');
+    expect(result.error.message).toContain('profile');
   });
 
   it('returns validation error when a field has wrong type', async () => {
@@ -150,15 +216,43 @@ describe('loadConfig', () => {
             seniority: 'expert',
             roleFamily: ['backend'],
           },
-          ranking: { useLlmFitScore: true, llmModel: 'x', topN: 1, digestK: 1 },
+          ranking: { topN: 1, digestK: 1 },
           output: { dir: '/tmp' },
-          anthropic: { apiKey: 'k' },
         }),
       );
       const result = await loadConfig(p);
       if (!isErr(result)) throw new Error('expected err');
       expect(result.error.type).toBe('validation');
       expect(result.error.message).toContain('seniority');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns validation error when rules.mode is invalid', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jobhelp-cfg-test-'));
+    try {
+      const p = join(dir, 'bad-rules-mode.json');
+      writeFileSync(
+        p,
+        JSON.stringify({
+          profile: {
+            resumeDumpPath: '/tmp/r.md',
+            skills: ['ts'],
+            location: 'X',
+            remoteOk: true,
+            salaryFloor: 1,
+            seniority: 'entry',
+            roleFamily: ['backend'],
+          },
+          output: { dir: '/tmp' },
+          rules: { mode: 'bogus_mode' },
+        }),
+      );
+      const result = await loadConfig(p);
+      if (!isErr(result)) throw new Error('expected err');
+      expect(result.error.type).toBe('validation');
+      expect(result.error.message).toContain('rules.mode');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -180,14 +274,41 @@ describe('loadConfig', () => {
             seniority: 'entry',
             roleFamily: ['backend'],
           },
-          ranking: { useLlmFitScore: false, llmModel: 'x', topN: 1, digestK: 1 },
+          ranking: { topN: 1, digestK: 1 },
           output: { dir: '/tmp' },
-          anthropic: { apiKey: 'k' },
         }),
       );
       const result = await loadConfig(p);
       if (!isOk(result)) throw new Error('expected ok');
       expect(result.value.sources).toEqual({});
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('forces useLlmFitScore false even when file says true', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jobhelp-cfg-test-'));
+    try {
+      const p = join(dir, 'llm-true.json');
+      writeFileSync(
+        p,
+        JSON.stringify({
+          profile: {
+            resumeDumpPath: '/tmp/r.md',
+            skills: ['ts'],
+            location: 'X',
+            remoteOk: true,
+            salaryFloor: 1,
+            seniority: 'entry',
+            roleFamily: ['backend'],
+          },
+          ranking: { useLlmFitScore: true, topN: 5, digestK: 5 },
+          output: { dir: '/tmp' },
+        }),
+      );
+      const result = await loadConfig(p);
+      if (!isOk(result)) throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
+      expect(result.value.ranking.useLlmFitScore).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

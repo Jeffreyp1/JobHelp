@@ -19,15 +19,14 @@
     "lever": { "slugs": ["plaid", "anthropic"] }
   },
   "ranking": {
-    "useLlmFitScore": true,
-    "llmModel": "claude-haiku-4-5",
     "topN": 20,
     "digestK": 10
   },
   "output": {
     "dir": "~/jobhelp/digests"
   },
-  "anthropic": {
-    "apiKey": "${JOBHELP_TEST_ANTHROPIC_KEY}"
+  "rules": {
+    "mode": "additive",
+    "userRulesDir": "~/jobhelp/rules"
   }
 }
