@@ -111,12 +111,11 @@ function makeConfig(outDir: string, digestK: number): JobDigestConfig {
     sources: {},
     ranking: {
       useLlmFitScore: false,
-      llmModel: 'claude-haiku-4-5',
       topN: 20,
       digestK,
     },
+    rules: { userRulesDir: '/tmp/rules-test', mode: 'additive' },
     output: { dir: outDir },
-    anthropic: { apiKey: 'test' },
   };
 }
 

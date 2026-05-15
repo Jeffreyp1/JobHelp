@@ -16,12 +16,11 @@ function makeConfig(overrides: Partial<JobDigestConfig> = {}): JobDigestConfig {
     sources: {},
     ranking: {
       useLlmFitScore: false,
-      llmModel: 'claude-haiku-4-5',
       topN: 20,
       digestK: 10,
     },
+    rules: { userRulesDir: '/tmp/rules-test', mode: 'additive' },
     output: { dir: '/tmp/digests' },
-    anthropic: { apiKey: 'sk-ant-test' },
   };
   return { ...base, ...overrides };
 }

@@ -8,8 +8,9 @@ export type {
   UsaJobsConfig,
   JSearchConfig,
   RankingConfig,
+  RulesConfig,
+  RulesMode,
   OutputConfig,
-  AnthropicConfig,
   Seniority,
 } from './config.js';
 
