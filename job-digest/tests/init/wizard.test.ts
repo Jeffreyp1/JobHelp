@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { initConfig } from '../../core/init/wizard.js';
 import { applyConfigAnswers } from '../../core/init/applyAnswers.js';
 import { loadConfig } from '../../core/lib/config.js';
-import { isOk } from '../../core/types/result.js';
+import { isErr, isOk } from '../../core/types/result.js';
 
 describe('initConfig', () => {
   describe('interactive mode', () => {
@@ -129,16 +129,22 @@ describe('initConfig', () => {
   });
 
   describe('non-interactive mode', () => {
-    it('returns ok with nextStep: apply', () => {
+    it('returns err with validation type', () => {
       const result = initConfig({ interactive: false });
-      if (!isOk(result)) throw new Error(`expected ok; got ${JSON.stringify(result)}`);
-      expect(result.value.nextStep).toBe('apply');
+      if (!isErr(result)) throw new Error(`expected err; got ${JSON.stringify(result)}`);
+      expect(result.error.type).toBe('validation');
     });
 
-    it('returns empty prompts array', () => {
+    it('error message mentions interactive', () => {
       const result = initConfig({ interactive: false });
-      if (!isOk(result)) throw new Error('expected ok');
-      expect(result.value.prompts).toHaveLength(0);
+      if (!isErr(result)) throw new Error('expected err');
+      expect(result.error.message).toMatch(/interactive/);
+    });
+
+    it('refuses to apply when interactive=false (does not silently write incomplete config)', () => {
+      const result = initConfig({ interactive: false });
+      if (!isErr(result)) throw new Error('expected err');
+      expect(result.error.message).toMatch(/interactive: true/);
     });
   });
 

@@ -221,3 +221,70 @@ describe('mcp/wiring e2e — boot real server with temp JOBHELP_HOME', () => {
     expect(body.error?.type).toBe('not_found');
   });
 });
+
+describe('mcp/wiring lazy re-bootstrap — config written after boot', () => {
+  let tmp: string;
+  let prevHome: string | undefined;
+  let prevConfigPath: string | undefined;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'jobhelp-lazy-'));
+    prevHome = process.env['JOBHELP_HOME'];
+    prevConfigPath = process.env['JOBHELP_CONFIG_PATH'];
+    process.env['JOBHELP_HOME'] = tmp;
+    process.env['JOBHELP_CONFIG_PATH'] = join(tmp, '.config', 'jobhelp', 'config.json');
+  });
+
+  afterEach(() => {
+    if (prevHome === undefined) delete process.env['JOBHELP_HOME'];
+    else process.env['JOBHELP_HOME'] = prevHome;
+    if (prevConfigPath === undefined) delete process.env['JOBHELP_CONFIG_PATH'];
+    else process.env['JOBHELP_CONFIG_PATH'] = prevConfigPath;
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('tool returns not_configured before config exists, then real result after config is written', async () => {
+    const { coreDeps, resourceDeps } = await bootstrap();
+    const handle = buildServer({ coreDeps, resourceDeps });
+    const listRecent = findTool(handle.tools, 'list_recent_applications');
+
+    const before = await listRecent.invoke({});
+    const beforeBody = parseToolBody(before.content);
+    expect(beforeBody.ok).toBe(false);
+    expect(beforeBody.error?.type).toBe('not_configured');
+
+    writeMinimalConfig(tmp);
+
+    const after = await listRecent.invoke({});
+    const afterBody = parseToolBody(after.content);
+    expect(afterBody.ok).toBe(true);
+    expect(afterBody.value?.['applications']).toEqual([]);
+  });
+
+  it('resource returns not_configured before config, then real content after config is written', async () => {
+    const { coreDeps, resourceDeps } = await bootstrap();
+    const handle = buildServer({ coreDeps, resourceDeps });
+    const stateResource = findResource(handle.resources, 'jobhelp://state');
+
+    const before = await stateResource.read();
+    expect(before.isError).toBe(true);
+
+    writeMinimalConfig(tmp);
+
+    const after = await stateResource.read();
+    expect(after.isError).not.toBe(true);
+    const text = after.contents[0]?.text;
+    if (text === undefined) throw new Error('expected content');
+    const parsed = JSON.parse(text) as { resumes?: unknown; applications?: unknown };
+    expect(Array.isArray(parsed.resumes)).toBe(true);
+  });
+
+  it('init_config works even when no config exists (uninitialized branch)', async () => {
+    const { coreDeps, resourceDeps } = await bootstrap();
+    const handle = buildServer({ coreDeps, resourceDeps });
+    const tool = findTool(handle.tools, 'init_config');
+    const response = await tool.invoke({ interactive: true });
+    const body = parseToolBody(response.content);
+    expect(body.ok).toBe(true);
+  });
+});
