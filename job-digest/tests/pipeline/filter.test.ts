@@ -11,7 +11,7 @@ function makeConfig(overrides: Partial<JobDigestConfig> = {}): JobDigestConfig {
       remoteOk: true,
       salaryFloor: 100000,
       seniority: 'mid',
-      roleFamily: ['backend'],
+      roleFamily: ['backend', 'fullstack'],
     },
     sources: {},
     ranking: {
@@ -25,6 +25,11 @@ function makeConfig(overrides: Partial<JobDigestConfig> = {}): JobDigestConfig {
   return { ...base, ...overrides };
 }
 
+const DEFAULT_DESCRIPTION =
+  'We are looking for a backend engineer to build distributed systems in Go and TypeScript. ' +
+  'You will own services from design through deployment, work closely with product and infra, ' +
+  'and ship features that affect every customer. Strong fundamentals and a curious mindset required.';
+
 function makeJob(overrides: Partial<NormalizedJob> = {}): NormalizedJob {
   return {
     id: 'adzuna:abc',
@@ -34,7 +39,7 @@ function makeJob(overrides: Partial<NormalizedJob> = {}): NormalizedJob {
     company: 'Acme',
     location: 'Irvine, CA',
     remote: 'hybrid',
-    description: 'Build software in Go and TypeScript',
+    description: DEFAULT_DESCRIPTION,
     ...overrides,
   };
 }
@@ -103,13 +108,133 @@ describe('filter', () => {
 
   it('keeps a posting with no seniority signal (missing data never drops)', async () => {
     const cfg = makeConfig({ profile: { ...makeConfig().profile, seniority: 'intern' } });
-    const out = await filter([makeJob({ title: 'Software Engineer', description: 'Build stuff' })], cfg);
+    const out = await filter([makeJob({ title: 'Software Engineer' })], cfg);
     expect(out).toHaveLength(1);
   });
 
   it('detects seniority signal in description as well as title', async () => {
     const cfg = makeConfig({ profile: { ...makeConfig().profile, seniority: 'intern' } });
-    const out = await filter([makeJob({ title: 'Engineer', description: 'We need a staff engineer' })], cfg);
+    const longDesc =
+      'We need a staff engineer to lead our distributed-systems efforts and own the platform. ' +
+      'You will mentor others, set technical direction, and help us scale safely. ' +
+      'Experience with Go, Kubernetes, and large-team collaboration is a strong plus.';
+    const out = await filter([makeJob({ title: 'Engineer', description: longDesc })], cfg);
     expect(out).toHaveLength(0);
+  });
+
+  describe('dropForGhost', () => {
+    it('drops [TEMPLATE] Default Template payload', async () => {
+      const out = await filter(
+        [makeJob({ title: '[TEMPLATE] Default Template' })],
+        makeConfig(),
+      );
+      expect(out).toHaveLength(0);
+    });
+
+    it('drops a posting with an empty description', async () => {
+      const out = await filter([makeJob({ description: '' })], makeConfig());
+      expect(out).toHaveLength(0);
+    });
+
+    it('keeps a real SWE job with a full description', async () => {
+      const out = await filter([makeJob()], makeConfig());
+      expect(out).toHaveLength(1);
+    });
+
+    it('drops a real title with a too-short description', async () => {
+      const out = await filter(
+        [makeJob({ description: 'We are hiring engineers. Apply now.' })],
+        makeConfig(),
+      );
+      expect(out).toHaveLength(0);
+    });
+  });
+
+  describe('dropForRoleFamily', () => {
+    it('drops a PM posting when roleFamily=["backend"]', async () => {
+      const cfg = makeConfig({
+        profile: { ...makeConfig().profile, roleFamily: ['backend'] },
+      });
+      const out = await filter([makeJob({ title: 'Product Manager, Sail Core' })], cfg);
+      expect(out).toHaveLength(0);
+    });
+
+    it('drops an Operations Associate when roleFamily=["backend","fullstack"]', async () => {
+      const cfg = makeConfig({
+        profile: { ...makeConfig().profile, roleFamily: ['backend', 'fullstack'] },
+      });
+      const out = await filter(
+        [makeJob({ title: 'Operations Associate, GTM Accelerate' })],
+        cfg,
+      );
+      expect(out).toHaveLength(0);
+    });
+
+    it('drops a Finance Analyst when roleFamily allows only swe families', async () => {
+      const cfg = makeConfig({
+        profile: {
+          ...makeConfig().profile,
+          roleFamily: ['backend', 'fullstack', 'ai-engineer'],
+        },
+      });
+      const out = await filter(
+        [makeJob({ title: 'Finance & Strategy Analytics Analyst' })],
+        cfg,
+      );
+      expect(out).toHaveLength(0);
+    });
+
+    it('drops an Android Engineer when roleFamily=["backend","fullstack"]', async () => {
+      const cfg = makeConfig({
+        profile: { ...makeConfig().profile, roleFamily: ['backend', 'fullstack'] },
+      });
+      const out = await filter([makeJob({ title: 'Android Engineer, Terminal' })], cfg);
+      expect(out).toHaveLength(0);
+    });
+
+    it('keeps an ambiguous title that the classifier cannot place', async () => {
+      const cfg = makeConfig({
+        profile: { ...makeConfig().profile, roleFamily: ['backend', 'fullstack'] },
+      });
+      const out = await filter([makeJob({ title: 'Network Solution Lead' })], cfg);
+      expect(out).toHaveLength(1);
+    });
+
+    it('empty roleFamily disables the role-family filter (back-compat)', async () => {
+      const cfg = makeConfig({
+        profile: { ...makeConfig().profile, roleFamily: [] },
+      });
+      const out = await filter(
+        [makeJob({ title: 'Operations Associate, GTM Accelerate' })],
+        cfg,
+      );
+      expect(out).toHaveLength(1);
+    });
+  });
+
+  describe('strict-senior drop', () => {
+    it('drops a Staff Engineer for an entry-level profile', async () => {
+      const cfg = makeConfig({ profile: { ...makeConfig().profile, seniority: 'entry' } });
+      const out = await filter([makeJob({ title: 'Staff Engineer' })], cfg);
+      expect(out).toHaveLength(0);
+    });
+
+    it('drops a Principal Engineer for a mid-level profile', async () => {
+      const cfg = makeConfig({ profile: { ...makeConfig().profile, seniority: 'mid' } });
+      const out = await filter([makeJob({ title: 'Principal Engineer' })], cfg);
+      expect(out).toHaveLength(0);
+    });
+
+    it('drops a Senior Software Engineer for an entry profile (distance rule regression)', async () => {
+      const cfg = makeConfig({ profile: { ...makeConfig().profile, seniority: 'entry' } });
+      const out = await filter([makeJob({ title: 'Senior Software Engineer' })], cfg);
+      expect(out).toHaveLength(0);
+    });
+
+    it('keeps a Senior Software Engineer for a senior profile', async () => {
+      const cfg = makeConfig({ profile: { ...makeConfig().profile, seniority: 'senior' } });
+      const out = await filter([makeJob({ title: 'Senior Software Engineer' })], cfg);
+      expect(out).toHaveLength(1);
+    });
   });
 });
