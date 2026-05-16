@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { applyConfigAnswers } from '../../core/init/applyAnswers.js';
+import { loadConfig } from '../../core/lib/config.js';
 import { isOk, isErr } from '../../core/types/result.js';
 
 function makeTmpDir(): string {
@@ -187,6 +188,22 @@ describe('applyConfigAnswers', () => {
       await applyConfigAnswers({ answers: MINIMAL_ANSWERS, outputPath: configPath });
       const written = JSON.parse(readFileSync(configPath, 'utf8')) as unknown;
       expect(written).toMatchObject({ ranking: { useLlmFitScore: false } });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('with empty answers, the written config FAILS loadConfig validation', async () => {
+    const dir = makeTmpDir();
+    try {
+      const configPath = join(dir, 'config.json');
+      const result = await applyConfigAnswers({ answers: {}, outputPath: configPath });
+      if (!isOk(result)) throw new Error(`expected write to succeed; got ${JSON.stringify(result.error)}`);
+      const loaded = await loadConfig(configPath);
+      if (!isErr(loaded)) {
+        throw new Error('expected loadConfig to fail on empty-answers config — this contract guarantees the wizard cannot silently write an unusable config');
+      }
+      expect(loaded.error.type).toBe('validation');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
