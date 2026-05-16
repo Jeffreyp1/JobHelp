@@ -10,6 +10,8 @@ export type {
   RemotiveConfig,
   RemoteOkConfig,
   RankingConfig,
+  BM25ConfigBlock,
+  BM25FieldName,
   RulesConfig,
   RulesMode,
   OutputConfig,
