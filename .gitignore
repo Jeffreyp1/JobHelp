@@ -18,7 +18,18 @@ dist/
 # Local user-specific Claude / extension config (contains permissioned commands list,
 # may contain personal paths — not appropriate for a shared repo)
 .claude/settings.local.json
+.claude/worktrees/
 .claude-mem/
+
+# Personal job-search artifacts (NEVER commit — these contain real resume, scraped JDs, etc.)
+resume-dump/
+out/
+job-descriptions/
+experiments/
+docs/research/
+
+# Scratch dirs used by sub-agents as Write-tool sandbox workaround
+.scratch-*/
 
 # Source maps for built bundles (generated, not source of truth)
 extension/public/**/*.js.map
