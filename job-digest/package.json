@@ -1,8 +1,16 @@
 {
   "name": "@jeffreyp1/jobhelp-mcp",
-  "version": "0.2.0-alpha.0",
+  "version": "0.2.0",
   "description": "JobHelp MCP server: zero-API-key job discovery, ranking, and tailoring context for any MCP-compatible client",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jeffreyp1/JobHelp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jeffreyp1/JobHelp/issues"
+  },
+  "homepage": "https://github.com/jeffreyp1/JobHelp#readme",
   "type": "module",
   "private": false,
   "files": [
@@ -26,6 +34,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
+    "postbuild": "chmod +x mcp/dist/mcp/src/bin.js",
     "prepublishOnly": "npm run build"
   },
   "engines": {

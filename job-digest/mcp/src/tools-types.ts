@@ -11,6 +11,15 @@ export interface InitConfigResult {
   readonly path: string;
 }
 
+export interface ApplyConfigAnswersArgs {
+  readonly answers: Record<string, unknown>;
+  readonly outputPath?: string;
+}
+
+export interface ApplyConfigAnswersResult {
+  readonly path: string;
+}
+
 export interface RegisterResumeArgs {
   readonly name: string;
   readonly path?: string;
@@ -160,6 +169,9 @@ export interface ToolError {
 
 export interface CoreDeps {
   readonly initConfig: (args: InitConfigArgs) => Promise<Result<InitConfigResult, ToolError>>;
+  readonly applyConfigAnswers: (
+    args: ApplyConfigAnswersArgs,
+  ) => Promise<Result<ApplyConfigAnswersResult, ToolError>>;
   readonly registerResume: (
     args: RegisterResumeArgs,
   ) => Promise<Result<RegisterResumeResult, ToolError>>;
