@@ -15,6 +15,7 @@ import {
 
 const EXPECTED_TOOL_NAMES = [
   'init_config',
+  'apply_config_answers',
   'register_resume',
   'set_active_resume',
   'find_matching_jobs',
@@ -128,7 +129,7 @@ describe('bootstrap (wired) — surface', () => {
     expect(resourceDeps).toBeDefined();
   });
 
-  it('all 13 tool keys present on CoreDeps', async () => {
+  it('all 14 tool keys present on CoreDeps', async () => {
     const { coreDeps } = await bootstrap();
     for (const name of EXPECTED_TOOL_NAMES) {
       const key = name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()) as keyof typeof coreDeps;
@@ -146,10 +147,10 @@ describe('bootstrap (wired) — surface', () => {
     expect(typeof resourceDeps.readState).toBe('function');
   });
 
-  it('buildServer accepts wired deps and exposes 13 tools + 6 resources', async () => {
+  it('buildServer accepts wired deps and exposes 14 tools + 6 resources', async () => {
     const { coreDeps, resourceDeps } = await bootstrap();
     const handle = buildServer({ coreDeps, resourceDeps });
-    expect(handle.tools.length).toBe(13);
+    expect(handle.tools.length).toBe(14);
     expect(handle.resources.length).toBe(6);
     const toolNames = handle.tools.map((t) => t.definition.name).sort();
     expect(toolNames).toEqual([...EXPECTED_TOOL_NAMES].sort());

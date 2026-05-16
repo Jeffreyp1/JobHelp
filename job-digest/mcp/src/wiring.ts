@@ -20,6 +20,7 @@ import {
   type LazyDepsFactory,
 } from './wiring-cache.js';
 import {
+  handleApplyConfigAnswers,
   handleFindMatchingJobs,
   handleGetJob,
   handleGetLatestDigest,
@@ -49,6 +50,7 @@ export function buildCoreDeps(opts: BuildOpts): CoreDeps {
   const { config, registry } = opts;
   return {
     initConfig: handleInitConfig,
+    applyConfigAnswers: handleApplyConfigAnswers,
     registerResume: (args) => handleRegisterResume(registry, args),
     setActiveResume: (args) => handleSetActiveResume(registry, args),
     findMatchingJobs: (args) => handleFindMatchingJobs(config, args),

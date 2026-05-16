@@ -3,7 +3,7 @@ import type { JobDigestConfig } from '../../core/types/config.js';
 import type { JobId, NormalizedJob } from '../../core/types/job.js';
 import type { RankedJob } from '../../core/types/pipeline.js';
 import { err, ok, type Result } from '../../core/types/result.js';
-import { initConfig as coreInitConfig } from '../../core/init/index.js';
+import { applyConfigAnswers as coreApplyConfigAnswers, initConfig as coreInitConfig } from '../../core/init/index.js';
 import type { Registry } from '../../core/resumes/registry.js';
 import { readState } from '../../core/state/store.js';
 import { persistDigest, getLatestDigest, getLatestPointerPath } from '../../core/state/digestStore.js';
@@ -15,6 +15,7 @@ import {
 import { ALL_ADAPTERS } from '../../core/sources/index.js';
 import { runPipeline } from '../../core/pipeline/index.js';
 import type {
+  ApplyConfigAnswersArgs, ApplyConfigAnswersResult,
   FindMatchingJobsArgs, FindMatchingJobsResult, GetJobResult, GetLatestDigestResult,
   InitConfigArgs, InitConfigResult, ListApplicationVersionsArgs, ListApplicationVersionsResult,
   ListRecentApplicationsResult, ReadResumeResult, ReadRulesResult, RegisterResumeArgs,
@@ -51,6 +52,18 @@ export async function handleInitConfig(
   const wizard = coreInitConfig({ interactive });
   if (!wizard.ok) return err({ type: 'invalid_input', message: wizard.error.message });
   return ok({ created: false, path: getConfigPath() });
+}
+
+export async function handleApplyConfigAnswers(
+  args: ApplyConfigAnswersArgs,
+): Promise<Result<ApplyConfigAnswersResult, ToolError>> {
+  const result = await coreApplyConfigAnswers(
+    args.outputPath !== undefined
+      ? { answers: args.answers, outputPath: args.outputPath }
+      : { answers: args.answers },
+  );
+  if (!result.ok) return err(toToolError(result.error));
+  return ok({ path: result.value.path });
 }
 
 export async function handleRegisterResume(

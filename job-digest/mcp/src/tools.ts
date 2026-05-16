@@ -2,6 +2,7 @@ import type { JobId } from '../../core/types/job.js';
 import type { CoreDeps, RulesMode, ToolHandler } from './tools-types.js';
 import { buildHandler, unwrap } from './tools-helpers.js';
 import {
+  parseApplyConfigAnswers,
   parseEmpty,
   parseFindMatchingJobs,
   parseGetJob,
@@ -18,6 +19,8 @@ import {
 export type {
   ApplicationKind,
   ApplicationVersion,
+  ApplyConfigAnswersArgs,
+  ApplyConfigAnswersResult,
   CoreDeps,
   FindMatchingJobsArgs,
   FindMatchingJobsResult,
@@ -69,6 +72,22 @@ export function createTools(deps: CoreDeps): readonly ToolHandler[] {
       },
       parse: parseInitConfig,
       run: async (args) => unwrap(await deps.initConfig(args)),
+    }),
+    buildHandler({
+      name: 'apply_config_answers',
+      description:
+        'Persist the answers gathered during init_config to ~/.config/jobhelp/config.json. Call this after collecting all profile/sources/rules/output answers from the user. Idempotent — overwrites existing config.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          answers: { type: 'object', additionalProperties: true },
+          outputPath: { type: 'string' },
+        },
+        required: ['answers'],
+        additionalProperties: false,
+      },
+      parse: parseApplyConfigAnswers,
+      run: async (args) => unwrap(await deps.applyConfigAnswers(args)),
     }),
     buildHandler({
       name: 'register_resume',

@@ -1,6 +1,18 @@
 # Changelog
 
-## [0.2.0-alpha.0] - 2026-05-15
+## [0.2.0] - 2026-05-15
+
+### Added
+
+- `apply_config_answers` MCP tool — persists wizard answers to `~/.config/jobhelp/config.json`. Closes the init_config first-run gap.
+- Filter-side ranker improvements (Phase 5): role-family classifier, ghost/template detection, strict-senior rule. Drops top-20 noise by ~40% on the live test.
+
+### Changed
+
+- Promoted from `0.2.0-alpha.0` to `0.2.0` stable. README's `npx -y @jeffreyp1/jobhelp-mcp` now resolves to this version.
+- `package.json`: added `repository`, `bugs`, `homepage` fields; added `postbuild` script to chmod the bin executable.
+
+## [0.2.0] - 2026-05-15
 
 ### Changed
 
