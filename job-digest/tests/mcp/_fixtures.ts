@@ -40,6 +40,7 @@ export interface Calls {
   writeApplicationOutput: unknown[];
   listApplicationVersions: unknown[];
   listRecentApplications: unknown[];
+  applyConfigAnswers: unknown[];
 }
 
 export function makeDeps(
@@ -47,6 +48,7 @@ export function makeDeps(
 ): { deps: CoreDeps; calls: Calls } {
   const calls: Calls = {
     initConfig: [],
+    applyConfigAnswers: [],
     registerResume: [],
     setActiveResume: [],
     findMatchingJobs: [],
@@ -123,6 +125,10 @@ export function makeDeps(
     initConfig: async (args) => {
       calls.initConfig.push(args);
       return ok(initConfigResult);
+    },
+    applyConfigAnswers: async (args) => {
+      calls.applyConfigAnswers.push(args);
+      return ok({ path: '/home/u/.config/jobhelp/config.json' });
     },
     registerResume: async (args) => {
       calls.registerResume.push(args);
