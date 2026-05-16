@@ -1,7 +1,9 @@
-import { initConfig as coreInitConfig } from '../../core/init/index.js';
+import { applyConfigAnswers as coreApplyConfigAnswers, initConfig as coreInitConfig } from '../../core/init/index.js';
 import { err, ok, type Result } from '../../core/types/result.js';
 import type { ConfigError } from '../../core/lib/config.js';
 import type {
+  ApplyConfigAnswersArgs,
+  ApplyConfigAnswersResult,
   CoreDeps,
   InitConfigArgs,
   InitConfigResult,
@@ -12,6 +14,7 @@ import {
   getConfigPath,
   notConfiguredResource,
   notConfiguredTool,
+  toToolError,
 } from './wiring-helpers.js';
 
 async function handleInit(
@@ -26,10 +29,23 @@ async function handleInit(
   return ok({ created: false, path: loadErr.path ?? getConfigPath() });
 }
 
+async function handleApply(
+  args: ApplyConfigAnswersArgs,
+): Promise<Result<ApplyConfigAnswersResult, ToolError>> {
+  const result = await coreApplyConfigAnswers(
+    args.outputPath !== undefined
+      ? { answers: args.answers, outputPath: args.outputPath }
+      : { answers: args.answers },
+  );
+  if (!result.ok) return err(toToolError(result.error));
+  return ok({ path: result.value.path });
+}
+
 export function uninitializedCoreDeps(loadErr: ConfigError): CoreDeps {
   const notConfigured = notConfiguredTool();
   return {
     initConfig: (args) => handleInit(args, loadErr),
+    applyConfigAnswers: handleApply,
     registerResume: async () => err(notConfigured),
     setActiveResume: async () => err(notConfigured),
     findMatchingJobs: async () => err(notConfigured),
