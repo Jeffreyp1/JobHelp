@@ -15,7 +15,7 @@ function makeConfig(overrides: Partial<JobDigestConfig> = {}): JobDigestConfig {
       remoteOk: true,
       salaryFloor: 100000,
       seniority: 'mid',
-      roleFamily: ['backend'],
+      roleFamily: ['backend', 'fullstack'],
     },
     sources: {},
     ranking: { useLlmFitScore: false, topN: 20, digestK: 10 },
@@ -24,6 +24,11 @@ function makeConfig(overrides: Partial<JobDigestConfig> = {}): JobDigestConfig {
   };
   return { ...base, ...overrides };
 }
+
+const DEFAULT_DESCRIPTION =
+  'Build software in TypeScript and Go. We are a small high-leverage team building distributed ' +
+  'systems and shipping product end-to-end. You will own services, contribute to architecture, ' +
+  'and pair with product on iteration. Strong fundamentals matter more than years of experience.';
 
 function makeJob(overrides: Partial<NormalizedJob>): NormalizedJob {
   return {
@@ -34,21 +39,26 @@ function makeJob(overrides: Partial<NormalizedJob>): NormalizedJob {
     company: 'Acme',
     location: 'Austin, TX',
     remote: 'hybrid',
-    description: 'Build software in TypeScript and Go.',
+    description: DEFAULT_DESCRIPTION,
     ...overrides,
   };
 }
 describe('runPipeline', () => {
   it('composes normalize, dedupe, filter, rank end-to-end', async () => {
     vi.mocked(callClaude).mockReset();
+    const padding =
+      ' We are a small high-leverage engineering team that values fundamentals, ' +
+      'iteration speed, and clear writing. Bring strong opinions held loosely. ' +
+      'Our codebase is modern and well-tested; we ship often and learn fast. ' +
+      'Compensation and benefits are competitive for the market.';
     const jobs: readonly NormalizedJob[] = [
-      makeJob({ id: 'ok-1', title: 'TypeScript Engineer', description: 'go python', salaryMax: 150000 }),
+      makeJob({ id: 'ok-1', title: 'TypeScript Engineer', description: 'go python' + padding, salaryMax: 150000 }),
       makeJob({ id: 'malformed', title: '' }),
-      makeJob({ id: 'low-salary', title: 'TypeScript Eng', description: 'go', salaryMax: 50000 }),
-      makeJob({ id: 'remote-only', title: 'Engineer', description: 'typescript go', remote: 'remote' }),
-      makeJob({ id: 'ok-1', title: 'TypeScript Engineer', description: 'duplicate id' }),
-      makeJob({ id: 'ok-2', title: 'Backend Engineer', description: 'we use python and go' }),
-      makeJob({ id: 'senior-too-far', title: 'Staff Engineer', description: 'leadership role' }),
+      makeJob({ id: 'low-salary', title: 'TypeScript Eng', description: 'go' + padding, salaryMax: 50000 }),
+      makeJob({ id: 'remote-only', title: 'Engineer', description: 'typescript go' + padding, remote: 'remote' }),
+      makeJob({ id: 'ok-1', title: 'TypeScript Engineer', description: 'duplicate id' + padding }),
+      makeJob({ id: 'ok-2', title: 'Backend Engineer', description: 'we use python and go' + padding }),
+      makeJob({ id: 'senior-too-far', title: 'Staff Engineer', description: 'leadership role' + padding }),
     ];
     const cfg = makeConfig({ profile: { ...makeConfig().profile, remoteOk: false, seniority: 'entry' } });
     const out = await runPipeline(jobs, cfg);
@@ -83,9 +93,18 @@ describe('runPipeline', () => {
   });
 
   it('higher keyword match ranks above lower keyword match', async () => {
+    const padding =
+      ' We are a small high-leverage engineering team that values fundamentals, ' +
+      'iteration speed, and clear writing. Bring strong opinions held loosely. ' +
+      'Our codebase is modern and well-tested; we ship often and learn fast. ' +
+      'Compensation and benefits are competitive for the market.';
     const jobs: readonly NormalizedJob[] = [
-      makeJob({ id: 'low-match', title: 'Engineer', description: 'we use python only' }),
-      makeJob({ id: 'high-match', title: 'TypeScript Engineer', description: 'we use go python and typescript' }),
+      makeJob({ id: 'low-match', title: 'Engineer', description: 'we use python only' + padding }),
+      makeJob({
+        id: 'high-match',
+        title: 'TypeScript Engineer',
+        description: 'we use go python and typescript' + padding,
+      }),
     ];
     const out = await runPipeline(jobs, makeConfig());
     expect(out[0]?.job.id).toBe('high-match');
