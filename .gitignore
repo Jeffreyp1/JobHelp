@@ -58,3 +58,7 @@ npm-debug.log*
 # tmp
 *.tmp
 *.swp
+
+# job-digest build outputs
+job-digest/mcp/dist/
+job-digest/dist/
