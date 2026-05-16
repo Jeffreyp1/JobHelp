@@ -1,4 +1,4 @@
-import { ok, type Result } from '../types/result.js';
+import { ok, err, type Result } from '../types/result.js';
 import { DEFAULT_RULES_MODE, DEFAULT_USER_RULES_DIR_HOME_RELATIVE } from './applyAnswers.js';
 
 export type PromptType = 'string' | 'number' | 'boolean' | 'array';
@@ -15,6 +15,14 @@ export interface WizardResult {
   readonly nextStep: 'ask_user' | 'apply';
   readonly prompts: readonly WizardPrompt[];
 }
+
+export interface InitError {
+  readonly type: 'validation';
+  readonly message: string;
+}
+
+const NON_INTERACTIVE_REFUSAL_MESSAGE =
+  'interactive mode required for first-time setup; pass interactive: true so the wizard can collect required profile fields';
 
 const INTERACTIVE_PROMPTS: readonly WizardPrompt[] = [
   {
@@ -109,7 +117,7 @@ export interface InitConfigOptions {
   readonly interactive?: boolean;
 }
 
-export function initConfig(options: InitConfigOptions): Result<WizardResult, never> {
+export function initConfig(options: InitConfigOptions): Result<WizardResult, InitError> {
   const interactive = options.interactive !== false;
   if (interactive) {
     return ok({
@@ -117,5 +125,5 @@ export function initConfig(options: InitConfigOptions): Result<WizardResult, nev
       prompts: INTERACTIVE_PROMPTS,
     });
   }
-  return ok({ nextStep: 'apply', prompts: [] });
+  return err({ type: 'validation', message: NON_INTERACTIVE_REFUSAL_MESSAGE });
 }

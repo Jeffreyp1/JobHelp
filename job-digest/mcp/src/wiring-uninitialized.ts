@@ -1,7 +1,4 @@
-import {
-  initConfig as coreInitConfig,
-  applyConfigAnswers,
-} from '../../core/init/index.js';
+import { initConfig as coreInitConfig } from '../../core/init/index.js';
 import { err, ok, type Result } from '../../core/types/result.js';
 import type { ConfigError } from '../../core/lib/config.js';
 import type {
@@ -23,13 +20,10 @@ async function handleInit(
 ): Promise<Result<InitConfigResult, ToolError>> {
   const interactive = args.interactive !== false;
   const wizard = coreInitConfig({ interactive });
-  if (!wizard.ok) return err({ type: 'internal', message: 'wizard failure' });
-  if (wizard.value.nextStep === 'ask_user') {
-    return ok({ created: false, path: loadErr.path ?? getConfigPath() });
+  if (!wizard.ok) {
+    return err({ type: 'invalid_input', message: wizard.error.message });
   }
-  const applied = await applyConfigAnswers({ answers: {} });
-  if (!applied.ok) return err({ type: 'io_error', message: applied.error.message });
-  return ok({ created: true, path: applied.value.path });
+  return ok({ created: false, path: loadErr.path ?? getConfigPath() });
 }
 
 export function uninitializedCoreDeps(loadErr: ConfigError): CoreDeps {

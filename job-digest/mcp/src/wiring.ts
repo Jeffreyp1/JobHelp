@@ -1,24 +1,24 @@
 import type { JobDigestConfig } from '../../core/types/config.js';
 import { err, ok, type Result } from '../../core/types/result.js';
-import { loadConfig } from '../../core/lib/config.js';
-import { createRegistry, type Registry } from '../../core/resumes/registry.js';
+import type { Registry } from '../../core/resumes/registry.js';
 import { readState } from '../../core/state/store.js';
 import { getLatestDigest } from '../../core/state/digestStore.js';
 import { loadDefaults, loadUserRules } from '../../core/rules/loader.js';
 import { merge } from '../../core/rules/merger.js';
 import type { CoreDeps } from './tools-types.js';
 import type { ResourceDeps, ResourceError, RuleFileContent } from './resources.js';
-import {
-  getConfigPath,
-  getResumesDir,
-  rulesToRuleFileContent,
-  toResourceError,
-} from './wiring-helpers.js';
-import { createResumeStateAdapter } from './wiring-state-adapter.js';
+import { rulesToRuleFileContent, toResourceError } from './wiring-helpers.js';
 import {
   uninitializedCoreDeps,
   uninitializedResourceDeps,
 } from './wiring-uninitialized.js';
+import {
+  createDepsResolver,
+  createLazyCoreDeps,
+  createLazyResourceDeps,
+  type LazyDeps,
+  type LazyDepsFactory,
+} from './wiring-cache.js';
 import {
   handleFindMatchingJobs,
   handleGetJob,
@@ -110,22 +110,24 @@ export function buildResourceDeps(opts: BuildOpts): ResourceDeps {
   };
 }
 
-export async function bootstrap(): Promise<BootstrapResult> {
-  const configPath = getConfigPath();
-  const loaded = await loadConfig(configPath);
-  if (!loaded.ok) {
-    return {
-      coreDeps: uninitializedCoreDeps(loaded.error),
-      resourceDeps: uninitializedResourceDeps(),
-    };
-  }
-  const stateStore = createResumeStateAdapter();
-  const registry = createRegistry({
-    store: stateStore,
-    resumesDir: getResumesDir(),
-  });
+function buildFactory(): LazyDepsFactory {
   return {
-    coreDeps: buildCoreDeps({ config: loaded.value, registry }),
-    resourceDeps: buildResourceDeps({ config: loaded.value, registry }),
+    resolve: createDepsResolver(),
+    buildReady: (config, registry): LazyDeps => ({
+      coreDeps: buildCoreDeps({ config, registry }),
+      resourceDeps: buildResourceDeps({ config, registry }),
+    }),
+    buildUninitialized: (error): LazyDeps => ({
+      coreDeps: uninitializedCoreDeps(error),
+      resourceDeps: uninitializedResourceDeps(),
+    }),
+  };
+}
+
+export async function bootstrap(): Promise<BootstrapResult> {
+  const factory = buildFactory();
+  return {
+    coreDeps: createLazyCoreDeps(factory),
+    resourceDeps: createLazyResourceDeps(factory),
   };
 }
