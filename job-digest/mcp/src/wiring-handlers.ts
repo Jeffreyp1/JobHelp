@@ -49,13 +49,11 @@ export async function handleInitConfig(
 ): Promise<Result<InitConfigResult, ToolError>> {
   const interactive = args.interactive !== false;
   const wizard = coreInitConfig({ interactive });
-  if (!wizard.ok) return err({ type: 'internal', message: 'wizard failure' });
+  if (!wizard.ok) return err({ type: 'invalid_input', message: wizard.error.message });
   if (wizard.value.nextStep === 'ask_user') {
     return ok({ created: false, path: getConfigPath() });
   }
-  const applied = await applyConfigAnswers({ answers: {} });
-  if (!applied.ok) return err({ type: 'io_error', message: applied.error.message });
-  return ok({ created: true, path: applied.value.path });
+  return ok({ created: false, path: getConfigPath() });
 }
 
 export async function handleRegisterResume(
