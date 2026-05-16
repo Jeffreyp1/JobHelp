@@ -3,7 +3,7 @@ import type { JobDigestConfig } from '../../core/types/config.js';
 import type { JobId, NormalizedJob } from '../../core/types/job.js';
 import type { RankedJob } from '../../core/types/pipeline.js';
 import { err, ok, type Result } from '../../core/types/result.js';
-import { initConfig as coreInitConfig, applyConfigAnswers } from '../../core/init/index.js';
+import { initConfig as coreInitConfig } from '../../core/init/index.js';
 import type { Registry } from '../../core/resumes/registry.js';
 import { readState } from '../../core/state/store.js';
 import { persistDigest, getLatestDigest, getLatestPointerPath } from '../../core/state/digestStore.js';
@@ -50,9 +50,6 @@ export async function handleInitConfig(
   const interactive = args.interactive !== false;
   const wizard = coreInitConfig({ interactive });
   if (!wizard.ok) return err({ type: 'invalid_input', message: wizard.error.message });
-  if (wizard.value.nextStep === 'ask_user') {
-    return ok({ created: false, path: getConfigPath() });
-  }
   return ok({ created: false, path: getConfigPath() });
 }
 
