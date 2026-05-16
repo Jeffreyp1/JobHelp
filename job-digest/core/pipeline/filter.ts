@@ -1,27 +1,29 @@
 import type { JobDigestConfig, NormalizedJob, Seniority } from '../types/index.js';
 import { log } from '../lib/log.js';
+import { detectRoleFamily, detectSeniorityLevel, isGhostJob } from './classify.js';
 
 const SENIORITY_LADDER: readonly Seniority[] = ['intern', 'entry', 'mid', 'senior', 'staff'];
-
-const INTERN_RE = /\b(intern|internship)\b/i;
-const SENIOR_PLUS_RE = /\b(staff|principal|director|head of|lead engineer|sr\.|senior)\b/i;
-const STAFF_RE = /\b(staff|principal|director|head of)\b/i;
+const STRICT_SENIOR_PROFILES: ReadonlySet<Seniority> = new Set(['intern', 'entry', 'mid']);
+const STRICT_SENIOR_TITLE_RE = /\b(staff|principal|director|head of)\b/i;
 
 function seniorityIndex(level: Seniority): number {
   return SENIORITY_LADDER.indexOf(level);
 }
 
-/**
- * Best-effort seniority signal extraction.
- * Returns undefined when no confident signal is present (then filter must keep the job).
- */
-function detectSeniority(text: string): Seniority | undefined {
-  if (INTERN_RE.test(text)) return 'intern';
-  if (SENIOR_PLUS_RE.test(text)) {
-    if (STAFF_RE.test(text)) return 'staff';
-    return 'senior';
-  }
-  return undefined;
+function dropsForGhost(job: NormalizedJob): boolean {
+  return isGhostJob(job);
+}
+
+function dropsForRoleFamily(job: NormalizedJob, config: JobDigestConfig): boolean {
+  if (config.profile.roleFamily.length === 0) return false;
+  const detected = detectRoleFamily(job.title, job.description);
+  if (detected === undefined) return false;
+  return !config.profile.roleFamily.includes(detected);
+}
+
+function dropsForStrictSenior(job: NormalizedJob, config: JobDigestConfig): boolean {
+  if (!STRICT_SENIOR_PROFILES.has(config.profile.seniority)) return false;
+  return STRICT_SENIOR_TITLE_RE.test(job.title);
 }
 
 function dropsForRemote(job: NormalizedJob, config: JobDigestConfig): boolean {
@@ -33,7 +35,7 @@ function dropsForSalary(job: NormalizedJob, config: JobDigestConfig): boolean {
 }
 
 function dropsForSeniority(job: NormalizedJob, config: JobDigestConfig): boolean {
-  const signal = detectSeniority(`${job.title} ${job.description}`);
+  const signal = detectSeniorityLevel(job.title, job.description);
   if (signal === undefined) return false;
   const distance = Math.abs(seniorityIndex(signal) - seniorityIndex(config.profile.seniority));
   return distance >= 2;
@@ -42,11 +44,15 @@ function dropsForSeniority(job: NormalizedJob, config: JobDigestConfig): boolean
 /**
  * Drop jobs that are confidently incompatible with the profile.
  *
+ *   - ghost / template / placeholder titles, or descriptions too short to be real postings
+ *   - role-family mismatch (only when the profile opts in via non-empty roleFamily)
+ *   - strict-senior: staff/principal/director titles for intern/entry/mid profiles
  *   - remote-only postings when the candidate is onsite-only
  *   - salaryMax below the candidate's salary floor
  *   - seniority signal in title/description >=2 steps from the candidate's level
  *
  * Missing data NEVER drops — only confidently incompatible postings are removed.
+ * Drop order is fixed so ghost/role-family run before the cheaper field checks.
  */
 export async function filter(
   jobs: readonly NormalizedJob[],
@@ -54,6 +60,27 @@ export async function filter(
 ): Promise<readonly NormalizedJob[]> {
   const out: NormalizedJob[] = [];
   for (const job of jobs) {
+    if (dropsForGhost(job)) {
+      log('warn', 'filter.drop_ghost', { id: job.id, source: job.source, reason: 'ghost_or_template' });
+      continue;
+    }
+    if (dropsForRoleFamily(job, config)) {
+      log('debug', 'filter.drop_role_family', {
+        id: job.id,
+        source: job.source,
+        detected: detectRoleFamily(job.title, job.description),
+        allowed: config.profile.roleFamily,
+      });
+      continue;
+    }
+    if (dropsForStrictSenior(job, config)) {
+      log('debug', 'filter.drop_strict_senior', {
+        id: job.id,
+        source: job.source,
+        profileSeniority: config.profile.seniority,
+      });
+      continue;
+    }
     if (dropsForRemote(job, config)) {
       log('debug', 'filter.drop_remote', { id: job.id });
       continue;
