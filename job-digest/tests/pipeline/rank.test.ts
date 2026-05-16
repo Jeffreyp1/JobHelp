@@ -115,11 +115,52 @@ describe('rank — ranking and sort', () => {
     const out = await rank([], makeConfig());
     expect(out).toEqual([]);
   });
-  it('score equals keywordOverlap * recencyBoost', async () => {
+  it('score equals bm25f * recencyBoost', async () => {
     const job = makeJob({ id: 'a', title: 'TypeScript', description: 'go python' });
     const out = await rank([job], makeConfig());
-    const k = out[0]?.breakdown.keywordOverlap ?? 0;
+    const bm25f = out[0]?.breakdown.bm25f ?? 0;
     const r = out[0]?.breakdown.recencyBoost ?? 0;
-    expect(out[0]?.score).toBeCloseTo(k * r, 5);
+    expect(out[0]?.score).toBeCloseTo(bm25f * r, 5);
+  });
+});
+
+describe('rank — BM25F-based ranking', () => {
+  it('Backend Engineer @ Stripe outranks Operations Associate @ Stripe for backend-heavy resume', async () => {
+    const backendCfg = makeConfig({
+      profile: {
+        ...makeConfig().profile,
+        skills: ['typescript', 'go', 'python', 'kubernetes', 'kafka', 'postgresql'],
+      },
+    });
+    const backend = makeJob({
+      id: 'stripe-backend',
+      title: 'Backend Engineer',
+      company: 'Stripe',
+      description: 'You will build distributed systems in Go and TypeScript, with Postgres and Kafka.',
+    });
+    const ops = makeJob({
+      id: 'stripe-ops',
+      title: 'Operations Associate',
+      company: 'Stripe',
+      description: 'Coordinate vendor onboarding and reconcile finance reports across teams.',
+    });
+    const out = await rank([ops, backend], backendCfg);
+    expect(out[0]?.job.id).toBe('stripe-backend');
+    expect(out[1]?.job.id).toBe('stripe-ops');
+  });
+
+  it('ScoreBreakdown contains bm25f field (number, >= 0)', async () => {
+    const job = makeJob({ title: 'TypeScript', description: 'go python kubernetes' });
+    const out = await rank([job], makeConfig());
+    const b = out[0]?.breakdown.bm25f;
+    expect(typeof b).toBe('number');
+    expect(b ?? -1).toBeGreaterThanOrEqual(0);
+  });
+
+  it('keywordOverlap is still computed alongside bm25f (back-compat)', async () => {
+    const job = makeJob({ id: 'a', title: 'TypeScript Engineer', description: 'You will write Go and Python code daily.' });
+    const out = await rank([job], makeConfig());
+    expect(out[0]?.breakdown.keywordOverlap).toBeCloseTo(0.75, 5);
+    expect(typeof out[0]?.breakdown.bm25f).toBe('number');
   });
 });
