@@ -93,7 +93,7 @@ function makeRanked(job: NormalizedJob, rank: number, score: number): RankedJob 
     job,
     rank,
     score,
-    breakdown: { keywordOverlap: score, recencyBoost: 1 },
+    breakdown: { keywordOverlap: score, recencyBoost: 1, bm25f: score },
   };
 }
 

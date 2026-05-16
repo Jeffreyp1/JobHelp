@@ -67,6 +67,7 @@ function makeRanked(rank: number, score: number, over: RankedOverrides = {}): Ra
     breakdown: over.breakdown ?? {
       keywordOverlap: 0.7,
       recencyBoost: 0.97,
+      bm25f: 0.7,
       llmFitScore: 0.85,
     },
     ...(llmRationale !== null ? { llmRationale } : {}),

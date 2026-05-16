@@ -24,6 +24,8 @@ export interface ScoreBreakdown {
   readonly keywordOverlap: number;
   /** Recency multiplier — `max(0.5, 1 - daysOld/30)`. */
   readonly recencyBoost: number;
+  /** Field-weighted BM25 score. Raw (unbounded ≥ 0); not in [0,1]. */
+  readonly bm25f: number;
   /** LLM fit-score in [0, 1], present only when {@link RankingConfig.useLlmFitScore}. */
   readonly llmFitScore?: number;
 }
