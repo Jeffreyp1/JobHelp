@@ -86,6 +86,7 @@ export function createLazyCoreDeps(factory: LazyDepsFactory): CoreDeps {
   }
   return {
     initConfig: async (args) => (await pick('initConfig'))(args),
+    applyConfigAnswers: async (args) => (await pick('applyConfigAnswers'))(args),
     registerResume: async (args) => (await pick('registerResume'))(args),
     setActiveResume: async (args) => (await pick('setActiveResume'))(args),
     findMatchingJobs: async (args) => (await pick('findMatchingJobs'))(args),
