@@ -1,5 +1,7 @@
 import type { NormalizedJob } from './job.js';
 
+export type { RoleFamily, SeniorityLevel } from '../pipeline/classify.js';
+
 /**
  * A job after the pipeline finishes — carries score, rank, and breakdown.
  */
