@@ -2,23 +2,45 @@
   "name": "@jeffreyp1/jobhelp-mcp",
   "version": "0.2.0-alpha.0",
   "description": "JobHelp MCP server: zero-API-key job discovery, ranking, and tailoring context for any MCP-compatible client",
+  "license": "MIT",
   "type": "module",
-  "private": true,
+  "private": false,
+  "files": [
+    "mcp/dist/",
+    "prompts-bundle/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "bin": {
     "jobhelp-mcp": "./mcp/dist/mcp/src/bin.js"
   },
   "exports": {
-    ".": "./core/index.ts",
-    "./types": "./core/types/index.ts",
-    "./mcp": "./mcp/src/index.ts"
+    ".": "./mcp/dist/core/index.js",
+    "./types": "./mcp/dist/core/types/index.js",
+    "./mcp": "./mcp/dist/mcp/src/index.js"
   },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build"
   },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "jobs",
+    "job-search",
+    "resume",
+    "tailoring",
+    "claude",
+    "anthropic"
+  ],
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@vitest/coverage-v8": "^1.4.0",
