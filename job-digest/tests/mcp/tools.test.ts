@@ -4,12 +4,13 @@ import { createTools } from '../../mcp/src/tools.js';
 import { fail, getTool, makeDeps, parseResponseBody } from './_fixtures.js';
 
 describe('createTools — surface', () => {
-  it('exposes all 13 tools from spec §7', () => {
+  it('exposes all 14 tools from spec §7', () => {
     const { deps } = makeDeps();
     const tools = createTools(deps);
     const names = tools.map((t) => t.definition.name).sort();
     expect(names).toEqual(
       [
+        'apply_config_answers',
         'find_matching_jobs',
         'get_job',
         'get_latest_digest',

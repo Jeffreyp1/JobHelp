@@ -1,6 +1,7 @@
 import type { Result } from '../../core/types/result.js';
 import type {
   ApplicationKind,
+  ApplyConfigAnswersArgs,
   FindMatchingJobsArgs,
   InitConfigArgs,
   ListApplicationVersionsArgs,
@@ -17,6 +18,7 @@ import {
   isApplicationKind,
   isBoolean,
   isNumber,
+  isPlainObject,
   isRulesMode,
   isString,
   isStringArray,
@@ -32,6 +34,17 @@ export function parseInitConfig(
   const out: { interactive?: boolean } = {};
   const interactive = getOptional(obj, 'interactive', isBoolean);
   if (interactive !== undefined) out.interactive = interactive;
+  return { ok: true, value: out };
+}
+
+export function parseApplyConfigAnswers(
+  obj: Record<string, unknown>,
+): Result<ApplyConfigAnswersArgs, ToolError> {
+  const answers = obj['answers'];
+  if (!isPlainObject(answers)) return bad('answers must be an object');
+  const out: { answers: Record<string, unknown>; outputPath?: string } = { answers };
+  const outputPath = getOptional(obj, 'outputPath', isString);
+  if (outputPath !== undefined) out.outputPath = outputPath;
   return { ok: true, value: out };
 }
 

@@ -25,6 +25,7 @@ const rule = (n: string, c: string): RuleFileContent => ({ name: n, content: c }
 function stubCoreDeps(): CoreDeps {
   return {
     initConfig: async () => ok({ created: true, path: '/x' }),
+    applyConfigAnswers: async () => ok({ path: '/x' }),
     registerResume: async () => ok({ name: 'r', storedAt: '/x', active: true }),
     setActiveResume: async () => ok({ active: 'r', registered: ['r'] }),
     findMatchingJobs: async () => ok({ digestPath: '/x', jobs: [], warnings: [] }),
@@ -69,7 +70,7 @@ describe('buildServer', () => {
       resourceDeps: stubResourceDeps(),
     });
     expect(handle.server).toBeDefined();
-    expect(handle.tools.length).toBe(13);
+    expect(handle.tools.length).toBe(14);
     expect(handle.resources.length).toBe(6);
   });
 
