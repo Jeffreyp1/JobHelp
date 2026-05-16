@@ -1,0 +1,5 @@
+{
+  "profile": {
+    "resumeDumpPath": "~/Documents/resume-dump.md",
+    "skills": ["typescript",
+  }

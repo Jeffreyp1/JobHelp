@@ -1,0 +1,18 @@
+{
+  "profile": {
+    "resumeDumpPath": "${JOBHELP_TEST_UNSET_VAR}/Documents/resume-dump.md",
+    "skills": ["typescript"],
+    "location": 12345,
+    "remoteOk": true,
+    "salaryFloor": 100000,
+    "seniority": "entry",
+    "roleFamily": ["backend"]
+  },
+  "ranking": {
+    "topN": 20,
+    "digestK": 10
+  },
+  "output": {
+    "dir": "~/jobhelp/digests"
+  }
+}
