@@ -13,6 +13,7 @@ import {
   parseScoreKeywordMatch,
   parseSetActiveResume,
   parseStartApplication,
+  parseValidateSources,
   parseWriteApplicationOutput,
 } from './tools-parsers.js';
 
@@ -43,6 +44,7 @@ export type {
   ScoreKeywordMatchResult,
   SetActiveResumeArgs,
   SetActiveResumeResult,
+  SourceValidationResultItem,
   SourceWarning,
   StartApplicationArgs,
   StartApplicationResult,
@@ -52,6 +54,9 @@ export type {
   ToolError,
   ToolHandler,
   ToolJsonSchema,
+  ValidateSourcesArgs,
+  ValidateSourcesResult,
+  ValidateSourcesSummary,
   WriteApplicationOutputArgs,
   WriteApplicationOutputResult,
 } from './tools-types.js';
@@ -252,6 +257,24 @@ export function createTools(deps: CoreDeps): readonly ToolHandler[] {
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       parse: parseEmpty,
       run: async () => unwrap(await deps.listRecentApplications()),
+    }),
+    buildHandler({
+      name: 'validate_sources',
+      description:
+        'Ping each configured source adapter (Greenhouse tokens, Lever slugs, Adzuna credentials, Remotive, RemoteOK) and report per-source health: ok/failed, statusCode, jobCount, durationMs. Use this at config time to catch stale tokens, expired credentials, or rate limits before they silently produce empty digests.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          source: {
+            type: 'string',
+            enum: ['adzuna', 'greenhouse', 'lever', 'remotive', 'remoteok'],
+            description: 'Optional adapter name to validate only that source. Omit to validate all configured adapters.',
+          },
+        },
+        additionalProperties: false,
+      },
+      parse: parseValidateSources,
+      run: async (args) => unwrap(await deps.validateSources(args)),
     }),
   ];
 }
