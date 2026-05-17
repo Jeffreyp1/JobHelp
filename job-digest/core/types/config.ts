@@ -94,6 +94,13 @@ export interface RankingConfig {
   readonly maxAge?: MaxAgeConfig;
   /** Per-source trust weights. Loader injects defaults at runtime; consumers fall back to DEFAULT_SOURCE_TRUST. */
   readonly sourceTrust?: SourceTrustConfig;
+  /** Reciprocal Rank Fusion toggle. Opt-in (default disabled); when enabled, replaces the multiplicative product score. */
+  readonly fusion?: FusionConfig;
+}
+
+export interface FusionConfig {
+  readonly enabled: boolean;
+  readonly k: number;
 }
 
 export interface RecencyConfig {
