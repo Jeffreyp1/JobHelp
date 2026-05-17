@@ -18,6 +18,7 @@ import type {
 } from '../types/config.js';
 import {
   validateBM25,
+  validateFusion,
   validateMaxAge,
   validateRecency,
   validateSourceTrust,
@@ -141,6 +142,7 @@ function validateRanking(raw: unknown): RankingConfig {
       recency: validateRecency(undefined),
       maxAge: validateMaxAge(undefined),
       sourceTrust: validateSourceTrust(undefined),
+      fusion: validateFusion(undefined),
     };
   }
   const obj = requireRecord(raw, 'ranking');
@@ -152,6 +154,7 @@ function validateRanking(raw: unknown): RankingConfig {
     recency: validateRecency(obj['recency']),
     maxAge: validateMaxAge(obj['maxAge']),
     sourceTrust: validateSourceTrust(obj['sourceTrust']),
+    fusion: validateFusion(obj['fusion']),
   };
 }
 
