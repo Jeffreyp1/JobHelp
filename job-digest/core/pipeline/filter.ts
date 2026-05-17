@@ -5,6 +5,10 @@ import { detectRoleFamily, detectSeniorityLevel, isGhostJob } from './classify.j
 const SENIORITY_LADDER: readonly Seniority[] = ['intern', 'entry', 'mid', 'senior', 'staff'];
 const STRICT_SENIOR_PROFILES: ReadonlySet<Seniority> = new Set(['intern', 'entry', 'mid']);
 const STRICT_SENIOR_TITLE_RE = /\b(staff|principal|director|head of)\b/i;
+const ENGINEER_LEVEL_RE = /\b(?:software\s+)?engineer\s+(?:II|III|IV)\b/i;
+const SENIOR_TITLE_RE = /\bsenior\b|\bsr\.?\b/i;
+const LEAD_TITLE_RE = /\blead\b/i;
+const INTERN_TITLE_RE = /\b(intern|internship|new ?grad)\b/i;
 const MS_PER_DAY = 86_400_000;
 
 function seniorityIndex(level: Seniority): number {
@@ -25,6 +29,25 @@ function dropsForRoleFamily(job: NormalizedJob, config: JobDigestConfig): boolea
 function dropsForStrictSenior(job: NormalizedJob, config: JobDigestConfig): boolean {
   if (!STRICT_SENIOR_PROFILES.has(config.profile.seniority)) return false;
   return STRICT_SENIOR_TITLE_RE.test(job.title);
+}
+
+function dropsForEngineerLevel(job: NormalizedJob, config: JobDigestConfig): boolean {
+  if (config.profile.seniority !== 'entry') return false;
+  return ENGINEER_LEVEL_RE.test(job.title);
+}
+
+function dropsForSeniorInTitle(job: NormalizedJob, config: JobDigestConfig): boolean {
+  if (config.profile.seniority !== 'entry' && config.profile.seniority !== 'mid') return false;
+  return SENIOR_TITLE_RE.test(job.title);
+}
+
+// Conservative: "Lead Backend Engineer" drops for entry, but "Team Lead Intern"
+// is an intern posting (the intern signal overrides; entry profiles should still
+// see intern roles as plausibly relevant).
+function dropsForLeadInTitle(job: NormalizedJob, config: JobDigestConfig): boolean {
+  if (config.profile.seniority !== 'entry') return false;
+  if (INTERN_TITLE_RE.test(job.title)) return false;
+  return LEAD_TITLE_RE.test(job.title);
 }
 
 function dropsForRemote(job: NormalizedJob, config: JobDigestConfig): boolean {
@@ -127,6 +150,30 @@ export async function filter(
         id: job.id,
         source: job.source,
         profileSeniority: config.profile.seniority,
+      });
+      continue;
+    }
+    if (dropsForEngineerLevel(job, config)) {
+      log('debug', 'filter.drop_engineer_level', {
+        id: job.id,
+        source: job.source,
+        title: job.title,
+      });
+      continue;
+    }
+    if (dropsForSeniorInTitle(job, config)) {
+      log('debug', 'filter.drop_senior_in_title', {
+        id: job.id,
+        source: job.source,
+        title: job.title,
+      });
+      continue;
+    }
+    if (dropsForLeadInTitle(job, config)) {
+      log('debug', 'filter.drop_lead_in_title', {
+        id: job.id,
+        source: job.source,
+        title: job.title,
       });
       continue;
     }

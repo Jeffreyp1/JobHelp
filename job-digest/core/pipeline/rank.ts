@@ -8,7 +8,7 @@ import type {
 } from '../types/index.js';
 import { log } from '../lib/log.js';
 import { escapeRegExp } from '../lib/regexp.js';
-import { DEFAULT_RECENCY, DEFAULT_SOURCE_TRUST } from '../lib/config-ranking.js';
+import { DEFAULT_FUSION, DEFAULT_RECENCY, DEFAULT_SOURCE_TRUST } from '../lib/config-ranking.js';
 import {
   buildCorpus,
   scoreBM25F,
@@ -23,6 +23,12 @@ import {
   canonicalizeAll,
   type AliasMap,
 } from './skill-aliases.js';
+import {
+  buildBm25Rank,
+  buildRecencyRank,
+  buildRoleFitRank,
+  computeRrf,
+} from './rrf.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -194,8 +200,10 @@ export async function rank(
   const pc = precomputed ?? buildRankPrecomputed(jobs, config);
   const recencyCfg = config.ranking.recency ?? DEFAULT_RECENCY;
   const sourceTrustCfg = config.ranking.sourceTrust ?? DEFAULT_SOURCE_TRUST;
+  const fusionCfg = config.ranking.fusion ?? DEFAULT_FUSION;
 
-  const scored: RankedJob[] = jobs.map((job) => {
+  const bm25Scores = new Map<string, number>();
+  const baseScored = jobs.map((job) => {
     const keywordOverlap = keywordOverlapScore(job, config.profile.skills);
     const recencyBoost = computeRecencyMultiplier(job, recencyCfg, now);
     const sourceTrust = computeSourceTrustMultiplier(job, sourceTrustCfg);
@@ -211,10 +219,37 @@ export async function rank(
       pc.tokenize,
       pc.params,
     );
-    const score = bm25f * recencyBoost * sourceTrust;
+    bm25Scores.set(job.id, bm25f);
+    const productScore = bm25f * recencyBoost * sourceTrust;
     const breakdown: ScoreBreakdown = { keywordOverlap, recencyBoost, bm25f, sourceTrust };
-    return { job, rank: 0, score, breakdown };
+    return { job, productScore, breakdown };
   });
+
+  let scored: RankedJob[];
+  if (fusionCfg.enabled) {
+    const lists = [
+      buildBm25Rank(jobs, bm25Scores),
+      buildRecencyRank(jobs),
+    ];
+    if (config.profile.roleFamily.length > 0) {
+      lists.push(buildRoleFitRank(jobs, config.profile.roleFamily));
+    }
+    const rrfScores = computeRrf(lists, (j: NormalizedJob) => j.id, fusionCfg.k);
+    scored = baseScored.map(({ job, breakdown }) => {
+      const rrfMaybe = rrfScores.get(job.id);
+      const merged: ScoreBreakdown = rrfMaybe !== undefined
+        ? { ...breakdown, rrf: rrfMaybe }
+        : breakdown;
+      return { job, rank: 0, score: rrfMaybe ?? 0, breakdown: merged };
+    });
+  } else {
+    scored = baseScored.map(({ job, productScore, breakdown }) => ({
+      job,
+      rank: 0,
+      score: productScore,
+      breakdown,
+    }));
+  }
 
   scored.sort((a, b) => b.score - a.score);
   return scored.map((r, idx) => ({ ...r, rank: idx + 1 }));

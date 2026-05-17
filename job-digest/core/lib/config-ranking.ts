@@ -1,6 +1,7 @@
 import type {
   BM25ConfigBlock,
   BM25FieldName,
+  FusionConfig,
   MaxAgeConfig,
   RecencyConfig,
   SourceTrustConfig,
@@ -29,6 +30,11 @@ export const DEFAULT_SOURCE_TRUST: SourceTrustConfig = {
     remotive: 0.85,
     remoteok: 0.75,
   },
+};
+
+export const DEFAULT_FUSION: FusionConfig = {
+  enabled: false,
+  k: 60,
 };
 
 const BM25_FIELDS: readonly BM25FieldName[] = ['title', 'description', 'company', 'location'];
@@ -109,6 +115,14 @@ export function validateMaxAge(raw: unknown): MaxAgeConfig {
   const requireDate =
     typeof raw['requireDate'] === 'boolean' ? raw['requireDate'] : DEFAULT_MAX_AGE.requireDate;
   return { enabled, days, requireDate };
+}
+
+export function validateFusion(raw: unknown): FusionConfig {
+  if (!isPlainObject(raw)) return DEFAULT_FUSION;
+  const enabled =
+    typeof raw['enabled'] === 'boolean' ? raw['enabled'] : DEFAULT_FUSION.enabled;
+  const k = isFinitePositive(raw['k']) ? raw['k'] : DEFAULT_FUSION.k;
+  return { enabled, k };
 }
 
 export function validateSourceTrust(raw: unknown): SourceTrustConfig {

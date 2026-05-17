@@ -107,10 +107,12 @@ export function parseScoreBreakdown(raw: unknown): ScoreBreakdown | null {
   const bm25f = typeof rawBm25f === 'number' ? rawBm25f : 0;
   const rawSourceTrust = raw['sourceTrust'];
   const sourceTrust = typeof rawSourceTrust === 'number' ? rawSourceTrust : 1.0;
+  const rawRrf = raw['rrf'];
+  const rrf = typeof rawRrf === 'number' && Number.isFinite(rawRrf) ? rawRrf : undefined;
   const llmFitScore = raw['llmFitScore'];
-  if (llmFitScore === undefined) return { keywordOverlap, recencyBoost, bm25f, sourceTrust };
+  if (llmFitScore === undefined) return { keywordOverlap, recencyBoost, bm25f, sourceTrust, ...(rrf !== undefined && { rrf }) };
   if (typeof llmFitScore !== 'number') return null;
-  return { keywordOverlap, recencyBoost, bm25f, sourceTrust, llmFitScore };
+  return { keywordOverlap, recencyBoost, bm25f, sourceTrust, ...(rrf !== undefined && { rrf }), llmFitScore };
 }
 
 export function parseRankedJob(raw: unknown): RankedJob | null {
