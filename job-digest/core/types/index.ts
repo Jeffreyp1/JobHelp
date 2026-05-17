@@ -15,6 +15,7 @@ export type {
   RecencyConfig,
   MaxAgeConfig,
   SourceTrustConfig,
+  FusionConfig,
   RulesConfig,
   RulesMode,
   OutputConfig,
