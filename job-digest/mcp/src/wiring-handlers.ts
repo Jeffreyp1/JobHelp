@@ -23,6 +23,7 @@ import type {
   SetActiveResumeArgs, SetActiveResumeResult, StartApplicationArgs, StartApplicationResult,
   ToolError, WriteApplicationOutputArgs, WriteApplicationOutputResult,
 } from './tools-types.js';
+export { handleValidateSources } from './wiring-handlers-validate.js';
 import {
   extractSkillsFromMarkdown, getConfigPath, loadRulesByMode, rulesToReadRulesResult,
   runAdapterIsolated, scoreOverlap, todayIsoDate, toToolError,
@@ -288,3 +289,4 @@ export async function handleListRecentApplications(): Promise<
   }));
   return ok({ applications });
 }
+
