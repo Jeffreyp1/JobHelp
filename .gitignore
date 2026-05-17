@@ -62,3 +62,17 @@ npm-debug.log*
 # job-digest build outputs
 job-digest/mcp/dist/
 job-digest/dist/
+
+# Tests — maintained locally only, NOT pushed to GitHub
+# (test data in tests/fixtures/ is kept; only test code is excluded)
+appsscript/tests/
+extension/tests/
+job-digest/tests/
+tests/contracts/
+tests/smoke/
+tests/fixtures/_validate.test.ts
+prompts/shared/_validate.test.ts
+**/*.test.ts
+**/*.test.mts
+**/*.test.js
+**/*.spec.ts
