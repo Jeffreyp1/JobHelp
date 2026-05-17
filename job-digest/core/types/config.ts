@@ -86,6 +86,21 @@ export interface RankingConfig {
   readonly topN: number;
   /** Number of jobs in the final digest. */
   readonly digestK: number;
+  /** Field-weighted BM25 tuning. Defaults filled in by loader if absent. */
+  readonly bm25?: BM25ConfigBlock;
+}
+
+export type BM25FieldName = 'title' | 'description' | 'company' | 'location';
+
+export interface BM25ConfigBlock {
+  /** TF saturation; ~1.2-2.0 is typical. */
+  readonly k1?: number;
+  /** Length normalization in [0, 1]. */
+  readonly b?: number;
+  /** Per-field score multipliers. */
+  readonly fieldWeights?: Partial<Record<BM25FieldName, number>>;
+  /** IDF floor for tiny pools. */
+  readonly minIdfFloor?: number;
 }
 
 export type RulesMode = 'defaults_only' | 'additive' | 'replace';

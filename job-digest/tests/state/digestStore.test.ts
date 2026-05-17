@@ -47,7 +47,7 @@ const FIXTURE_DIGEST: PersistedDigest = {
         salaryCurrency: 'USD',
         postedAt: '2026-05-13T00:00:00.000Z',
       },
-      breakdown: { keywordOverlap: 0.7, recencyBoost: 0.95 },
+      breakdown: { keywordOverlap: 0.7, recencyBoost: 0.95, bm25f: 0.7 },
     },
   ],
 };
