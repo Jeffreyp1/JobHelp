@@ -29,8 +29,10 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
   // 'pm' covers IC product/program/project managers and people-manager titles ("Engineering Manager",
   // "Manager I, Engineering"). For an IC engineering profile, manager IS a role-family mismatch and
   // should drop — so these all bucket under 'pm' and fall outside roleFamily=['backend',...].
+  // 'technical product' tightened to require manager|owner suffix so "Technical Product Architect"
+  // doesn't false-positive into 'pm'.
   {
-    pattern: /\b(?:product|program|project|engineering)\s+manager\b|^manager\s+[IVX0-9]+\b|\bmanager,\s*engineering\b|product owner|technical product/i,
+    pattern: /\b(?:product|program|project|engineering)\s+manager\b|^manager\s+[IVX0-9]+\b|\bmanager,\s*engineering\b|product owner|\btechnical\s+product\s+(?:manager|owner)\b/i,
     family: 'pm',
   },
   {
@@ -74,7 +76,7 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
   // don't fall into backend's systems-engineer match. The (solutions?|services) alternation keeps the
   // immediate (architect|engineer|lead) constraint so "Customer Service Representative" never matches.
   {
-    pattern: /\b(?:solutions?|services)\s+(?:architect|engineer|lead)\b/i,
+    pattern: /\b(?:solutions?\s+(?:architect|engineer|lead)|services\s+(?:architect|lead))\b/i,
     family: 'solutions-architect',
   },
   {
