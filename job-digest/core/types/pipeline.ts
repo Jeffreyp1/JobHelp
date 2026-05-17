@@ -28,6 +28,8 @@ export interface ScoreBreakdown {
   readonly bm25f: number;
   /** Source-trust multiplier in [0, ∞). 1.0 when disabled or source key missing. Optional for back-compat with pre-Phase-3 fixtures. */
   readonly sourceTrust?: number;
+  /** Reciprocal Rank Fusion score (Cormack 2009). Present only when ranking.fusion.enabled. Raw RRF score (sum of `1/(k+rank_i)` across input lists); not in [0,1]. */
+  readonly rrf?: number;
   /** LLM fit-score in [0, 1], present only when {@link RankingConfig.useLlmFitScore}. */
   readonly llmFitScore?: number;
 }
