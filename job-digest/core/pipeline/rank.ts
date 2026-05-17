@@ -1,6 +1,14 @@
-import type { JobDigestConfig, NormalizedJob, RankedJob, ScoreBreakdown } from '../types/index.js';
+import type {
+  JobDigestConfig,
+  NormalizedJob,
+  RankedJob,
+  RecencyConfig,
+  ScoreBreakdown,
+  SourceTrustConfig,
+} from '../types/index.js';
 import { log } from '../lib/log.js';
 import { escapeRegExp } from '../lib/regexp.js';
+import { DEFAULT_RECENCY, DEFAULT_SOURCE_TRUST } from '../lib/config-ranking.js';
 import {
   buildCorpus,
   scoreBM25F,
@@ -16,8 +24,6 @@ import {
   type AliasMap,
 } from './skill-aliases.js';
 
-const DEFAULT_RECENCY_FLOOR = 0.5;
-const DEFAULT_RECENCY_WINDOW_DAYS = 30;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function keywordOverlapScore(job: NormalizedJob, skills: readonly string[]): number {
@@ -34,13 +40,53 @@ function keywordOverlapScore(job: NormalizedJob, skills: readonly string[]): num
   return Math.min(1, Math.max(0, raw));
 }
 
-function recencyBoostScore(postedAt: string | undefined): number {
+export function computeRecencyMultiplier(
+  job: NormalizedJob,
+  cfg: RecencyConfig,
+  now: Date,
+): number {
+  if (cfg.enabled === false) return 1.0;
+  const halfLife = cfg.halfLifeDays;
+  if (!Number.isFinite(halfLife) || halfLife <= 0) {
+    log('warn', 'rank.recency.invalid_half_life', { halfLifeDays: halfLife });
+    return 1.0;
+  }
+  const postedAt = job.postedAt;
+  // Empty string treated as absent (lenient): some adapters emit '' as a sentinel.
   if (postedAt === undefined || postedAt === '') return 1.0;
+  const nowMs = now.getTime();
+  if (!Number.isFinite(nowMs)) {
+    log('warn', 'rank.recency.invalid_now', { id: job.id, source: job.source });
+    return 1.0;
+  }
   const ts = Date.parse(postedAt);
-  if (Number.isNaN(ts)) return 1.0;
-  const daysOld = (Date.now() - ts) / MS_PER_DAY;
-  if (daysOld <= 0) return 1.0;
-  return Math.max(DEFAULT_RECENCY_FLOOR, 1 - daysOld / DEFAULT_RECENCY_WINDOW_DAYS);
+  if (!Number.isFinite(ts)) {
+    log('warn', 'rank.recency.unparseable_postedAt', {
+      id: job.id,
+      source: job.source,
+      postedAt,
+    });
+    return 1.0;
+  }
+  const ageDays = (nowMs - ts) / MS_PER_DAY;
+  if (ageDays <= 0) return 1.0;
+  const m = Math.pow(2, -ageDays / halfLife);
+  if (!Number.isFinite(m)) return 1.0;
+  return Math.min(1, Math.max(0, m));
+}
+
+export function computeSourceTrustMultiplier(
+  job: NormalizedJob,
+  cfg: SourceTrustConfig,
+): number {
+  if (cfg.enabled === false) return 1.0;
+  const raw = cfg.weights[job.source];
+  if (raw === undefined) return 1.0;
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) {
+    log('warn', 'rank.source_trust.invalid_weight', { source: job.source, weight: raw });
+    return 1.0;
+  }
+  return raw;
 }
 
 function resolveBM25Params(config: JobDigestConfig): BM25Params {
@@ -116,7 +162,8 @@ export function buildRankPrecomputed(
 }
 
 /**
- * Rank jobs by BM25F × recency boost. Pure deterministic — no LLM calls.
+ * Rank jobs by BM25F × recency multiplier × source-trust multiplier. Pure
+ * deterministic — no LLM calls.
  *
  * BM25F (field-weighted BM25) scores each job against the canonicalized skill
  * query: title hits weighted ~3x description hits; TF saturation prevents
@@ -125,16 +172,18 @@ export function buildRankPrecomputed(
  * hits. The corpus + alias map are built once per `rank()` call and shared
  * across all jobs in the pool.
  *
+ * Recency: half-life decay `2^(-ageDays / halfLifeDays)` clamped to [0, 1].
+ * Source trust: per-source multiplier from `cfg.ranking.sourceTrust.weights`.
+ * Both toggles default to `1.0` when disabled.
+ *
  * Design B: ranking.useLlmFitScore is silently ignored. breakdown.llmFitScore
  * and llmRationale are always undefined.
- *
- * Back-compat: ScoreBreakdown still carries the legacy `keywordOverlap` field
- * for any consumer that read it, plus the new `bm25f` raw score.
  */
 export async function rank(
   jobs: readonly NormalizedJob[],
   config: JobDigestConfig,
   precomputed?: RankPrecomputed,
+  now: Date = new Date(),
 ): Promise<readonly RankedJob[]> {
   if (jobs.length === 0) return [];
 
@@ -143,10 +192,13 @@ export async function rank(
   }
 
   const pc = precomputed ?? buildRankPrecomputed(jobs, config);
+  const recencyCfg = config.ranking.recency ?? DEFAULT_RECENCY;
+  const sourceTrustCfg = config.ranking.sourceTrust ?? DEFAULT_SOURCE_TRUST;
 
   const scored: RankedJob[] = jobs.map((job) => {
     const keywordOverlap = keywordOverlapScore(job, config.profile.skills);
-    const recencyBoost = recencyBoostScore(job.postedAt);
+    const recencyBoost = computeRecencyMultiplier(job, recencyCfg, now);
+    const sourceTrust = computeSourceTrustMultiplier(job, sourceTrustCfg);
     const bm25f = scoreBM25F(
       pc.corpus,
       {
@@ -159,8 +211,8 @@ export async function rank(
       pc.tokenize,
       pc.params,
     );
-    const score = bm25f * recencyBoost;
-    const breakdown: ScoreBreakdown = { keywordOverlap, recencyBoost, bm25f };
+    const score = bm25f * recencyBoost * sourceTrust;
+    const breakdown: ScoreBreakdown = { keywordOverlap, recencyBoost, bm25f, sourceTrust };
     return { job, rank: 0, score, breakdown };
   });
 

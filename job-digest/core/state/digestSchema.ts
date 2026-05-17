@@ -105,10 +105,12 @@ export function parseScoreBreakdown(raw: unknown): ScoreBreakdown | null {
   if (typeof keywordOverlap !== 'number' || typeof recencyBoost !== 'number') return null;
   const rawBm25f = raw['bm25f'];
   const bm25f = typeof rawBm25f === 'number' ? rawBm25f : 0;
+  const rawSourceTrust = raw['sourceTrust'];
+  const sourceTrust = typeof rawSourceTrust === 'number' ? rawSourceTrust : 1.0;
   const llmFitScore = raw['llmFitScore'];
-  if (llmFitScore === undefined) return { keywordOverlap, recencyBoost, bm25f };
+  if (llmFitScore === undefined) return { keywordOverlap, recencyBoost, bm25f, sourceTrust };
   if (typeof llmFitScore !== 'number') return null;
-  return { keywordOverlap, recencyBoost, bm25f, llmFitScore };
+  return { keywordOverlap, recencyBoost, bm25f, sourceTrust, llmFitScore };
 }
 
 export function parseRankedJob(raw: unknown): RankedJob | null {
