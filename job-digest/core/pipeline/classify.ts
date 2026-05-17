@@ -26,13 +26,19 @@ interface RoleFamilyRule {
 }
 
 const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
-  { pattern: /product manager|product owner|technical product/i, family: 'pm' },
+  // 'pm' covers IC product/program/project managers and people-manager titles ("Engineering Manager",
+  // "Manager I, Engineering"). For an IC engineering profile, manager IS a role-family mismatch and
+  // should drop — so these all bucket under 'pm' and fall outside roleFamily=['backend',...].
+  {
+    pattern: /\b(?:product|program|project|engineering)\s+manager\b|^manager\s+[IVX0-9]+\b|\bmanager,\s*engineering\b|product owner|technical product/i,
+    family: 'pm',
+  },
   {
     pattern: /operations associate|operations manager|chief of staff|business operations/i,
     family: 'ops',
   },
   {
-    pattern: /sales engineer|account executive|business development|sdr|customer success/i,
+    pattern: /sales engineer|account executive|business development|sdr/i,
     family: 'sales',
   },
   { pattern: /marketing|brand|content strategist|seo manager/i, family: 'marketing' },
@@ -42,8 +48,10 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
     family: 'finance',
   },
   // 'support' must precede 'backend' so "Support Engineer" lands here, not in backend's systems-engineer match.
+  // Customer success + technical specialist + solutions specialist are customer-facing — bucketed here,
+  // not in 'sales', so an engineering-profile drop trips on role-family rather than a sales/support distinction.
   {
-    pattern: /\b(?:product|technical|customer)\s+support\b|\bsupport\s+(?:specialist|engineer|lead|associate)\b/i,
+    pattern: /\b(?:product|technical|customer)\s+support\b|\bsupport\s+(?:specialist|engineer|lead|associate)\b|\btechnical\s+specialist\b|\bcustomer\s+success\b|\bsolutions?\s+specialist\b/i,
     family: 'support',
   },
   {
@@ -62,9 +70,11 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
     family: 'mobile',
   },
   { pattern: /frontend engineer|front-end|ui engineer/i, family: 'frontend' },
-  // Must precede 'backend' so "Solutions Engineer" / "Network Solution Lead" don't fall into backend's systems-engineer match.
+  // Must precede 'backend' so "Solutions Engineer" / "Services Architect" / "Network Solution Lead"
+  // don't fall into backend's systems-engineer match. The (solutions?|services) alternation keeps the
+  // immediate (architect|engineer|lead) constraint so "Customer Service Representative" never matches.
   {
-    pattern: /\bsolutions?\s+(?:architect|engineer|lead)\b/i,
+    pattern: /\b(?:solutions?|services)\s+(?:architect|engineer|lead)\b/i,
     family: 'solutions-architect',
   },
   {
