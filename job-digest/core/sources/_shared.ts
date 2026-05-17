@@ -16,9 +16,10 @@ export class SourceFetchError extends Error {
 
 export function classifyHttpStatus(status: number): SourceErrorType {
   if (status === 401 || status === 403) return 'auth';
+  if (status === 404) return 'not_found';
   if (status === 429) return 'rate_limit';
-  if (status >= 500) return 'network';
-  if (status >= 400) return 'network';
+  if (status >= 500) return 'server';
+  if (status >= 400) return 'client';
   return 'unknown';
 }
 

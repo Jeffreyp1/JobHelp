@@ -13,7 +13,16 @@ export function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 export function isSourceErrorType(v: string): v is SourceErrorType {
-  return v === 'network' || v === 'auth' || v === 'rate_limit' || v === 'parse' || v === 'unknown';
+  return (
+    v === 'network' ||
+    v === 'auth' ||
+    v === 'rate_limit' ||
+    v === 'parse' ||
+    v === 'unknown' ||
+    v === 'server' ||
+    v === 'client' ||
+    v === 'not_found'
+  );
 }
 
 export function isRemoteMode(v: string): v is RemoteMode {

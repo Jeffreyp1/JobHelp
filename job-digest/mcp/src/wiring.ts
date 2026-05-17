@@ -33,6 +33,7 @@ import {
   handleScoreKeywordMatch,
   handleSetActiveResume,
   handleStartApplication,
+  handleValidateSources,
   handleWriteApplicationOutput,
 } from './wiring-handlers.js';
 
@@ -63,6 +64,7 @@ export function buildCoreDeps(opts: BuildOpts): CoreDeps {
     writeApplicationOutput: handleWriteApplicationOutput,
     listApplicationVersions: handleListApplicationVersions,
     listRecentApplications: handleListRecentApplications,
+    validateSources: (args) => handleValidateSources(config, args),
   };
 }
 
