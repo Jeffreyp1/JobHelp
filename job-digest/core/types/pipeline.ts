@@ -22,10 +22,12 @@ export interface RankedJob {
 export interface ScoreBreakdown {
   /** Weighted keyword-overlap score from {@link normalize}/{@link rank}. */
   readonly keywordOverlap: number;
-  /** Recency multiplier — `max(0.5, 1 - daysOld/30)`. */
+  /** Recency multiplier in [0, 1]. Half-life decay when enabled; 1.0 when disabled or undated. */
   readonly recencyBoost: number;
   /** Field-weighted BM25 score. Raw (unbounded ≥ 0); not in [0,1]. */
   readonly bm25f: number;
+  /** Source-trust multiplier in [0, ∞). 1.0 when disabled or source key missing. Optional for back-compat with pre-Phase-3 fixtures. */
+  readonly sourceTrust?: number;
   /** LLM fit-score in [0, 1], present only when {@link RankingConfig.useLlmFitScore}. */
   readonly llmFitScore?: number;
 }

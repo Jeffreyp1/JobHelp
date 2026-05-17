@@ -3,8 +3,6 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AdzunaConfig,
-  BM25ConfigBlock,
-  BM25FieldName,
   GreenhouseConfig,
   JobDigestConfig,
   JSearchConfig,
@@ -18,7 +16,12 @@ import type {
   SourcesConfig,
   UsaJobsConfig,
 } from '../types/config.js';
-import { DEFAULT_BM25_PARAMS } from '../pipeline/bm25.js';
+import {
+  validateBM25,
+  validateMaxAge,
+  validateRecency,
+  validateSourceTrust,
+} from './config-ranking.js';
 import { err, ok, type Result } from '../types/result.js';
 
 export type { RulesMode, RulesConfig };
@@ -128,31 +131,17 @@ function validateProfile(raw: unknown): ProfileConfig {
   };
 }
 
-const BM25_FIELDS: readonly BM25FieldName[] = ['title', 'description', 'company', 'location'];
-
-function validateBM25(raw: unknown): BM25ConfigBlock {
-  const d = DEFAULT_BM25_PARAMS;
-  if (raw === undefined) return { k1: d.k1, b: d.b, fieldWeights: { ...d.fieldWeights }, minIdfFloor: d.minIdfFloor };
-  const obj = requireRecord(raw, 'ranking.bm25');
-  const fw: Partial<Record<BM25FieldName, number>> = { ...d.fieldWeights };
-  const rawW = obj['fieldWeights'];
-  if (rawW !== undefined) {
-    const w = requireRecord(rawW, 'ranking.bm25.fieldWeights');
-    for (const f of BM25_FIELDS) {
-      if (w[f] !== undefined) fw[f] = requireNumber(w[f], `ranking.bm25.fieldWeights.${f}`);
-    }
-  }
-  return {
-    k1: obj['k1'] !== undefined ? requireNumber(obj['k1'], 'ranking.bm25.k1') : d.k1,
-    b: obj['b'] !== undefined ? requireNumber(obj['b'], 'ranking.bm25.b') : d.b,
-    fieldWeights: fw,
-    minIdfFloor: obj['minIdfFloor'] !== undefined ? requireNumber(obj['minIdfFloor'], 'ranking.bm25.minIdfFloor') : d.minIdfFloor,
-  };
-}
-
 function validateRanking(raw: unknown): RankingConfig {
   if (raw === undefined) {
-    return { useLlmFitScore: false, topN: 20, digestK: 10, bm25: validateBM25(undefined) };
+    return {
+      useLlmFitScore: false,
+      topN: 20,
+      digestK: 10,
+      bm25: validateBM25(undefined),
+      recency: validateRecency(undefined),
+      maxAge: validateMaxAge(undefined),
+      sourceTrust: validateSourceTrust(undefined),
+    };
   }
   const obj = requireRecord(raw, 'ranking');
   return {
@@ -160,6 +149,9 @@ function validateRanking(raw: unknown): RankingConfig {
     topN: obj['topN'] !== undefined ? requireNumber(obj['topN'], 'ranking.topN') : 20,
     digestK: obj['digestK'] !== undefined ? requireNumber(obj['digestK'], 'ranking.digestK') : 10,
     bm25: validateBM25(obj['bm25']),
+    recency: validateRecency(obj['recency']),
+    maxAge: validateMaxAge(obj['maxAge']),
+    sourceTrust: validateSourceTrust(obj['sourceTrust']),
   };
 }
 

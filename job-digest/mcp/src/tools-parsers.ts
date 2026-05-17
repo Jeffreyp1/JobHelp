@@ -85,6 +85,8 @@ export function parseFindMatchingJobs(
     useAllResumes?: boolean;
     instructions?: string;
     count?: number;
+    maxAgeDays?: number | null;
+    recencyEnabled?: boolean;
   } = { queries };
   const resumeName = getOptional(obj, 'resumeName', isString);
   if (resumeName !== undefined) out.resumeName = resumeName;
@@ -94,6 +96,17 @@ export function parseFindMatchingJobs(
   if (instructions !== undefined) out.instructions = instructions;
   const count = getOptional(obj, 'count', isNumber);
   if (count !== undefined) out.count = count;
+  if ('maxAgeDays' in obj) {
+    const raw = obj['maxAgeDays'];
+    if (raw === null) {
+      out.maxAgeDays = null;
+    } else if (raw !== undefined) {
+      if (!isNumber(raw) || raw <= 0) return bad('maxAgeDays must be a positive number or null');
+      out.maxAgeDays = raw;
+    }
+  }
+  const recencyEnabled = getOptional(obj, 'recencyEnabled', isBoolean);
+  if (recencyEnabled !== undefined) out.recencyEnabled = recencyEnabled;
   return { ok: true, value: out };
 }
 

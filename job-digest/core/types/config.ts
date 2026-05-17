@@ -88,6 +88,28 @@ export interface RankingConfig {
   readonly digestK: number;
   /** Field-weighted BM25 tuning. Defaults filled in by loader if absent. */
   readonly bm25?: BM25ConfigBlock;
+  /** Recency decay multiplier toggle. Loader injects defaults at runtime; consumers fall back to DEFAULT_RECENCY when constructing config literals in tests. */
+  readonly recency?: RecencyConfig;
+  /** Hard age cutoff. Loader injects defaults at runtime; consumers fall back to DEFAULT_MAX_AGE. */
+  readonly maxAge?: MaxAgeConfig;
+  /** Per-source trust weights. Loader injects defaults at runtime; consumers fall back to DEFAULT_SOURCE_TRUST. */
+  readonly sourceTrust?: SourceTrustConfig;
+}
+
+export interface RecencyConfig {
+  readonly enabled: boolean;
+  readonly halfLifeDays: number;
+}
+
+export interface MaxAgeConfig {
+  readonly enabled: boolean;
+  readonly days: number;
+  readonly requireDate: boolean;
+}
+
+export interface SourceTrustConfig {
+  readonly enabled: boolean;
+  readonly weights: Readonly<Record<string, number>>;
 }
 
 export type BM25FieldName = 'title' | 'description' | 'company' | 'location';

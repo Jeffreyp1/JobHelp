@@ -1,10 +1,11 @@
-import type { JobDigestConfig, NormalizedJob, Seniority } from '../types/index.js';
+import type { JobDigestConfig, MaxAgeConfig, NormalizedJob, Seniority } from '../types/index.js';
 import { log } from '../lib/log.js';
 import { detectRoleFamily, detectSeniorityLevel, isGhostJob } from './classify.js';
 
 const SENIORITY_LADDER: readonly Seniority[] = ['intern', 'entry', 'mid', 'senior', 'staff'];
 const STRICT_SENIOR_PROFILES: ReadonlySet<Seniority> = new Set(['intern', 'entry', 'mid']);
 const STRICT_SENIOR_TITLE_RE = /\b(staff|principal|director|head of)\b/i;
+const MS_PER_DAY = 86_400_000;
 
 function seniorityIndex(level: Seniority): number {
   return SENIORITY_LADDER.indexOf(level);
@@ -41,6 +42,47 @@ function dropsForSeniority(job: NormalizedJob, config: JobDigestConfig): boolean
   return distance >= 2;
 }
 
+// Boundary: a job with ageDays exactly equal to cfg.days is KEPT (strict >).
+// `days: 1` means "today + yesterday survive"; jobs older than 1 day drop.
+export function dropForAge(job: NormalizedJob, cfg: MaxAgeConfig, now: Date): boolean {
+  if (!cfg.enabled) return false;
+  // Empty string treated as absent (lenient): some adapters emit '' as a sentinel.
+  if (job.postedAt === undefined || job.postedAt === '') {
+    if (cfg.requireDate) {
+      log('debug', 'filter.drop_age_undated', { id: job.id, source: job.source });
+      return true;
+    }
+    return false;
+  }
+  if (!Number.isFinite(now.getTime())) {
+    log('warn', 'filter.drop_age_invalid_now', {
+      id: job.id,
+      source: job.source,
+    });
+    return false;
+  }
+  const posted = Date.parse(job.postedAt);
+  if (!Number.isFinite(posted)) {
+    log('warn', 'filter.drop_age_unparseable', {
+      id: job.id,
+      source: job.source,
+      postedAt: job.postedAt,
+    });
+    return cfg.requireDate;
+  }
+  const ageDays = (now.getTime() - posted) / MS_PER_DAY;
+  if (ageDays > cfg.days) {
+    log('debug', 'filter.drop_age_exceeded', {
+      id: job.id,
+      source: job.source,
+      ageDays: Math.round(ageDays * 10) / 10,
+      maxAgeDays: cfg.days,
+    });
+    return true;
+  }
+  return false;
+}
+
 /**
  * Drop jobs that are confidently incompatible with the profile.
  *
@@ -50,13 +92,20 @@ function dropsForSeniority(job: NormalizedJob, config: JobDigestConfig): boolean
  *   - remote-only postings when the candidate is onsite-only
  *   - salaryMax below the candidate's salary floor
  *   - seniority signal in title/description >=2 steps from the candidate's level
+ *   - postedAt older than config.ranking.maxAge.days (toggleable; lenient on missing date)
  *
- * Missing data NEVER drops — only confidently incompatible postings are removed.
- * Drop order is fixed so ghost/role-family run before the cheaper field checks.
+ * Missing data NEVER drops — only confidently incompatible postings are removed,
+ * except when `maxAge.requireDate` is true (strict mode).
+ * Drop order is fixed so ghost/role-family run before the cheaper field checks;
+ * age runs LAST so log messages for date-shaped drops surface only after structural
+ * mismatches are already filtered.
+ *
+ * `now` is injectable so tests can pin the clock; defaults to wall-clock at call time.
  */
 export async function filter(
   jobs: readonly NormalizedJob[],
   config: JobDigestConfig,
+  now: Date = new Date(),
 ): Promise<readonly NormalizedJob[]> {
   const out: NormalizedJob[] = [];
   for (const job of jobs) {
@@ -91,6 +140,9 @@ export async function filter(
     }
     if (dropsForSeniority(job, config)) {
       log('debug', 'filter.drop_seniority', { id: job.id, title: job.title });
+      continue;
+    }
+    if (config.ranking.maxAge !== undefined && dropForAge(job, config.ranking.maxAge, now)) {
       continue;
     }
     out.push(job);
