@@ -13,7 +13,7 @@ import {
   listRecentApplications as coreListRecentApplications,
 } from '../../core/applications/store.js';
 import { ALL_ADAPTERS } from '../../core/sources/index.js';
-import { runPipeline } from '../../core/pipeline/index.js';
+import { runPipeline, type PipelineOverrides } from '../../core/pipeline/index.js';
 import type {
   ApplyConfigAnswersArgs, ApplyConfigAnswersResult,
   FindMatchingJobsArgs, FindMatchingJobsResult, GetJobResult, GetLatestDigestResult,
@@ -113,8 +113,9 @@ export async function handleSetActiveResume(
 
 export async function handleFindMatchingJobs(
   config: JobDigestConfig,
-  _args: FindMatchingJobsArgs,
+  args: FindMatchingJobsArgs,
 ): Promise<Result<FindMatchingJobsResult, ToolError>> {
+  const now = new Date();
   const outcomes = await Promise.all(
     ALL_ADAPTERS.map((a) => runAdapterIsolated(a, config)),
   );
@@ -130,12 +131,19 @@ export async function handleFindMatchingJobs(
       message: 'all source adapters failed or are unconfigured',
     });
   }
-  const ranked = await runPipeline(pool, config);
+  const overrides: PipelineOverrides = {
+    now,
+    ...(args.maxAgeDays === null || typeof args.maxAgeDays === 'number'
+      ? { maxAgeDays: args.maxAgeDays }
+      : {}),
+    ...(args.recencyEnabled !== undefined ? { recencyEnabled: args.recencyEnabled } : {}),
+  };
+  const ranked = await runPipeline(pool, config, overrides);
   const topK = ranked.slice(0, config.ranking.digestK);
-  const date = todayIsoDate(new Date());
+  const date = todayIsoDate(now);
   const persisted = await persistDigest({
     date,
-    generatedAt: new Date().toISOString(),
+    generatedAt: now.toISOString(),
     totalDurationMs: 0,
     sourceResults: outcomes.map((o) => ({
       source: o.source,

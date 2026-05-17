@@ -47,6 +47,13 @@ export interface FindMatchingJobsArgs {
   readonly queries: readonly string[];
   readonly instructions?: string;
   readonly count?: number;
+  /**
+   * Per-call age cutoff in days. `null` disables the filter for this call;
+   * a number overrides `config.ranking.maxAge.days` for this call only.
+   */
+  readonly maxAgeDays?: number | null;
+  /** Per-call override for recency decay. */
+  readonly recencyEnabled?: boolean;
 }
 
 export interface SourceWarning {
