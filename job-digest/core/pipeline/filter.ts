@@ -31,6 +31,14 @@ function dropsForStrictSenior(job: NormalizedJob, config: JobDigestConfig): bool
   return STRICT_SENIOR_TITLE_RE.test(job.title);
 }
 
+// Intern + new-grad postings should only survive when the profile is itself seeking intern roles.
+// Existing distance rule (>=2 steps) keeps intern visible for entry profiles (distance 1); this
+// helper closes that gap explicitly so an "entry" candidate doesn't get summer-internship noise.
+function dropsForInternMismatch(job: NormalizedJob, config: JobDigestConfig): boolean {
+  if (config.profile.seniority === 'intern') return false;
+  return INTERN_TITLE_RE.test(job.title);
+}
+
 function dropsForEngineerLevel(job: NormalizedJob, config: JobDigestConfig): boolean {
   if (config.profile.seniority !== 'entry') return false;
   return ENGINEER_LEVEL_RE.test(job.title);
@@ -41,12 +49,10 @@ function dropsForSeniorInTitle(job: NormalizedJob, config: JobDigestConfig): boo
   return SENIOR_TITLE_RE.test(job.title);
 }
 
-// Conservative: "Lead Backend Engineer" drops for entry, but "Team Lead Intern"
-// is an intern posting (the intern signal overrides; entry profiles should still
-// see intern roles as plausibly relevant).
+// Conservative: drops "Lead Backend Engineer" for entry profiles.
+// Intern handling is fully delegated to dropsForInternMismatch, which runs before this.
 function dropsForLeadInTitle(job: NormalizedJob, config: JobDigestConfig): boolean {
   if (config.profile.seniority !== 'entry') return false;
-  if (INTERN_TITLE_RE.test(job.title)) return false;
   return LEAD_TITLE_RE.test(job.title);
 }
 
@@ -112,6 +118,7 @@ export function dropForAge(job: NormalizedJob, cfg: MaxAgeConfig, now: Date): bo
  *   - ghost / template / placeholder titles, or descriptions too short to be real postings
  *   - role-family mismatch (only when the profile opts in via non-empty roleFamily)
  *   - strict-senior: staff/principal/director titles for intern/entry/mid profiles
+ *   - intern-mismatch: intern/internship/new-grad titles for non-intern profiles
  *   - remote-only postings when the candidate is onsite-only
  *   - salaryMax below the candidate's salary floor
  *   - seniority signal in title/description >=2 steps from the candidate's level
@@ -166,6 +173,14 @@ export async function filter(
         id: job.id,
         source: job.source,
         title: job.title,
+      });
+      continue;
+    }
+    if (dropsForInternMismatch(job, config)) {
+      log('debug', 'filter.drop_intern_mismatch', {
+        id: job.id,
+        source: job.source,
+        profileSeniority: config.profile.seniority,
       });
       continue;
     }
