@@ -161,6 +161,31 @@ export interface ListRecentApplicationsResult {
   readonly applications: readonly RecentApplication[];
 }
 
+export interface ValidateSourcesArgs {
+  readonly source?: string;
+}
+
+export interface SourceValidationResultItem {
+  readonly source: string;
+  readonly label?: string;
+  readonly ok: boolean;
+  readonly jobCount?: number;
+  readonly statusCode?: number;
+  readonly error?: { readonly type: string; readonly message: string };
+  readonly durationMs: number;
+}
+
+export interface ValidateSourcesSummary {
+  readonly total: number;
+  readonly ok: number;
+  readonly failed: number;
+}
+
+export interface ValidateSourcesResult {
+  readonly results: readonly SourceValidationResultItem[];
+  readonly summary: ValidateSourcesSummary;
+}
+
 export interface ToolError {
   readonly type:
     | 'invalid_input'
@@ -207,6 +232,9 @@ export interface CoreDeps {
   readonly listRecentApplications: () => Promise<
     Result<ListRecentApplicationsResult, ToolError>
   >;
+  readonly validateSources: (
+    args: ValidateSourcesArgs,
+  ) => Promise<Result<ValidateSourcesResult, ToolError>>;
 }
 
 export interface ToolJsonSchema {
