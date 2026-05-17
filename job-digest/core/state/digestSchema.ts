@@ -103,10 +103,12 @@ export function parseScoreBreakdown(raw: unknown): ScoreBreakdown | null {
   const keywordOverlap = raw['keywordOverlap'];
   const recencyBoost = raw['recencyBoost'];
   if (typeof keywordOverlap !== 'number' || typeof recencyBoost !== 'number') return null;
+  const rawBm25f = raw['bm25f'];
+  const bm25f = typeof rawBm25f === 'number' ? rawBm25f : 0;
   const llmFitScore = raw['llmFitScore'];
-  if (llmFitScore === undefined) return { keywordOverlap, recencyBoost };
+  if (llmFitScore === undefined) return { keywordOverlap, recencyBoost, bm25f };
   if (typeof llmFitScore !== 'number') return null;
-  return { keywordOverlap, recencyBoost, llmFitScore };
+  return { keywordOverlap, recencyBoost, bm25f, llmFitScore };
 }
 
 export function parseRankedJob(raw: unknown): RankedJob | null {
