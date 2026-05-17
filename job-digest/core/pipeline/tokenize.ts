@@ -40,7 +40,7 @@ export function tokenize(
   let working = text.toLowerCase();
 
   for (const phrase of multiWordPhrases) {
-    const lower = phrase.toLowerCase();
+    const lower = phrase.toLowerCase().trim();
     if (lower.length === 0) continue;
     const joined = lower.replace(/\s+/g, '_');
     const re = new RegExp('\\b' + escapeRegExp(lower) + '\\b', 'g');

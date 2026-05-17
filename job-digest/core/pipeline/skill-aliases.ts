@@ -1,3 +1,5 @@
+import { log } from '../lib/log.js';
+
 export interface AliasMap {
   readonly canonical: ReadonlyMap<string, string>;
   readonly multiWordPhrases: readonly string[];
@@ -135,16 +137,24 @@ function toLookupKey(s: string): string {
   return s.toLowerCase().replace(/\s+/g, '_');
 }
 
-function buildAliasMap(): AliasMap {
+function buildAliasMap(rawAliases: Record<string, readonly string[]> = RAW_ALIASES): AliasMap {
   const canonical = new Map<string, string>();
   const phrases = new Set<string>();
-  for (const [rawCanon, variants] of Object.entries(RAW_ALIASES)) {
-    const canon = rawCanon.toLowerCase();
+  for (const [rawCanon, variants] of Object.entries(rawAliases)) {
+    const canon = rawCanon.toLowerCase().trim();
+    if (canon.length === 0) {
+      log('warn', 'skill_aliases.skipped_empty_canonical', { rawCanon });
+      continue;
+    }
     const canonKey = toLookupKey(canon);
     if (canon.includes(' ')) phrases.add(canon);
     canonical.set(canonKey, canon);
     for (const v of variants) {
-      const vl = v.toLowerCase();
+      const vl = v.toLowerCase().trim();
+      if (vl.length === 0) {
+        log('warn', 'skill_aliases.skipped_empty_variant', { canonical: canon });
+        continue;
+      }
       if (vl.includes(' ')) phrases.add(vl);
       canonical.set(toLookupKey(vl), canon);
     }

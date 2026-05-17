@@ -1,3 +1,5 @@
+import { log } from '../lib/log.js';
+
 export type FieldName = 'title' | 'description' | 'company' | 'location';
 
 export const FIELDS: readonly FieldName[] = ['title', 'description', 'company', 'location'];
@@ -15,6 +17,29 @@ export const DEFAULT_BM25_PARAMS: BM25Params = {
   fieldWeights: { title: 3.0, description: 1.0, company: 0.5, location: 0.3 },
   minIdfFloor: 0.1,
 };
+
+function sanitizeParams(p: BM25Params): BM25Params {
+  let { k1, b, minIdfFloor } = p;
+  const warnings: Record<string, unknown> = {};
+  if (!Number.isFinite(k1) || k1 < 0) {
+    warnings['k1'] = k1;
+    k1 = DEFAULT_BM25_PARAMS.k1;
+  }
+  if (!Number.isFinite(b) || b < 0 || b > 1) {
+    warnings['b'] = b;
+    b = DEFAULT_BM25_PARAMS.b;
+  }
+  // minIdfFloor < 0 is intentionally permitted: Okapi BM25 allows negative idf for terms appearing in >50% of the corpus, which acts as a soft penalty for common words.
+  if (!Number.isFinite(minIdfFloor)) {
+    warnings['minIdfFloor'] = minIdfFloor;
+    minIdfFloor = DEFAULT_BM25_PARAMS.minIdfFloor;
+  }
+  if (Object.keys(warnings).length > 0) {
+    log('warn', 'bm25.invalid_param_clamped_to_default', warnings);
+    return { ...p, k1, b, minIdfFloor };
+  }
+  return p;
+}
 
 export interface Corpus {
   readonly avgFieldLengths: Record<FieldName, number>;
@@ -134,7 +159,7 @@ export function scoreBM25F(
 
   const querySet = uniqueTerms(queryTerms);
   let total = 0;
-  const { k1, b, fieldWeights, minIdfFloor } = params;
+  const { k1, b, fieldWeights, minIdfFloor } = sanitizeParams(params);
 
   for (const q of querySet) {
     let weightedTf = 0;
