@@ -36,4 +36,7 @@ export type SourceErrorType =
   | 'auth'
   | 'rate_limit'
   | 'parse'
+  | 'not_found'
+  | 'server'
+  | 'client'
   | 'unknown';

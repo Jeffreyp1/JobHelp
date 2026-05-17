@@ -99,6 +99,7 @@ export function createLazyCoreDeps(factory: LazyDepsFactory): CoreDeps {
     writeApplicationOutput: async (args) => (await pick('writeApplicationOutput'))(args),
     listApplicationVersions: async (args) => (await pick('listApplicationVersions'))(args),
     listRecentApplications: async () => (await pick('listRecentApplications'))(),
+    validateSources: async (args) => (await pick('validateSources'))(args),
   };
 }
 
