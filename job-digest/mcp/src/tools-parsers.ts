@@ -11,6 +11,7 @@ import type {
   SetActiveResumeArgs,
   StartApplicationArgs,
   ToolError,
+  ValidateSourcesArgs,
   WriteApplicationOutputArgs,
 } from './tools-types.js';
 import {
@@ -180,4 +181,25 @@ export function parseListApplicationVersions(
 
 export function parseEmpty(_obj: Record<string, unknown>): Result<Record<string, never>, ToolError> {
   return { ok: true, value: {} };
+}
+
+const KNOWN_SOURCES = ['adzuna', 'greenhouse', 'lever', 'remotive', 'remoteok'] as const;
+
+export function parseValidateSources(
+  obj: Record<string, unknown>,
+): Result<ValidateSourcesArgs, ToolError> {
+  const out: { source?: string } = {};
+  if ('source' in obj) {
+    const raw = obj['source'];
+    if (raw !== undefined) {
+      if (!isString(raw)) return bad('source must be a string');
+      if (!(KNOWN_SOURCES as readonly string[]).includes(raw)) {
+        return bad(
+          `unknown source "${raw}"; valid options are: ${KNOWN_SOURCES.join(', ')}`,
+        );
+      }
+      out.source = raw;
+    }
+  }
+  return { ok: true, value: out };
 }
