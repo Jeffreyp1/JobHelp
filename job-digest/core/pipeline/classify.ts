@@ -13,7 +13,10 @@ export type RoleFamily =
   | 'ops'
   | 'designer'
   | 'analyst'
-  | 'marketing';
+  | 'marketing'
+  | 'support'
+  | 'finance'
+  | 'solutions-architect';
 
 export type SeniorityLevel = 'intern' | 'entry' | 'mid' | 'senior' | 'staff';
 
@@ -33,9 +36,15 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
     family: 'sales',
   },
   { pattern: /marketing|brand|content strategist|seo manager/i, family: 'marketing' },
+  // 'finance' must precede 'solutions-architect' so "Accounting Technical Solutions Lead" wins.
   {
-    pattern: /financial analyst|financial planning|finance.{0,15}analyt/i,
-    family: 'analyst',
+    pattern: /\baccounting\b|financial\s+analyst|financial\s+planning|finance.{0,15}analyt|\bfinance\s+(?:systems|technical|technology)?\s*(?:lead|engineer|analyst|associate)\b/i,
+    family: 'finance',
+  },
+  // 'support' must precede 'backend' so "Support Engineer" lands here, not in backend's systems-engineer match.
+  {
+    pattern: /\b(?:product|technical|customer)\s+support\b|\bsupport\s+(?:specialist|engineer|lead|associate)\b/i,
+    family: 'support',
   },
   {
     pattern: /data scientist|machine learning|ml engineer|applied scientist|nlp/i,
@@ -53,6 +62,11 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
     family: 'mobile',
   },
   { pattern: /frontend engineer|front-end|ui engineer/i, family: 'frontend' },
+  // Must precede 'backend' so "Solutions Engineer" / "Network Solution Lead" don't fall into backend's systems-engineer match.
+  {
+    pattern: /\bsolutions?\s+(?:architect|engineer|lead)\b/i,
+    family: 'solutions-architect',
+  },
   {
     pattern: /backend engineer|back-end|api engineer|systems engineer|,\s*backend\b/i,
     family: 'backend',
@@ -108,7 +122,7 @@ interface SeniorityRule {
 const SENIORITY_TITLE_RULES: readonly SeniorityRule[] = [
   { pattern: /\b(intern|internship|new ?grad)\b/i, level: 'intern' },
   { pattern: /\b(staff|principal|distinguished)\b/i, level: 'staff' },
-  { pattern: /\b(senior|sr\.|lead engineer|forward deployed|head of)\b/i, level: 'senior' },
+  { pattern: /\b(senior|sr\.|lead engineer|forward[\s-]+deployed|head of)\b/i, level: 'senior' },
   {
     pattern: /\b(?:engineer|developer|swe|sde)\s+(II|III|IV)\b|\b(II|III|IV)\s+(?:engineer|developer|swe|sde)\b/i,
     level: 'mid',
@@ -124,7 +138,7 @@ const SENIORITY_DESC_RULES: readonly SeniorityRule[] = [
   { pattern: /\b(intern|internship|new ?grad)\b/i, level: 'intern' },
   { pattern: new RegExp(`\\b(staff|principal|distinguished)\\s+${ROLE_NOUN}\\b`, 'i'), level: 'staff' },
   {
-    pattern: new RegExp(`\\b(senior|forward deployed|head of|lead)\\s+${ROLE_NOUN}\\b`, 'i'),
+    pattern: new RegExp(`\\b(senior|forward[\\s-]+deployed|head of|lead)\\s+${ROLE_NOUN}\\b`, 'i'),
     level: 'senior',
   },
   {
