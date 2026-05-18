@@ -24,6 +24,7 @@ import type {
   ToolError, WriteApplicationOutputArgs, WriteApplicationOutputResult,
 } from './tools-types.js';
 export { handleValidateSources } from './wiring-handlers-validate.js';
+export { handleRerankTopJobs } from './wiring-handlers-rerank.js';
 import {
   extractSkillsFromMarkdown, getConfigPath, loadRulesByMode, rulesToReadRulesResult,
   runAdapterIsolated, scoreOverlap, todayIsoDate, toToolError,
