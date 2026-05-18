@@ -10,6 +10,10 @@ const TOKEN_FILE = join(__dirname, 'greenhouse-tokens.json');
 const greenhouseTokens: readonly string[] = existsSync(TOKEN_FILE)
   ? (JSON.parse(readFileSync(TOKEN_FILE, 'utf8')) as readonly string[])
   : ['stripe', 'anthropic', 'vercel'];
+const ASHBY_FILE = join(__dirname, 'ashby-slugs.json');
+const ashbyTokens: readonly string[] = existsSync(ASHBY_FILE)
+  ? (JSON.parse(readFileSync(ASHBY_FILE, 'utf8')) as readonly string[])
+  : ['ramp', 'notion', 'linear'];
 
 const config: JobDigestConfig = {
   profile: {
@@ -27,6 +31,7 @@ const config: JobDigestConfig = {
   },
   sources: {
     greenhouse: { tokens: greenhouseTokens },
+    ashby: { tokens: ashbyTokens },
     lever: { slugs: ['plaid', 'figma', 'mercury', 'ramp'] },
     remoteok: {},
     remotive: { queries: ['typescript', 'python backend', 'fullstack engineer'] },
@@ -93,6 +98,7 @@ console.log('JobHelp digest — live run + AI final filter');
 console.log('──────────────────────────────────────────────────────');
 const { judger, mode } = pickJudger();
 console.log(`  greenhouse tokens: ${greenhouseTokens.length}`);
+console.log(`  ashby tokens:      ${ashbyTokens.length}`);
 console.log(`  AI judger:         ${mode}`);
 console.log('  Fetching jobs…');
 
