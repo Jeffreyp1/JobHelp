@@ -30,7 +30,7 @@ Details, API shapes, and caveats: [docs/v2-features.md](docs/v2-features.md). Re
 git clone https://github.com/<your-fork>/JobHelp.git
 cd JobHelp
 npm install
-node extension/scripts/build.mjs
+node extension/scripts/build.mts
 ```
 
 Then load the unpacked extension in Chrome:
@@ -50,7 +50,7 @@ The JobHelp icon appears in the toolbar; click it to open the side panel.
 The backend reads/writes your Drive, calls Claude, and logs to your tracking sheet. Build the bundle, then paste each file into a new Apps Script project.
 
 ```bash
-node appsscript/scripts/build.mjs
+node appsscript/scripts/build.mts
 ls appsscript/dist/
 # Code.gs  claude.gs  drive.gs  sheet.gs  prompt.gs  tokens.gs  cost.gs  seed.gs
 ```

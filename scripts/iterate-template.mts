@@ -1,7 +1,4 @@
-/**
- * Iteration pipeline: sample-data → .docx → .pdf → .png
- * Run: node scripts/iterate-template.mjs
- */
+// Iteration pipeline: sample-data → .docx → .pdf → .png.
 
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -69,7 +66,21 @@ execSync(
   { stdio: 'pipe' },
 );
 
-const { fillResumeTemplate, parseResumeMarkdown } = await import(bundlePath);
+interface ResumeData {
+  name: string;
+  contact: string;
+  skills: unknown[];
+  experiences: unknown[];
+  projects: unknown[];
+  education: unknown[];
+}
+
+interface FillerModule {
+  fillResumeTemplate: (templateBuf: ArrayBuffer, data: ResumeData) => Promise<Blob>;
+  parseResumeMarkdown: (md: string) => ResumeData;
+}
+
+const { fillResumeTemplate, parseResumeMarkdown } = await import(bundlePath) as FillerModule;
 
 const data = parseResumeMarkdown(SAMPLE_MD);
 console.log(JSON.stringify({
@@ -84,7 +95,7 @@ console.log(JSON.stringify({
 const templatePath = join(ROOT, 'templates/engineering-resume-template.docx');
 const templateBuf = readFileSync(templatePath);
 
-const filledBlob = await fillResumeTemplate(templateBuf.buffer, data);
+const filledBlob = await fillResumeTemplate(templateBuf.buffer as ArrayBuffer, data);
 const filledArr = new Uint8Array(await filledBlob.arrayBuffer());
 writeFileSync('/tmp/iter-out.docx', filledArr);
 
