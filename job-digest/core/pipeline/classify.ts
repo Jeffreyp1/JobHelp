@@ -192,3 +192,58 @@ export function detectSeniorityLevel(
   if (description.length === 0) return undefined;
   return scanRules(description.slice(0, DESCRIPTION_SCAN_LIMIT), SENIORITY_DESC_RULES);
 }
+
+interface CountryRule {
+  readonly pattern: RegExp;
+  readonly country: string;
+}
+
+// Order matters. More-specific / disambiguating rules go first so that a
+// "Dublin, CA" or "Indianapolis" string lands in US before the broader
+// Ireland / India rules can claim them. Two-letter state codes require a
+// preceding comma (", CA") so they don't false-positive on prose words.
+const COUNTRY_RULES: ReadonlyArray<CountryRule> = [
+  { pattern: /\b(united states|usa|u\.s\.a\.?|us)\b/i, country: 'US' },
+  { pattern: /,\s*(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b/i, country: 'US' },
+  { pattern: /\b(california|new york state|texas|florida|washington state|massachusetts|illinois|pennsylvania|colorado|oregon|georgia|virginia|new jersey)\b/i, country: 'US' },
+  { pattern: /\b(san francisco|sf bay|silicon valley|new york city|nyc|los angeles|chicago|seattle|austin|boston|denver|atlanta|miami|portland|san diego|dallas|houston|phoenix|philadelphia|washington dc|minneapolis|detroit|charlotte|nashville|raleigh|salt lake city|cincinnati|columbus|indianapolis|baltimore|orlando)\b/i, country: 'US' },
+  { pattern: /\bcanada\b|\b(toronto|vancouver|montreal|ottawa|calgary|edmonton|quebec)\b|,\s*(ON|BC|AB|QC|MB|SK|NS|NB|PE|NL|YT|NT|NU)\b/i, country: 'Canada' },
+  { pattern: /\b(united kingdom|u\.k\.?|england|scotland|wales|northern ireland|london|manchester|edinburgh|leeds|liverpool|bristol|glasgow)\b/i, country: 'UK' },
+  { pattern: /\b(ireland|dublin|cork|galway|limerick)\b/i, country: 'Ireland' },
+  { pattern: /\b(germany|berlin|munich|hamburg|frankfurt|cologne|stuttgart)\b/i, country: 'Germany' },
+  { pattern: /\b(france|paris|lyon|marseille|toulouse|nice)\b/i, country: 'France' },
+  { pattern: /\b(spain|madrid|barcelona|valencia|seville|bilbao)\b/i, country: 'Spain' },
+  { pattern: /\b(netherlands|amsterdam|rotterdam|the hague|utrecht|eindhoven)\b/i, country: 'Netherlands' },
+  { pattern: /\b(italy|rome|milan|turin|naples|florence)\b/i, country: 'Italy' },
+  { pattern: /\b(india|bangalore|bengaluru|mumbai|delhi|hyderabad|chennai|pune|kolkata|noida|gurgaon|gurugram)\b/i, country: 'India' },
+  { pattern: /\b(australia|sydney|melbourne|brisbane|perth|adelaide)\b/i, country: 'Australia' },
+  { pattern: /\b(new zealand|auckland|wellington)\b/i, country: 'New Zealand' },
+  { pattern: /\bsingapore\b/i, country: 'Singapore' },
+  { pattern: /\b(japan|tokyo|osaka|kyoto|yokohama)\b/i, country: 'Japan' },
+  { pattern: /\b(china|beijing|shanghai|shenzhen|guangzhou|hong kong)\b/i, country: 'China' },
+  { pattern: /\b(korea|seoul|busan)\b/i, country: 'South Korea' },
+  { pattern: /\b(brazil|brasil|sao paulo|rio de janeiro|brasilia)\b/i, country: 'Brazil' },
+  { pattern: /\b(mexico|cdmx|mexico city|guadalajara|monterrey)\b/i, country: 'Mexico' },
+  { pattern: /\b(argentina|buenos aires|cordoba)\b/i, country: 'Argentina' },
+  { pattern: /\b(europe|emea)\b/i, country: 'EU' },
+  { pattern: /\b(apac|asia[\s-]pacific)\b/i, country: 'APAC' },
+  { pattern: /\b(latam|latin america)\b/i, country: 'LATAM' },
+  { pattern: /\b(aunz|anz)\b/i, country: 'Australia' },
+];
+
+/**
+ * Best-effort country detection from a free-form location string.
+ * Returns the canonical country label, or undefined when no rule confidently
+ * matches (preserving the filter's missing-data-never-drops invariant).
+ *
+ * Region buckets ('EU', 'APAC', 'LATAM') are emitted for broad descriptors
+ * like 'Remote - Europe' so the filter can drop confidently-non-allowlist
+ * regions while leaving bare 'Remote' undetected.
+ */
+export function detectCountryFromLocation(location: string): string | undefined {
+  if (typeof location !== 'string' || location.trim().length === 0) return undefined;
+  for (const rule of COUNTRY_RULES) {
+    if (rule.pattern.test(location)) return rule.country;
+  }
+  return undefined;
+}

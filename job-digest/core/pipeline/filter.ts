@@ -1,6 +1,6 @@
-import type { JobDigestConfig, MaxAgeConfig, NormalizedJob, Seniority } from '../types/index.js';
+import type { JobDigestConfig, MaxAgeConfig, NormalizedJob, ProfileConfig, Seniority } from '../types/index.js';
 import { log } from '../lib/log.js';
-import { detectRoleFamily, detectSeniorityLevel, isGhostJob } from './classify.js';
+import { detectCountryFromLocation, detectRoleFamily, detectSeniorityLevel, isGhostJob } from './classify.js';
 
 const SENIORITY_LADDER: readonly Seniority[] = ['intern', 'entry', 'mid', 'senior', 'staff'];
 const STRICT_SENIOR_PROFILES: ReadonlySet<Seniority> = new Set(['intern', 'entry', 'mid']);
@@ -58,6 +58,30 @@ function dropsForLeadInTitle(job: NormalizedJob, config: JobDigestConfig): boole
 
 function dropsForRemote(job: NormalizedJob, config: JobDigestConfig): boolean {
   return job.remote === 'remote' && config.profile.remoteOk === false;
+}
+
+// Geo allowlist: lenient on bare 'Remote' (undetected country survives) so
+// remote postings without a stated region aren't accidentally filtered. Strict
+// when the location names a confidently non-allowlist country or region.
+// Note: allowedCountries values are matched LITERALLY against detectCountryFromLocation's
+// output. Regional buckets ('EU', 'APAC', 'LATAM') don't subsume their member countries —
+// `['EU']` keeps "Remote - Europe" but drops "Remote - Germany". Users wanting
+// pan-European coverage should list `['EU', 'Germany', 'France', 'Spain', ...]`.
+function dropsForCountry(job: NormalizedJob, profile: ProfileConfig): boolean {
+  const allowlist = profile.allowedCountries;
+  if (allowlist === undefined || allowlist.length === 0) return false;
+
+  const detected = detectCountryFromLocation(job.location);
+
+  if (job.remote === 'remote') {
+    if (detected === undefined) return false;
+    if (allowlist.includes(detected)) return false;
+    return true;
+  }
+
+  if (detected === undefined) return false;
+  if (allowlist.includes(detected)) return false;
+  return true;
 }
 
 function dropsForSalary(job: NormalizedJob, config: JobDigestConfig): boolean {
@@ -120,6 +144,7 @@ export function dropForAge(job: NormalizedJob, cfg: MaxAgeConfig, now: Date): bo
  *   - strict-senior: staff/principal/director titles for intern/entry/mid profiles
  *   - intern-mismatch: intern/internship/new-grad titles for non-intern profiles
  *   - remote-only postings when the candidate is onsite-only
+ *   - country mismatch when profile.allowedCountries is non-empty (lenient on bare 'Remote')
  *   - salaryMax below the candidate's salary floor
  *   - seniority signal in title/description >=2 steps from the candidate's level
  *   - postedAt older than config.ranking.maxAge.days (toggleable; lenient on missing date)
@@ -194,6 +219,10 @@ export async function filter(
     }
     if (dropsForRemote(job, config)) {
       log('debug', 'filter.drop_remote', { id: job.id });
+      continue;
+    }
+    if (dropsForCountry(job, config.profile)) {
+      log('debug', 'filter.drop_country', { id: job.id, source: job.source, location: job.location });
       continue;
     }
     if (dropsForSalary(job, config)) {
