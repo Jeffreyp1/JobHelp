@@ -1,56 +1,21 @@
-/**
- * build-skills-dict.mjs
- *
- * SOURCE: Bundled / hand-crafted dataset (Option C)
- *
- * Rationale: ESCO bulk-download endpoint timed out (30 s, 0 bytes received);
- * Lightcast open-skills GitHub repo returned 404. Fell back to a curated list
- * covering skills that appear most frequently in software-engineering job
- * descriptions, based on publicly available market analyses (Lightcast,
- * LinkedIn, Stack Overflow Developer Survey 2023-24, ESCO taxonomy categories).
- *
- * Coverage:
- *   - Programming languages / type systems  ~55 canonical
- *   - Web / UI frameworks                   ~65 canonical
- *   - Backend / API frameworks              ~35 canonical
- *   - Cloud platforms & managed services    ~90 canonical
- *   - Databases & data stores               ~55 canonical
- *   - DevOps / infrastructure               ~75 canonical
- *   - Data / ML / AI / BI                   ~90 canonical
- *   - Message queues / streaming            ~15 canonical
- *   - Testing tools                         ~20 canonical
- *   - Project / process / design tools      ~55 canonical
- *   - Security                              ~15 canonical
- *   - Methodologies / practices             ~35 canonical
- *   - Soft skills                           ~15 canonical
- *   - Job roles / titles                    ~130 canonical
- *   - Miscellaneous tech concepts           ~40 canonical
- *
- * Each canonical entry has at least one synonym, many have 8-15.
- * The lookup map key is: lowercase(canonical) + all synonym strings.
- * Target: ≥ 3,000 total lookup keys.
- *
- * Output: extension/public/data/skills-dict.json
- */
+// Curated software-engineering skills dataset → extension/public/data/skills-dict.json.
 
-import { writeFileSync, mkdirSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+interface Skill {
+  canonical: string;
+  synonyms: string[];
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = join(__dirname, '..');
 
-// ---------------------------------------------------------------------------
-// Skills definition — { canonical: string, synonyms: string[] }
-// All synonyms PLUS lowercase(canonical) are expanded into the lookup map.
-// ---------------------------------------------------------------------------
+const SKILLS: Skill[] = [
 
-const SKILLS = [
-
-  // ════════════════════════════════════════════════════════════════════════
   // PROGRAMMING LANGUAGES
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Python', synonyms: ['python', 'py', 'python3', 'python2', 'cpython', 'python 3', 'python 2', 'python programming', 'python developer', 'python language', 'python scripting', 'python coding'] },
   { canonical: 'JavaScript', synonyms: ['javascript', 'js', 'es6', 'es2015', 'es2016', 'es2017', 'es2018', 'es2019', 'es2020', 'es2021', 'es2022', 'ecmascript', 'vanillajs', 'vanilla js', 'vanilla javascript', 'javascript programming', 'js developer', 'javascript developer', 'javascript engineer', 'node javascript'] },
   { canonical: 'TypeScript', synonyms: ['typescript', 'ts', 'typed javascript', 'typescript developer', 'typescript programming', 'strict typescript', 'typescript 4', 'typescript 5'] },
@@ -97,9 +62,7 @@ const SKILLS = [
   { canonical: 'XML', synonyms: ['xml', 'extensible markup language', 'xml parsing', 'xml schema', 'xsd', 'xpath', 'xslt'] },
   { canonical: 'Terraform HCL', synonyms: ['hcl', 'hashicorp configuration language', 'terraform hcl', 'hcl syntax'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // WEB / UI FRAMEWORKS
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'React', synonyms: ['react', 'reactjs', 'react.js', 'react js', 'react framework', 'react library', 'react hooks', 'react context', 'react 18', 'react 17', 'react 16', 'create react app', 'cra', 'react developer'] },
   { canonical: 'Angular', synonyms: ['angular', 'angularjs', 'angular.js', 'angular 2', 'angular 2+', 'angular2', 'angular framework', 'angular cli', 'angular material', 'angular 12', 'angular 13', 'angular 14', 'angular 15', 'angular 16', 'angular 17', 'angular developer'] },
   { canonical: 'Vue.js', synonyms: ['vue', 'vuejs', 'vue.js', 'vue js', 'vue 3', 'vue3', 'vue 2', 'vue2', 'vue framework', 'vue router', 'pinia', 'vuex', 'vue developer'] },
@@ -155,9 +118,7 @@ const SKILLS = [
   { canonical: 'Progressive Enhancement', synonyms: ['progressive enhancement', 'graceful degradation', 'web standards'] },
   { canonical: 'Responsive Design', synonyms: ['responsive design', 'responsive web design', 'mobile first', 'mobile-first design', 'adaptive design', 'fluid layout'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // BACKEND / API FRAMEWORKS
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Node.js', synonyms: ['node.js', 'nodejs', 'node js', 'node', 'node runtime', 'node backend', 'node server', 'node developer', 'node.js developer', 'bun', 'deno'] },
   { canonical: 'Express.js', synonyms: ['express', 'expressjs', 'express.js', 'express framework', 'express middleware', 'express routes', 'express server'] },
   { canonical: 'NestJS', synonyms: ['nestjs', 'nest.js', 'nest js', 'nest framework', 'nestjs framework', 'nestjs developer', 'nestjs modules'] },
@@ -191,9 +152,7 @@ const SKILLS = [
   { canonical: 'Axum', synonyms: ['axum', 'axum framework', 'rust axum', 'tokio axum'] },
   { canonical: 'Ktor', synonyms: ['ktor', 'ktor framework', 'kotlin ktor'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // CLOUD PLATFORMS & MANAGED SERVICES
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'AWS', synonyms: ['aws', 'amazon web services', 'amazon aws', 'amazon cloud', 'aws cloud', 'aws services', 'aws certified', 'aws developer', 'aws engineer', 'aws architect', 'aws solutions architect'] },
   { canonical: 'AWS Lambda', synonyms: ['aws lambda', 'lambda', 'lambda functions', 'serverless lambda', 'lambda function', 'lambda invocation', 'lambda trigger'] },
   { canonical: 'AWS EC2', synonyms: ['ec2', 'aws ec2', 'elastic compute cloud', 'ec2 instances', 'ec2 auto scaling', 'aws instances'] },
@@ -247,9 +206,7 @@ const SKILLS = [
   { canonical: 'Neon', synonyms: ['neon', 'neon database', 'neon postgres', 'neon serverless postgres'] },
   { canonical: 'Upstash', synonyms: ['upstash', 'upstash redis', 'upstash kafka'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // DATABASES & DATA STORES
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'PostgreSQL', synonyms: ['postgresql', 'postgres', 'psql', 'pgsql', 'postgre sql', 'postgres db', 'postgresql developer', 'postgres server', 'postgreSQL database', 'postgis'] },
   { canonical: 'MySQL', synonyms: ['mysql', 'my sql', 'mysql server', 'mysql developer', 'mysql database', 'mysql 8', 'mysql 5.7', 'mariadb', 'maria db', 'percona'] },
   { canonical: 'SQLite', synonyms: ['sqlite', 'sqlite3', 'sq lite', 'sqlite database', 'sqlite file'] },
@@ -281,9 +238,7 @@ const SKILLS = [
   { canonical: 'pgvector', synonyms: ['pgvector', 'pg vector', 'postgres vector', 'vector database', 'vector store', 'pinecone', 'weaviate', 'qdrant', 'chroma', 'milvus'] },
   { canonical: 'FaunaDB', synonyms: ['fauna', 'faunadb', 'fauna database'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // DEVOPS & INFRASTRUCTURE
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Docker', synonyms: ['docker', 'dockerfile', 'docker containers', 'docker compose', 'docker-compose', 'docker swarm', 'docker hub', 'containerization', 'container', 'containers', 'docker developer', 'docker networking', 'docker volumes'] },
   { canonical: 'Kubernetes', synonyms: ['kubernetes', 'k8s', 'k3s', 'kube', 'kubectl', 'kubernetes cluster', 'kubernetes pods', 'kubernetes deployment', 'k8s developer', 'kubernetes engineer', 'kubernetes operator', 'k8s networking'] },
   { canonical: 'Helm', synonyms: ['helm', 'helm charts', 'helm chart', 'helm release', 'helm templates'] },
@@ -328,9 +283,7 @@ const SKILLS = [
   { canonical: 'Site Reliability Engineering', synonyms: ['sre', 'site reliability engineering', 'site reliability engineer', 'reliability engineering', 'on-call', 'on call engineering', 'incident management'] },
   { canonical: 'Platform Engineering', synonyms: ['platform engineering', 'platform engineer', 'developer platform', 'internal developer platform', 'idp'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // MESSAGE QUEUES & EVENT STREAMING
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Apache Kafka', synonyms: ['kafka', 'apache kafka', 'kafka streams', 'kafka broker', 'kafka connect', 'kafka consumer', 'kafka producer', 'confluent kafka', 'kafka topics', 'kafka partitions'] },
   { canonical: 'RabbitMQ', synonyms: ['rabbitmq', 'rabbit mq', 'amqp', 'rabbitmq broker', 'rabbitmq exchange', 'rabbitmq queue'] },
   { canonical: 'Apache Pulsar', synonyms: ['pulsar', 'apache pulsar', 'pulsar broker', 'pulsar topics'] },
@@ -340,9 +293,7 @@ const SKILLS = [
   { canonical: 'Google Pub/Sub', synonyms: ['google pub/sub', 'google pubsub', 'cloud messaging'] },
   { canonical: 'ZeroMQ', synonyms: ['zeromq', 'zmq', '0mq', 'zero mq'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // DATA / ML / AI / BI
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Machine Learning', synonyms: ['machine learning', 'ml', 'supervised learning', 'unsupervised learning', 'reinforcement learning', 'statistical learning', 'predictive modeling', 'ml engineer', 'ml development', 'applied ml', 'ml pipeline', 'ml models', 'ml algorithms'] },
   { canonical: 'Deep Learning', synonyms: ['deep learning', 'dl', 'neural networks', 'neural network', 'ann', 'artificial neural network', 'convolutional neural network', 'cnn', 'recurrent neural network', 'rnn', 'lstm', 'transformer model', 'attention mechanism'] },
   { canonical: 'TensorFlow', synonyms: ['tensorflow', 'tensor flow', 'tf', 'tensorflow 2', 'tf2', 'tensorflow developer', 'tensorflow keras', 'tensorflow serving', 'tensorflow lite', 'tflite'] },
@@ -396,9 +347,7 @@ const SKILLS = [
   { canonical: 'Recommendation Systems', synonyms: ['recommendation system', 'recommendation engine', 'recommender system', 'collaborative filtering', 'content-based filtering'] },
   { canonical: 'Time Series Analysis', synonyms: ['time series', 'time series analysis', 'forecasting', 'prophet', 'arima', 'lstm forecasting'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // TESTING TOOLS
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Jest', synonyms: ['jest', 'jest testing', 'jest framework', 'jest unit test', 'jest mock', 'jest coverage'] },
   { canonical: 'Vitest', synonyms: ['vitest', 'vite test', 'vitest framework'] },
   { canonical: 'Mocha', synonyms: ['mocha', 'mocha.js', 'mocha testing', 'mocha framework'] },
@@ -420,9 +369,7 @@ const SKILLS = [
   { canonical: 'Test Driven Development', synonyms: ['tdd', 'test driven development', 'test-driven development', 'unit testing', 'integration testing', 'e2e testing', 'end to end testing', 'test coverage', 'bdd', 'behavior driven development', 'acceptance testing'] },
   { canonical: 'SonarQube', synonyms: ['sonarqube', 'sonar qube', 'sonar', 'code quality', 'static analysis', 'code analysis', 'sonar cloud'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // PROJECT / PROCESS / DESIGN TOOLS
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Jira', synonyms: ['jira', 'atlassian jira', 'jira software', 'jira project', 'jira tickets', 'jira issues', 'jira board', 'jira backlog'] },
   { canonical: 'Confluence', synonyms: ['confluence', 'atlassian confluence', 'confluence wiki', 'confluence pages'] },
   { canonical: 'Notion', synonyms: ['notion', 'notion.so', 'notion workspace', 'notion database'] },
@@ -453,9 +400,7 @@ const SKILLS = [
   { canonical: 'Makefile', synonyms: ['makefile', 'make', 'gnu make', 'makefile targets'] },
   { canonical: 'nx', synonyms: ['nx', 'nrwl nx', 'nx monorepo', 'nx workspace', 'turborepo', 'lerna', 'monorepo'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // SECURITY
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Cybersecurity', synonyms: ['cybersecurity', 'cyber security', 'information security', 'infosec', 'application security', 'appsec', 'cloud security', 'network security', 'security engineer'] },
   { canonical: 'Penetration Testing', synonyms: ['penetration testing', 'pen testing', 'pentest', 'ethical hacking', 'vulnerability assessment', 'red team', 'blue team'] },
   { canonical: 'OWASP', synonyms: ['owasp', 'owasp top 10', 'web application security', 'secure coding', 'security vulnerabilities', 'sqli', 'xss', 'csrf'] },
@@ -468,9 +413,7 @@ const SKILLS = [
   { canonical: 'DevSecOps', synonyms: ['devsecops', 'dev sec ops', 'security in devops', 'shift left security', 'secure sdlc'] },
   { canonical: 'SAST', synonyms: ['sast', 'static application security testing', 'dast', 'dynamic application security testing', 'dependency scanning', 'snyk', 'semgrep', 'checkmarx'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // METHODOLOGIES & PRACTICES
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Agile', synonyms: ['agile', 'agile methodology', 'agile development', 'agile framework', 'agile team', 'agile project management', 'agile ceremonies'] },
   { canonical: 'Scrum', synonyms: ['scrum', 'scrum methodology', 'sprint', 'scrum master', 'sprint planning', 'sprint review', 'sprint retrospective', 'daily standups', 'standup', 'backlog refinement'] },
   { canonical: 'Kanban', synonyms: ['kanban', 'kanban board', 'kanban methodology', 'kanban flow'] },
@@ -492,9 +435,7 @@ const SKILLS = [
   { canonical: 'Test Driven Development', synonyms: ['tdd', 'test first', 'red green refactor', 'unit test first'] },
   { canonical: 'Continuous Improvement', synonyms: ['continuous improvement', 'kaizen', 'retrospectives', 'blameless postmortem'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // SOFT SKILLS
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Communication', synonyms: ['communication', 'written communication', 'verbal communication', 'presentation skills', 'stakeholder communication', 'executive communication', 'technical communication'] },
   { canonical: 'Leadership', synonyms: ['leadership', 'team leadership', 'tech lead', 'technical leadership', 'engineering leadership', 'people management', 'team management'] },
   { canonical: 'Mentorship', synonyms: ['mentorship', 'mentoring', 'coaching', 'technical mentoring', 'knowledge transfer', 'onboarding'] },
@@ -508,9 +449,7 @@ const SKILLS = [
   { canonical: 'Customer Focus', synonyms: ['customer focus', 'customer centric', 'user focus', 'client focus', 'customer success', 'user experience focus'] },
   { canonical: 'Remote Work', synonyms: ['remote work', 'remote first', 'distributed team', 'async work', 'asynchronous work', 'work from home', 'wfh', 'hybrid work'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // JOB ROLES & TITLES
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Software Engineer', synonyms: ['software engineer', 'software developer', 'swe', 'software engineering', 'developer', 'programmer', 'coder', 'software architect', 'software professional'] },
   { canonical: 'Frontend Engineer', synonyms: ['frontend engineer', 'frontend developer', 'front end developer', 'front-end developer', 'front end engineer', 'ui developer', 'ui engineer', 'client side developer', 'react developer', 'vue developer', 'angular developer'] },
   { canonical: 'Backend Engineer', synonyms: ['backend engineer', 'backend developer', 'back end developer', 'back-end developer', 'server side developer', 'api developer', 'python developer', 'java developer', 'node developer', 'go developer'] },
@@ -550,9 +489,7 @@ const SKILLS = [
   { canonical: 'Game Developer', synonyms: ['game developer', 'game engineer', 'unity developer', 'unreal developer', 'game programming'] },
   { canonical: 'Blockchain Developer', synonyms: ['blockchain developer', 'web3 developer', 'smart contract developer', 'solidity developer', 'crypto developer', 'defi developer'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // MISCELLANEOUS TECH CONCEPTS
-  // ════════════════════════════════════════════════════════════════════════
   { canonical: 'Blockchain', synonyms: ['blockchain', 'block chain', 'decentralized', 'web3', 'ethereum', 'smart contracts', 'nft', 'defi', 'crypto', 'layer 2', 'polygon'] },
   { canonical: 'IoT', synonyms: ['iot', 'internet of things', 'embedded systems', 'firmware', 'rtos', 'edge computing', 'iot devices', 'raspberry pi', 'arduino', 'fpga'] },
   { canonical: 'AR/VR', synonyms: ['ar vr', 'augmented reality', 'virtual reality', 'mixed reality', 'xr', 'unity', 'unreal engine', 'spatial computing', 'metaverse', 'vr developer'] },
@@ -579,9 +516,7 @@ const SKILLS = [
   { canonical: 'Low-level Programming', synonyms: ['low level', 'systems programming', 'memory management', 'pointers', 'memory allocation', 'buffer management', 'bit manipulation'] },
   { canonical: 'Performance Optimization', synonyms: ['performance optimization', 'profiling', 'benchmarking', 'latency optimization', 'throughput optimization', 'performance tuning', 'code optimization'] },
 
-  // ════════════════════════════════════════════════════════════════════════
   // ADDITIONAL SKILLS — added to ensure ≥ 3000 unique lookup keys
-  // ════════════════════════════════════════════════════════════════════════
 
   // --- Additional Languages / Type Systems ---
   { canonical: 'OCaml', synonyms: ['ocaml', 'objective caml', 'ocaml programming', 'ocaml developer', 'ocaml language'] },
@@ -740,26 +675,29 @@ const SKILLS = [
 ];
 
 
-// ---------------------------------------------------------------------------
-// Build the output JSON
-// ---------------------------------------------------------------------------
-
 const outDir = `${ROOT}/public/data`;
 mkdirSync(outDir, { recursive: true });
 
-const totalCanonical = SKILLS.length;
+const totalCanonical: number = SKILLS.length;
 
-// Count total lookups (each canonical lowercase + each synonym)
 let totalLookups = 0;
 for (const s of SKILLS) {
-  totalLookups++; // canonical lowercased
+  totalLookups++;
   totalLookups += s.synonyms.length;
 }
 
 console.log(`Building skills dict: ${totalCanonical} canonical skills`);
 console.log(`Total lookup entries: ${totalLookups}`);
 
-const output = {
+interface SkillsDictOutput {
+  version: string;
+  source: string;
+  totalCanonical: number;
+  totalLookups: number;
+  skills: Skill[];
+}
+
+const output: SkillsDictOutput = {
   version: '1.0',
   source: 'bundled',
   totalCanonical,

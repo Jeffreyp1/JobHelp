@@ -1,29 +1,14 @@
 #!/usr/bin/env node
-/**
- * test-handler.mjs — POST a JSON request to the deployed Apps Script /exec URL
- * and pretty-print the response.
- *
- * Usage:
- *   node scripts/test-handler.mjs <action> [--field=value ...]
- *   echo '<json>' | node scripts/test-handler.mjs <action>
- *   node scripts/test-handler.mjs <action> < request.json
- *
- * Reads APPS_SCRIPT_URL from process.env or .env (manual parse, no dotenv dep).
- * Exit code: 0 if ok=true, 1 otherwise.
- */
+// POST a JSON request to the deployed Apps Script /exec URL and pretty-print the response.
 
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 
-const ACTIONS = [
+const ACTIONS: string[] = [
   'ping',
   'generate',
   'finalize',
@@ -41,7 +26,6 @@ const ACTIONS = [
   'multi_version',
 ];
 
-// Minimal ANSI codes — no chalk dep.
 const ANSI = {
   reset: '\x1b[0m',
   bold: '\x1b[1m',
@@ -52,23 +36,19 @@ const ANSI = {
   blue: '\x1b[34m',
   magenta: '\x1b[35m',
   cyan: '\x1b[36m',
-};
+} as const;
 
-const USE_COLOR = process.stdout.isTTY && !process.env.NO_COLOR;
-const c = (code, s) => (USE_COLOR ? `${code}${s}${ANSI.reset}` : s);
+const USE_COLOR: boolean = process.stdout.isTTY && !process.env.NO_COLOR;
+const c = (code: string, s: string): string => (USE_COLOR ? `${code}${s}${ANSI.reset}` : s);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Help
-// ─────────────────────────────────────────────────────────────────────────────
-
-function printHelp() {
+function printHelp(): void {
   const lines = [
-    `${c(ANSI.bold, 'test-handler.mjs')} — POST a JSON request to the deployed Apps Script /exec URL.`,
+    `${c(ANSI.bold, 'test-handler.mts')} — POST a JSON request to the deployed Apps Script /exec URL.`,
     '',
     `${c(ANSI.bold, 'USAGE')}`,
-    '  node scripts/test-handler.mjs <action> [--field=value ...]',
-    `  echo '<json>' | node scripts/test-handler.mjs <action>`,
-    '  node scripts/test-handler.mjs <action> < request.json',
+    '  node scripts/test-handler.mts <action> [--field=value ...]',
+    `  echo '<json>' | node scripts/test-handler.mts <action>`,
+    '  node scripts/test-handler.mts <action> < request.json',
     '',
     `${c(ANSI.bold, 'ENVIRONMENT')}`,
     '  APPS_SCRIPT_URL   Full /exec URL of the deployed Apps Script web app.',
@@ -86,35 +66,31 @@ function printHelp() {
     `${c(ANSI.bold, 'EXAMPLES')}`,
     `  ${c(ANSI.dim, '# Health check')}`,
     '  APPS_SCRIPT_URL=https://script.google.com/macros/s/.../exec \\',
-    '    node scripts/test-handler.mjs ping',
+    '    node scripts/test-handler.mts ping',
     '',
     `  ${c(ANSI.dim, '# List files in a Drive folder')}`,
-    '  node scripts/test-handler.mjs list_files \\',
+    '  node scripts/test-handler.mts list_files \\',
     '    --folderId=1abc... --folderType=rules',
     '',
     `  ${c(ANSI.dim, '# Pipe a full JSON body')}`,
-    `  echo '{"action":"ping"}' | node scripts/test-handler.mjs ping`,
+    `  echo '{"action":"ping"}' | node scripts/test-handler.mts ping`,
     '',
     `  ${c(ANSI.dim, '# Read from a JSON file')}`,
-    '  node scripts/test-handler.mjs generate < req.json',
+    '  node scripts/test-handler.mts generate < req.json',
     '',
   ];
   console.log(lines.join('\n'));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// .env parsing (manual — no dotenv dep)
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function loadEnvFile() {
+async function loadEnvFile(): Promise<Record<string, string>> {
   const envPath = join(ROOT, '.env');
-  let text;
+  let text: string;
   try {
     text = await readFile(envPath, 'utf8');
   } catch {
     return {};
   }
-  const out = {};
+  const out: Record<string, string> = {};
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
@@ -122,7 +98,6 @@ async function loadEnvFile() {
     if (eq === -1) continue;
     const key = line.slice(0, eq).trim();
     let val = line.slice(eq + 1).trim();
-    // Strip matching surrounding quotes.
     if (
       (val.startsWith('"') && val.endsWith('"')) ||
       (val.startsWith("'") && val.endsWith("'"))
@@ -134,23 +109,15 @@ async function loadEnvFile() {
   return out;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CLI argument parsing
-// ─────────────────────────────────────────────────────────────────────────────
+type FieldValue = string | number | boolean | null | unknown[] | Record<string, unknown>;
 
-/**
- * Parse `--key=value` flags into an object. Values are decoded as JSON when
- * they look like JSON (numbers, booleans, null, arrays, objects); otherwise
- * they remain plain strings.
- */
-function parseFlags(argv) {
-  const fields = {};
+function parseFlags(argv: string[]): Record<string, FieldValue> {
+  const fields: Record<string, FieldValue> = {};
   for (const arg of argv) {
     if (!arg.startsWith('--')) continue;
     const body = arg.slice(2);
     const eq = body.indexOf('=');
     if (eq === -1) {
-      // Bare flag: treat as boolean true.
       fields[body] = true;
       continue;
     }
@@ -161,23 +128,20 @@ function parseFlags(argv) {
   return fields;
 }
 
-function coerceValue(raw) {
-  // Numbers
+function coerceValue(raw: string): FieldValue {
   if (/^-?\d+(\.\d+)?$/.test(raw)) {
     const n = Number(raw);
     if (Number.isFinite(n)) return n;
   }
-  // Booleans / null
   if (raw === 'true') return true;
   if (raw === 'false') return false;
   if (raw === 'null') return null;
-  // JSON arrays / objects
   if (
     (raw.startsWith('[') && raw.endsWith(']')) ||
     (raw.startsWith('{') && raw.endsWith('}'))
   ) {
     try {
-      return JSON.parse(raw);
+      return JSON.parse(raw) as FieldValue;
     } catch {
       // fall through to string
     }
@@ -185,27 +149,18 @@ function coerceValue(raw) {
   return raw;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// stdin reader
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function readStdin() {
+async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
-  const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
   return Buffer.concat(chunks).toString('utf8').trim();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pretty JSON colourisation (lightweight — no jq dep)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function colourJson(json) {
+function colourJson(json: string): string {
   if (!USE_COLOR) return json;
-  // Strings (incl. keys), numbers, booleans, null.
   return json.replace(
     /("(\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|-?\d+(\.\d+)?([eE][+\-]?\d+)?/g,
-    (match, str, _esc, colon, kw) => {
+    (match: string, str: string | undefined, _esc: string | undefined, colon: string | undefined, kw: string | undefined): string => {
       if (str !== undefined) {
         return colon
           ? `${c(ANSI.cyan, str)}${colon}`
@@ -218,27 +173,25 @@ function colourJson(json) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Formatting helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function formatBytes(n) {
+function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function formatMs(ms) {
+function formatMs(ms: number): string {
   if (ms < 1000) return `${ms} ms`;
   return `${(ms / 1000).toFixed(2)} s`;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main
-// ─────────────────────────────────────────────────────────────────────────────
+interface ApiResponseBody {
+  ok?: boolean;
+  error?: { type?: string };
+  [k: string]: unknown;
+}
 
-async function main() {
-  const argv = process.argv.slice(2);
+async function main(): Promise<void> {
+  const argv: string[] = process.argv.slice(2);
 
   if (argv.length === 0 || argv.includes('--help') || argv.includes('-h')) {
     printHelp();
@@ -257,9 +210,8 @@ async function main() {
     process.exit(1);
   }
 
-  // Resolve APPS_SCRIPT_URL: env var wins, .env file is fallback.
   const envFile = await loadEnvFile();
-  const url = process.env.APPS_SCRIPT_URL || envFile.APPS_SCRIPT_URL;
+  const url: string | undefined = process.env.APPS_SCRIPT_URL || envFile.APPS_SCRIPT_URL;
   if (!url) {
     console.error(c(ANSI.red, 'Error: APPS_SCRIPT_URL is not set.'));
     console.error('');
@@ -271,22 +223,21 @@ async function main() {
     process.exit(1);
   }
 
-  // Build the request body. Precedence: stdin JSON > --flag fields. The action
-  // from argv[0] always wins (so users can't accidentally mismatch action and body).
+  // stdin JSON < --flag fields < action from argv[0] (last wins).
   const flagFields = parseFlags(argv.slice(1));
   const stdinText = await readStdin();
 
-  let body;
+  let body: Record<string, unknown>;
   if (stdinText) {
     try {
-      const parsed = JSON.parse(stdinText);
+      const parsed: unknown = JSON.parse(stdinText);
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         console.error(c(ANSI.red, 'Error: stdin JSON must be an object.'));
         process.exit(1);
       }
-      body = { ...parsed, ...flagFields, action };
+      body = { ...(parsed as Record<string, unknown>), ...flagFields, action };
     } catch (err) {
-      console.error(c(ANSI.red, `Error: stdin is not valid JSON — ${err.message}`));
+      console.error(c(ANSI.red, `Error: stdin is not valid JSON — ${(err as Error).message}`));
       process.exit(1);
     }
   } else {
@@ -296,25 +247,23 @@ async function main() {
   const payload = JSON.stringify(body);
   const requestBytes = Buffer.byteLength(payload, 'utf8');
 
-  // Header
   console.log(c(ANSI.bold, `→ POST ${url}`));
   console.log(`  ${c(ANSI.dim, 'action:')} ${c(ANSI.cyan, action)}`);
   console.log(`  ${c(ANSI.dim, 'request:')} ${formatBytes(requestBytes)}`);
   console.log('');
 
   const started = Date.now();
-  let response;
+  let response: Response;
   try {
     response = await fetch(url, {
       method: 'POST',
-      // Apps Script accepts JSON bodies under text/plain too; either content-type works.
       headers: { 'Content-Type': 'application/json' },
       body: payload,
       redirect: 'follow',
     });
   } catch (err) {
     const elapsed = Date.now() - started;
-    console.error(c(ANSI.red, `✗ Network error after ${formatMs(elapsed)}: ${err.message}`));
+    console.error(c(ANSI.red, `✗ Network error after ${formatMs(elapsed)}: ${(err as Error).message}`));
     process.exit(1);
   }
   const elapsed = Date.now() - started;
@@ -327,12 +276,10 @@ async function main() {
   console.log(`  ${c(ANSI.dim, 'time:')}     ${formatMs(elapsed)}`);
   console.log('');
 
-  // Parse and pretty-print.
-  let parsed;
+  let parsed: ApiResponseBody;
   try {
-    parsed = JSON.parse(responseText);
+    parsed = JSON.parse(responseText) as ApiResponseBody;
   } catch {
-    // Not JSON — print raw and exit non-zero.
     console.log(c(ANSI.yellow, '⚠ Response is not valid JSON:'));
     console.log(responseText);
     process.exit(1);
@@ -342,7 +289,6 @@ async function main() {
   console.log(colourJson(pretty));
   console.log('');
 
-  // Status line + exit code.
   if (parsed && parsed.ok === true) {
     console.log(c(ANSI.green, '✓ ok=true'));
     process.exit(0);
@@ -356,7 +302,8 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error(c(ANSI.red, `Fatal: ${err.stack || err.message || err}`));
+main().catch((err: unknown) => {
+  const e = err as Error;
+  console.error(c(ANSI.red, `Fatal: ${e.stack || e.message || String(err)}`));
   process.exit(1);
 });

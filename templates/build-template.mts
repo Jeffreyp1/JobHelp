@@ -1,27 +1,9 @@
-/**
- * build-template.mjs
- *
- * Generates the engineering-resume-template.docx that ships with JobHelp.
- *
- * The template is a standard .docx file with docxtemplater placeholders
- * embedded as plain text — e.g. `{name}`, `{#experiences}…{/experiences}`.
- *
- * Visual formatting (bold, tab stops, bullet glyphs, line spacing) lives in
- * the run/paragraph properties around the placeholders, so when docxtemplater
- * substitutes data the result inherits the template's appearance.
- *
- * Run:
- *   node templates/build-template.mjs
- *
- * Output:
- *   templates/engineering-resume-template.docx
- */
+// Generates templates/engineering-resume-template.docx with docxtemplater placeholders.
 
 import {
   AlignmentType,
   BorderStyle,
   Document,
-  LevelFormat,
   Packer,
   Paragraph,
   Tab,
@@ -29,6 +11,8 @@ import {
   TabStopType,
   TextRun,
 } from 'docx';
+
+type RunOpts = ConstructorParameters<typeof TextRun>[0];
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,27 +21,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = __dirname;
 const OUT_PATH = join(OUT_DIR, 'engineering-resume-template.docx');
 
-// ─── Style profile (matches the user's screenshot) ─────────────────────────
 const FONT = 'Calibri';
-const NAME_SIZE = 44;          // 22pt
-const BODY_SIZE = 20;          // 10pt
-const HEADING_SIZE = 22;       // 11pt
-const BULLET_GLYPH = '●'; // ●
+const NAME_SIZE = 44;
+const BODY_SIZE = 20;
+const HEADING_SIZE = 22;
+const BULLET_GLYPH = '●';
 const MARGINS = { top: 720, bottom: 720, left: 1080, right: 1080 };
 const PARA_SPACING = { before: 40, after: 40 };
 const HEADING_SPACING = { before: 160, after: 60 };
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-/** Plain run (body size, no bold). */
-const run = (text, opts = {}) =>
+const run = (text: string, opts: Partial<RunOpts> = {}): TextRun =>
   new TextRun({ text, font: FONT, size: BODY_SIZE, ...opts });
 
-/** Bold run. */
-const boldRun = (text, opts = {}) => run(text, { bold: true, ...opts });
+const boldRun = (text: string, opts: Partial<RunOpts> = {}): TextRun => run(text, { bold: true, ...opts });
 
-/** Section heading: bold + bottom border line. */
-function sectionHeading(text) {
+function sectionHeading(text: string): Paragraph {
   return new Paragraph({
     spacing: HEADING_SPACING,
     border: {
@@ -69,8 +47,7 @@ function sectionHeading(text) {
   });
 }
 
-/** Right-aligned tab paragraph with leading bold + a tab + right-side text. */
-function leftBoldRightTabPara(leftRuns, rightRuns) {
+function leftBoldRightTabPara(leftRuns: TextRun[], rightRuns: TextRun[]): Paragraph {
   return new Paragraph({
     spacing: PARA_SPACING,
     tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
@@ -82,8 +59,7 @@ function leftBoldRightTabPara(leftRuns, rightRuns) {
   });
 }
 
-/** Bullet paragraph using docxtemplater's loop body markup. */
-function bulletPara(children) {
+function bulletPara(children: TextRun[]): Paragraph {
   return new Paragraph({
     spacing: { before: 0, after: 40 },
     indent: { left: 360, hanging: 220 },
@@ -94,11 +70,8 @@ function bulletPara(children) {
   });
 }
 
-// ─── Build the template paragraphs in order ───────────────────────────────
+const paragraphs: Paragraph[] = [];
 
-const paragraphs = [];
-
-// Name (centered, bold, large)
 paragraphs.push(
   new Paragraph({
     alignment: AlignmentType.CENTER,
@@ -109,7 +82,6 @@ paragraphs.push(
   }),
 );
 
-// Contact (centered)
 paragraphs.push(
   new Paragraph({
     alignment: AlignmentType.CENTER,
@@ -118,9 +90,7 @@ paragraphs.push(
   }),
 );
 
-// SKILLS section
 paragraphs.push(sectionHeading('Skills'));
-// Loop: each skill on its own line, "**Category:** items"
 paragraphs.push(
   new Paragraph({
     spacing: PARA_SPACING,
@@ -143,12 +113,10 @@ paragraphs.push(
   }),
 );
 
-// EXPERIENCE section
 paragraphs.push(sectionHeading('Experience'));
 paragraphs.push(
   new Paragraph({ spacing: PARA_SPACING, children: [run('{#experiences}')] }),
 );
-// Header line: **Title,** Company – City, State    [tab] dateRange
 paragraphs.push(
   leftBoldRightTabPara(
     [
@@ -161,7 +129,6 @@ paragraphs.push(
     [run('{dateRange}')],
   ),
 );
-// Loop bullets: ● **{lead}:** {rest}
 paragraphs.push(
   new Paragraph({ spacing: PARA_SPACING, children: [run('{#bullets}')] }),
 );
@@ -175,12 +142,10 @@ paragraphs.push(
   new Paragraph({ spacing: PARA_SPACING, children: [run('{/experiences}')] }),
 );
 
-// PROJECTS section
 paragraphs.push(sectionHeading('Projects'));
 paragraphs.push(
   new Paragraph({ spacing: PARA_SPACING, children: [run('{#projects}')] }),
 );
-// Header line: **Title** — *tech stack* (inline, italic plain black)
 paragraphs.push(
   new Paragraph({
     spacing: PARA_SPACING,
@@ -191,7 +156,6 @@ paragraphs.push(
     ],
   }),
 );
-// Bullets: support **lead:** rest format like experience bullets
 paragraphs.push(
   new Paragraph({ spacing: PARA_SPACING, children: [run('{#bullets}')] }),
 );
@@ -209,7 +173,6 @@ paragraphs.push(
   new Paragraph({ spacing: PARA_SPACING, children: [run('{/projects}')] }),
 );
 
-// EDUCATION section
 paragraphs.push(sectionHeading('Education'));
 paragraphs.push(
   new Paragraph({ spacing: PARA_SPACING, children: [run('{#education}')] }),
@@ -223,8 +186,6 @@ paragraphs.push(
 paragraphs.push(
   new Paragraph({ spacing: PARA_SPACING, children: [run('{/education}')] }),
 );
-
-// ─── Build & write document ────────────────────────────────────────────────
 
 const doc = new Document({
   creator: 'JobHelp',

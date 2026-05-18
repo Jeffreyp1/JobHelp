@@ -29,7 +29,7 @@ If you have already used a v0.2.0-or-earlier install, see the migration note in 
 This step is unchanged in v0.2.1. The Apps Script project reads/writes your Drive, calls Claude, and appends rows to your tracking sheet — all under your Google identity. Follow Step 3 of the legacy guide:
 
 - See [SETUP.md, Step 3 ("Deploy the Apps Script backend")](../SETUP.md#step-3-deploy-the-apps-script-backend) for the click-by-click flow.
-- Build the bundle first: `node appsscript/scripts/build.mjs` produces eight `.gs` files in `appsscript/dist/`.
+- Build the bundle first: `node appsscript/scripts/build.mts` produces eight `.gs` files in `appsscript/dist/`.
 - Copy each compiled file into a new Apps Script project, deploy as a **Web app** (execute as **Me**, access **Only myself**), and copy the resulting `/exec` URL somewhere — you will paste it into your config file in Step 3 below.
 
 ## Step 2: Set the Anthropic API key in Apps Script Properties
@@ -81,7 +81,7 @@ The extension is not yet on the Chrome Web Store, so install it via developer mo
 git clone https://github.com/<your-fork>/JobHelp.git
 cd JobHelp
 npm install
-node extension/scripts/build.mjs
+node extension/scripts/build.mts
 ```
 
 Then:
