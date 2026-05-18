@@ -149,6 +149,12 @@ const ROLE_NOUN = '(?:engineer|developer|swe|sde)';
 const SENIORITY_DESC_RULES: readonly SeniorityRule[] = [
   { pattern: /\b(intern|internship|new ?grad)\b/i, level: 'intern' },
   { pattern: new RegExp(`\\b(staff|principal|distinguished)\\s+${ROLE_NOUN}\\b`, 'i'), level: 'staff' },
+  // 5+ years (or higher) of experience/industry/professional is a strong senior signal; sub-5
+  // year counts (2+, 3+, 4+) are ambiguous between entry and mid so they stay signal-less.
+  {
+    pattern: /\b(?:[5-9]|[12]\d)(?:[\s-]+\d+)?\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:experience|exp(?:erience)?|industry|professional|relevant)\b/i,
+    level: 'senior',
+  },
   {
     pattern: new RegExp(`\\b(senior|forward[\\s-]+deployed|head of|lead)\\s+${ROLE_NOUN}\\b`, 'i'),
     level: 'senior',
@@ -163,7 +169,8 @@ const SENIORITY_DESC_RULES: readonly SeniorityRule[] = [
   },
 ];
 
-const DESCRIPTION_SCAN_LIMIT = 500;
+// 3000 covers qualifications section where "X+ years required" typically lives.
+const DESCRIPTION_SCAN_LIMIT = 3000;
 
 function scanRules(text: string, rules: readonly SeniorityRule[]): SeniorityLevel | undefined {
   for (const rule of rules) {
