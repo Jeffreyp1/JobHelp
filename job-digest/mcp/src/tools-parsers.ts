@@ -6,6 +6,7 @@ import type {
   InitConfigArgs,
   ListApplicationVersionsArgs,
   RegisterResumeArgs,
+  RerankTopJobsArgs,
   RulesMode,
   ScoreKeywordMatchArgs,
   SetActiveResumeArgs,
@@ -181,6 +182,38 @@ export function parseListApplicationVersions(
 
 export function parseEmpty(_obj: Record<string, unknown>): Result<Record<string, never>, ToolError> {
   return { ok: true, value: {} };
+}
+
+const RERANK_MAX_TOP_K = 50;
+const RERANK_MAX_INSTRUCTIONS_CHARS = 1000;
+
+export function parseRerankTopJobs(
+  obj: Record<string, unknown>,
+): Result<RerankTopJobsArgs, ToolError> {
+  if ('fetchFullJDs' in obj && obj['fetchFullJDs'] !== undefined) {
+    return bad('fetchFullJDs is not a valid parameter');
+  }
+  const out: { topK?: number; instructions?: string } = {};
+  if ('topK' in obj) {
+    const raw = obj['topK'];
+    if (raw !== undefined) {
+      if (!isNumber(raw)) return bad('topK must be a number');
+      if (raw < 1) return bad('topK must be >= 1');
+      if (raw > RERANK_MAX_TOP_K) return bad(`topK must be <= ${RERANK_MAX_TOP_K}`);
+      out.topK = raw;
+    }
+  }
+  if ('instructions' in obj) {
+    const raw = obj['instructions'];
+    if (raw !== undefined) {
+      if (!isString(raw)) return bad('instructions must be a string');
+      if (raw.length > RERANK_MAX_INSTRUCTIONS_CHARS) {
+        return bad(`instructions must be <= ${RERANK_MAX_INSTRUCTIONS_CHARS} chars`);
+      }
+      out.instructions = raw;
+    }
+  }
+  return { ok: true, value: out };
 }
 
 const KNOWN_SOURCES = ['adzuna', 'greenhouse', 'lever', 'remotive', 'remoteok'] as const;
