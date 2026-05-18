@@ -70,6 +70,7 @@ extension/tests/
 job-digest/tests/
 tests/contracts/
 tests/smoke/
+tests/local/
 tests/fixtures/_validate.test.ts
 prompts/shared/_validate.test.ts
 **/*.test.ts
