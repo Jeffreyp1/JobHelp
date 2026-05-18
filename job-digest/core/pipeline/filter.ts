@@ -15,10 +15,6 @@ function seniorityIndex(level: Seniority): number {
   return SENIORITY_LADDER.indexOf(level);
 }
 
-function dropsForGhost(job: NormalizedJob): boolean {
-  return isGhostJob(job);
-}
-
 function dropsForRoleFamily(job: NormalizedJob, config: JobDigestConfig): boolean {
   if (config.profile.roleFamily.length === 0) return false;
   const detected = detectRoleFamily(job.title, job.description);
@@ -31,9 +27,7 @@ function dropsForStrictSenior(job: NormalizedJob, config: JobDigestConfig): bool
   return STRICT_SENIOR_TITLE_RE.test(job.title);
 }
 
-// Intern + new-grad postings should only survive when the profile is itself seeking intern roles.
-// Existing distance rule (>=2 steps) keeps intern visible for entry profiles (distance 1); this
-// helper closes that gap explicitly so an "entry" candidate doesn't get summer-internship noise.
+// Closes the gap left by the >=2-step seniority-distance rule (intern vs entry = distance 1).
 function dropsForInternMismatch(job: NormalizedJob, config: JobDigestConfig): boolean {
   if (config.profile.seniority === 'intern') return false;
   return INTERN_TITLE_RE.test(job.title);
@@ -49,8 +43,6 @@ function dropsForSeniorInTitle(job: NormalizedJob, config: JobDigestConfig): boo
   return SENIOR_TITLE_RE.test(job.title);
 }
 
-// Conservative: drops "Lead Backend Engineer" for entry profiles.
-// Intern handling is fully delegated to dropsForInternMismatch, which runs before this.
 function dropsForLeadInTitle(job: NormalizedJob, config: JobDigestConfig): boolean {
   if (config.profile.seniority !== 'entry') return false;
   return LEAD_TITLE_RE.test(job.title);
@@ -60,28 +52,15 @@ function dropsForRemote(job: NormalizedJob, config: JobDigestConfig): boolean {
   return job.remote === 'remote' && config.profile.remoteOk === false;
 }
 
-// Geo allowlist: lenient on bare 'Remote' (undetected country survives) so
-// remote postings without a stated region aren't accidentally filtered. Strict
-// when the location names a confidently non-allowlist country or region.
-// Note: allowedCountries values are matched LITERALLY against detectCountryFromLocation's
-// output. Regional buckets ('EU', 'APAC', 'LATAM') don't subsume their member countries —
-// `['EU']` keeps "Remote - Europe" but drops "Remote - Germany". Users wanting
-// pan-European coverage should list `['EU', 'Germany', 'France', 'Spain', ...]`.
+// allowedCountries matches detectCountryFromLocation output LITERALLY; region buckets
+// ('EU', 'APAC', 'LATAM') do NOT subsume member countries. Bare 'Remote' (undetected) survives.
+// Remote vs non-remote branches collapsed: both returned identical values for every (detected, allowlist) pair.
 function dropsForCountry(job: NormalizedJob, profile: ProfileConfig): boolean {
   const allowlist = profile.allowedCountries;
   if (allowlist === undefined || allowlist.length === 0) return false;
-
   const detected = detectCountryFromLocation(job.location);
-
-  if (job.remote === 'remote') {
-    if (detected === undefined) return false;
-    if (allowlist.includes(detected)) return false;
-    return true;
-  }
-
   if (detected === undefined) return false;
-  if (allowlist.includes(detected)) return false;
-  return true;
+  return !allowlist.includes(detected);
 }
 
 function dropsForSalary(job: NormalizedJob, config: JobDigestConfig): boolean {
@@ -95,11 +74,10 @@ function dropsForSeniority(job: NormalizedJob, config: JobDigestConfig): boolean
   return distance >= 2;
 }
 
-// Boundary: a job with ageDays exactly equal to cfg.days is KEPT (strict >).
-// `days: 1` means "today + yesterday survive"; jobs older than 1 day drop.
+// Boundary: ageDays exactly equal to cfg.days is KEPT (strict >).
 export function dropForAge(job: NormalizedJob, cfg: MaxAgeConfig, now: Date): boolean {
   if (!cfg.enabled) return false;
-  // Empty string treated as absent (lenient): some adapters emit '' as a sentinel.
+  // Empty string treated as absent: some adapters emit '' as a sentinel.
   if (job.postedAt === undefined || job.postedAt === '') {
     if (cfg.requireDate) {
       log('debug', 'filter.drop_age_undated', { id: job.id, source: job.source });
@@ -108,10 +86,7 @@ export function dropForAge(job: NormalizedJob, cfg: MaxAgeConfig, now: Date): bo
     return false;
   }
   if (!Number.isFinite(now.getTime())) {
-    log('warn', 'filter.drop_age_invalid_now', {
-      id: job.id,
-      source: job.source,
-    });
+    log('warn', 'filter.drop_age_invalid_now', { id: job.id, source: job.source });
     return false;
   }
   const posted = Date.parse(job.postedAt);
@@ -136,27 +111,9 @@ export function dropForAge(job: NormalizedJob, cfg: MaxAgeConfig, now: Date): bo
   return false;
 }
 
-/**
- * Drop jobs that are confidently incompatible with the profile.
- *
- *   - ghost / template / placeholder titles, or descriptions too short to be real postings
- *   - role-family mismatch (only when the profile opts in via non-empty roleFamily)
- *   - strict-senior: staff/principal/director titles for intern/entry/mid profiles
- *   - intern-mismatch: intern/internship/new-grad titles for non-intern profiles
- *   - remote-only postings when the candidate is onsite-only
- *   - country mismatch when profile.allowedCountries is non-empty (lenient on bare 'Remote')
- *   - salaryMax below the candidate's salary floor
- *   - seniority signal in title/description >=2 steps from the candidate's level
- *   - postedAt older than config.ranking.maxAge.days (toggleable; lenient on missing date)
- *
- * Missing data NEVER drops — only confidently incompatible postings are removed,
- * except when `maxAge.requireDate` is true (strict mode).
- * Drop order is fixed so ghost/role-family run before the cheaper field checks;
- * age runs LAST so log messages for date-shaped drops surface only after structural
- * mismatches are already filtered.
- *
- * `now` is injectable so tests can pin the clock; defaults to wall-clock at call time.
- */
+// Drop order: ghost/role-family run before cheaper field checks; age runs LAST so date-shaped
+// drop logs surface only after structural mismatches are already filtered.
+// Invariant: missing data NEVER drops (except when maxAge.requireDate=true).
 export async function filter(
   jobs: readonly NormalizedJob[],
   config: JobDigestConfig,
@@ -164,7 +121,7 @@ export async function filter(
 ): Promise<readonly NormalizedJob[]> {
   const out: NormalizedJob[] = [];
   for (const job of jobs) {
-    if (dropsForGhost(job)) {
+    if (isGhostJob(job)) {
       log('warn', 'filter.drop_ghost', { id: job.id, source: job.source, reason: 'ghost_or_template' });
       continue;
     }
@@ -186,19 +143,11 @@ export async function filter(
       continue;
     }
     if (dropsForEngineerLevel(job, config)) {
-      log('debug', 'filter.drop_engineer_level', {
-        id: job.id,
-        source: job.source,
-        title: job.title,
-      });
+      log('debug', 'filter.drop_engineer_level', { id: job.id, source: job.source, title: job.title });
       continue;
     }
     if (dropsForSeniorInTitle(job, config)) {
-      log('debug', 'filter.drop_senior_in_title', {
-        id: job.id,
-        source: job.source,
-        title: job.title,
-      });
+      log('debug', 'filter.drop_senior_in_title', { id: job.id, source: job.source, title: job.title });
       continue;
     }
     if (dropsForInternMismatch(job, config)) {
@@ -210,11 +159,7 @@ export async function filter(
       continue;
     }
     if (dropsForLeadInTitle(job, config)) {
-      log('debug', 'filter.drop_lead_in_title', {
-        id: job.id,
-        source: job.source,
-        title: job.title,
-      });
+      log('debug', 'filter.drop_lead_in_title', { id: job.id, source: job.source, title: job.title });
       continue;
     }
     if (dropsForRemote(job, config)) {

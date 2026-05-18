@@ -87,13 +87,8 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
   { pattern: /designer|design engineer|ux engineer/i, family: 'designer' },
 ];
 
-/**
- * Title-first regex classifier. Returns undefined when no rule confidently matches
- * (so the filter's missing-data-never-drops invariant holds).
- *
- * The `description` parameter is reserved for a future tiebreaker pass; the current
- * implementation is intentionally title-only — descriptions are too noisy to classify on.
- */
+// Title-only classifier; descriptions are too noisy. Returns undefined when no rule matches
+// (preserves the filter's missing-data-never-drops invariant). `_description` reserved for a future tiebreaker.
 export function detectRoleFamily(
   title: string,
   _description: string,
@@ -114,11 +109,7 @@ function stripHtml(s: string): string {
   return s.replace(HTML_TAG_RE, ' ').replace(WHITESPACE_RUN_RE, ' ').trim();
 }
 
-/**
- * Detects "ghost" / template / placeholder postings that should never enter the digest.
- * Two signals: title pattern OR descriptions shorter than {@link DESCRIPTION_MIN_CHARS}
- * after a cheap HTML strip.
- */
+// Detects template/placeholder postings via title pattern OR description too short after HTML strip.
 // TODO_FUTURE: duplicate-posting detection (same title+company within 7 days) requires digest history; defer.
 export function isGhostJob(job: { readonly title: string; readonly description: string }): boolean {
   if (GHOST_TITLE_RE.test(job.title)) return true;
@@ -179,17 +170,8 @@ function scanRules(text: string, rules: readonly SeniorityRule[]): SeniorityLeve
   return undefined;
 }
 
-/**
- * Returns a confident seniority signal from the title; falls back to the first
- * {@link DESCRIPTION_SCAN_LIMIT} characters of the description ONLY when the title
- * yields nothing. Returns undefined when neither surface gives a clear signal —
- * callers must NOT default to a level (preserves missing-data-never-drops).
- *
- * Description fallback uses TIGHTER patterns (level + role-noun) so generic mentions
- * like "we are hiring senior engineers" (plural; no word-boundary after "engineer")
- * are intentionally ignored, while a posting that literally describes itself as a
- * "staff engineer" / "senior engineer" still triggers.
- */
+// Title first; description fallback uses tighter level+role-noun patterns so generic mentions
+// ("we are hiring senior engineers") don't trip. Returns undefined when neither surface signals.
 export function detectSeniorityLevel(
   title: string,
   description: string,
@@ -238,15 +220,8 @@ const COUNTRY_RULES: ReadonlyArray<CountryRule> = [
   { pattern: /\b(aunz|anz)\b/i, country: 'Australia' },
 ];
 
-/**
- * Best-effort country detection from a free-form location string.
- * Returns the canonical country label, or undefined when no rule confidently
- * matches (preserving the filter's missing-data-never-drops invariant).
- *
- * Region buckets ('EU', 'APAC', 'LATAM') are emitted for broad descriptors
- * like 'Remote - Europe' so the filter can drop confidently-non-allowlist
- * regions while leaving bare 'Remote' undetected.
- */
+// Returns canonical country label or undefined when no rule matches (bare 'Remote' stays undetected).
+// Region buckets ('EU', 'APAC', 'LATAM') are emitted for broad descriptors like 'Remote - Europe'.
 export function detectCountryFromLocation(location: string): string | undefined {
   if (typeof location !== 'string' || location.trim().length === 0) return undefined;
   for (const rule of COUNTRY_RULES) {

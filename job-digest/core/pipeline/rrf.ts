@@ -13,23 +13,7 @@ export interface RankedList<T> {
 
 export const RRF_K = 60;
 
-/**
- * Reciprocal Rank Fusion (Cormack et al. 2009).
- *
- * For each ranked list, every entry contributes `1 / (k + rank)` to its job's
- * cumulative score; jobs missing from a list contribute 0 (they're effectively
- * ranked at infinity). The fused score is the sum across all lists.
- *
- * Lists must be pre-sorted by their signal and use 1-indexed ranks (top job is
- * rank 1). Each list MAY contain a different subset of the global pool;
- * `keyFn(job)` is the join key.
- *
- * Returns a map keyed by `keyFn(job)`. Empty input → empty map.
- *
- * `k` defaults to 60 (the constant from Cormack's original paper). Invalid
- * `k` (non-finite or <= 0) falls back to 60 for numerical safety; this is a
- * defensive guard, not a user-facing API.
- */
+// Reciprocal Rank Fusion (Cormack et al. 2009): each list contributes 1/(k+rank); missing jobs contribute 0.
 export function computeRrf<T>(
   lists: readonly RankedList<T>[],
   keyFn: (job: T) => string,
@@ -54,23 +38,7 @@ export function computeRrf<T>(
   return scores;
 }
 
-function jobKey(j: NormalizedJob): string {
-  return j.id;
-}
-
-/**
- * Build a recency-ranked list from a job pool.
- *
- * Sort order: most-recent `postedAt` first. Undated jobs (missing or empty
- * `postedAt`, unparseable timestamps) sink to the END — they get the worst
- * rank in the recency dimension, so they contribute the smallest RRF
- * increment. This preserves the missing-data-never-drops invariant (they
- * still appear in the pool) while letting dated postings dominate when
- * recency matters.
- *
- * Ranks are 1-indexed and dense (no gaps); ties are broken by id for
- * determinism.
- */
+// Undated jobs sink to the end (NEGATIVE_INFINITY ts) so they get the worst recency rank but still appear.
 export function buildRecencyRank(
   jobs: readonly NormalizedJob[],
 ): RankedList<NormalizedJob> {
@@ -90,11 +58,6 @@ export function buildRecencyRank(
   };
 }
 
-/**
- * Build a BM25F-ranked list. Caller supplies the per-job BM25F scores keyed
- * by `job.id`. Jobs missing from the score map default to 0. Higher score →
- * better rank. Ties broken by id for determinism.
- */
 export function buildBm25Rank(
   jobs: readonly NormalizedJob[],
   scoresById: ReadonlyMap<string, number>,
@@ -112,20 +75,7 @@ export function buildBm25Rank(
   };
 }
 
-/**
- * Build a role-fit ranked list against the candidate's preferred role families.
- *
- * Strength tiers (best → worst):
- *   2: detected family is in the candidate's roleFamily list
- *   1: title yields no detected family (ambiguous — neither penalty nor reward)
- *   0: detected family is OUTSIDE the candidate's roleFamily list
- *
- * When `roleFamily` is empty (no preference), the list is irrelevant — every
- * job gets tier 1 and the RRF contribution is uniform across the pool,
- * effectively degrading to 2-list fusion.
- *
- * Ties broken by id for determinism.
- */
+// Role-fit tiers: 2 = preferred family, 1 = undetected (neutral), 0 = non-preferred family.
 export function buildRoleFitRank(
   jobs: readonly NormalizedJob[],
   preferredFamilies: readonly string[],
