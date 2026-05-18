@@ -59,6 +59,7 @@ export function uninitializedCoreDeps(loadErr: ConfigError): CoreDeps {
     listApplicationVersions: async () => err(notConfigured),
     listRecentApplications: async () => err(notConfigured),
     validateSources: async () => err(notConfigured),
+    rerankTopJobs: async () => err(notConfigured),
   };
 }
 
