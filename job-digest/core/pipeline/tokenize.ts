@@ -12,26 +12,11 @@ const DOMAIN_TOKENS = [
 const SPLIT_RE = /[\s,;:!?()[\]{}|<>"`'~@$%^&*=]+/;
 const PLACEHOLDER_RE = /^jhdomXX([0-9a-z]+)XXjhdom$/;
 
-function buildDomainRegex(): RegExp {
-  const parts = DOMAIN_TOKENS.map((t) => escapeRegExp(t)).join('|');
-  return new RegExp(`(?:${parts})`, 'gi');
-}
+const DOMAIN_RE = new RegExp(
+  `(?:${DOMAIN_TOKENS.map((t) => escapeRegExp(t)).join('|')})`,
+  'gi',
+);
 
-const DOMAIN_RE = buildDomainRegex();
-
-/**
- * Tokenize a string into lowercased terms.
- *
- * - Multi-word phrases (e.g. "amazon web services") are joined with `_` before
- *   the generic split, preserving them as single tokens.
- * - Domain tokens like `c++`, `c#`, `.net`, `node.js` are preserved via a
- *   pre-pass that maps them to opaque placeholder strings (no digits, so they
- *   survive the generic split and restore unambiguously after split).
- * - Splits on whitespace and most punctuation; hyphens and slashes inside a
- *   non-domain token are kept (so `forward-deployed` stays one token).
- * - Drops tokens with length < 2.
- * - Returns an empty array for empty input.
- */
 export function tokenize(
   text: string,
   multiWordPhrases: readonly string[] = [],
@@ -47,6 +32,7 @@ export function tokenize(
     working = working.replace(re, joined);
   }
 
+  // Map domain tokens to opaque placeholders so they survive the generic split.
   const placeholders: string[] = [];
   working = working.replace(DOMAIN_RE, (match) => {
     const idx = placeholders.length;
