@@ -40,6 +40,7 @@ export interface SourcesConfig {
   readonly adzuna?: AdzunaConfig;
   readonly greenhouse?: GreenhouseConfig;
   readonly lever?: LeverConfig;
+  readonly ashby?: AshbyConfig;
   readonly usajobs?: UsaJobsConfig;
   readonly jsearch?: JSearchConfig;
   readonly remotive?: RemotiveConfig;
@@ -62,6 +63,11 @@ export interface GreenhouseConfig {
 export interface LeverConfig {
   /** Public lever client slugs, e.g. ["plaid", "anthropic"]. */
   readonly slugs: readonly string[];
+}
+
+export interface AshbyConfig {
+  /** Public Ashby job board tokens, e.g. ["ramp", "notion"]. */
+  readonly tokens: readonly string[];
 }
 
 export interface UsaJobsConfig {
