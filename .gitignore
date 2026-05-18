@@ -72,6 +72,10 @@ tests/contracts/
 tests/smoke/
 tests/local/
 tests/fixtures/_validate.test.ts
+
+# Superpowers planning/spec docs — maintained locally only
+docs/superpowers/plans/
+docs/superpowers/specs/2026-05-17-resume-tailor-validator-design.md
 prompts/shared/_validate.test.ts
 **/*.test.ts
 **/*.test.mts
