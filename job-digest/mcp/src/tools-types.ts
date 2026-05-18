@@ -1,6 +1,6 @@
 import type { Result } from '../../core/types/result.js';
 import type { JobId, NormalizedJob } from '../../core/types/job.js';
-import type { RankedJob } from '../../core/types/pipeline.js';
+import type { RankedJob, ScoreBreakdown } from '../../core/types/pipeline.js';
 
 export interface InitConfigArgs {
   readonly interactive?: boolean;
@@ -161,6 +161,37 @@ export interface ListRecentApplicationsResult {
   readonly applications: readonly RecentApplication[];
 }
 
+export interface RerankTopJobsArgs {
+  readonly topK?: number;
+  readonly instructions?: string;
+}
+
+export interface RerankJobSummary {
+  readonly id: string;
+  readonly title: string;
+  readonly company: string;
+  readonly location: string;
+  readonly remote: 'remote' | 'hybrid' | 'onsite' | 'unknown';
+  readonly postedAt?: string;
+  readonly url: string;
+  readonly description: string;
+  readonly score: number;
+  readonly breakdown: ScoreBreakdown;
+}
+
+export interface RerankTopJobsResult {
+  readonly jobs: readonly RerankJobSummary[];
+  readonly resume: { readonly name: string; readonly content: string };
+  readonly rerank_prompt: string;
+  readonly summary: {
+    readonly topK: number;
+    readonly resumeChars: number;
+    readonly totalJDBytes: number;
+    readonly digestDate: string;
+    readonly digestPath: string;
+  };
+}
+
 export interface ValidateSourcesArgs {
   readonly source?: string;
 }
@@ -235,6 +266,9 @@ export interface CoreDeps {
   readonly validateSources: (
     args: ValidateSourcesArgs,
   ) => Promise<Result<ValidateSourcesResult, ToolError>>;
+  readonly rerankTopJobs: (
+    args: RerankTopJobsArgs,
+  ) => Promise<Result<RerankTopJobsResult, ToolError>>;
 }
 
 export interface ToolJsonSchema {

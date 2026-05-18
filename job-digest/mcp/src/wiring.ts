@@ -30,6 +30,7 @@ import {
   handleReadResume,
   handleReadRules,
   handleRegisterResume,
+  handleRerankTopJobs,
   handleScoreKeywordMatch,
   handleSetActiveResume,
   handleStartApplication,
@@ -65,6 +66,7 @@ export function buildCoreDeps(opts: BuildOpts): CoreDeps {
     listApplicationVersions: handleListApplicationVersions,
     listRecentApplications: handleListRecentApplications,
     validateSources: (args) => handleValidateSources(config, args),
+    rerankTopJobs: (args) => handleRerankTopJobs(registry, args),
   };
 }
 
