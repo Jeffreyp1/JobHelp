@@ -6,12 +6,12 @@ repo already pulls in for the extension/Apps Script builds.
 
 | Script | Purpose |
 | --- | --- |
-| `test-handler.mjs` | POST a JSON request to the deployed Apps Script `/exec` URL and pretty-print the response. |
-| `iterate-template.mjs` | Iteration pipeline: render a sample resume Markdown into the docxtemplater template, convert to PDF + PNG for visual review. |
+| `test-handler.mts` | POST a JSON request to the deployed Apps Script `/exec` URL and pretty-print the response. |
+| `iterate-template.mts` | Iteration pipeline: render a sample resume Markdown into the docxtemplater template, convert to PDF + PNG for visual review. |
 
 ---
 
-## `test-handler.mjs`
+## `test-handler.mts`
 
 Exercises any Apps Script handler from the terminal — no need to roundtrip
 through the Chrome extension. Useful for debugging routes, validating request
@@ -38,15 +38,15 @@ Three ways to supply the request body:
 
 ```bash
 # 1) Build body from --field=value flags
-node scripts/test-handler.mjs ping
-node scripts/test-handler.mjs list_files \
+node scripts/test-handler.mts ping
+node scripts/test-handler.mts list_files \
   --folderId=1abc...XYZ --folderType=rules
 
 # 2) Pipe JSON via stdin
-echo '{"action":"ping"}' | node scripts/test-handler.mjs ping
+echo '{"action":"ping"}' | node scripts/test-handler.mts ping
 
 # 3) Redirect a JSON file
-node scripts/test-handler.mjs generate < req.json
+node scripts/test-handler.mts generate < req.json
 ```
 
 When all three are mixed, the merge order is: stdin JSON object first, then
@@ -83,7 +83,7 @@ network errors, non-JSON responses, and missing `APPS_SCRIPT_URL`).
 `download_template`, `upload_filled_docx`, `research_company`, `benchmark_role`,
 `critique`, `auto_revise`, `cover_letter`, `verify_cl_hooks`, `multi_version`.
 
-Run `node scripts/test-handler.mjs --help` for the full list with examples.
+Run `node scripts/test-handler.mts --help` for the full list with examples.
 
 ### Limitations
 
@@ -97,7 +97,7 @@ Run `node scripts/test-handler.mjs --help` for the full list with examples.
 
 ---
 
-## `iterate-template.mjs`
+## `iterate-template.mts`
 
 Renders a hard-coded sample resume Markdown through the docxtemplater pipeline
 in `extension/src/lib/templateFiller.ts`, converts the resulting `.docx` to PDF
@@ -105,7 +105,7 @@ via `soffice`, and rasterises a preview PNG via `pdftoppm`. Useful for
 iterating on the template visually.
 
 ```bash
-node scripts/iterate-template.mjs
+node scripts/iterate-template.mts
 # → writes /tmp/iter-out.docx, /tmp/iter-out.pdf, /tmp/iter-out.png
 ```
 
@@ -113,7 +113,7 @@ Requires LibreOffice (`soffice`) and `poppler-utils` (`pdftoppm`) on `$PATH`.
 
 ---
 
-## `verify-bundle.mjs`
+## `verify-bundle.mts`
 
 Post-build state verifier. Runs both build pipelines and asserts the produced
 artifacts are well-formed before you ship them: present, non-empty, within size
@@ -121,8 +121,8 @@ budgets, contain the expected entry points and constants, and that
 `manifest.json`'s version matches the latest `CHANGELOG.md` entry.
 
 ```bash
-node scripts/verify-bundle.mjs
-node scripts/verify-bundle.mjs --no-build   # skip the build step
+node scripts/verify-bundle.mts
+node scripts/verify-bundle.mts --no-build   # skip the build step
 ```
 
 ### What it checks
@@ -153,25 +153,25 @@ wallclock duration; output respects `NO_COLOR`.
 
 ---
 
-## `smoke-test.mjs`
+## `smoke-test.mts`
 
-Pre-commit / CI smoke harness. Chains `verify-bundle.mjs` with an optional
+Pre-commit / CI smoke harness. Chains `verify-bundle.mts` with an optional
 deployed-endpoint ping.
 
 ```bash
 # Local: verifies bundles only.
-node scripts/smoke-test.mjs
+node scripts/smoke-test.mts
 
 # With a deployed URL: also pings /exec and asserts response shape.
 APPS_SCRIPT_URL=https://script.google.com/macros/s/.../exec \
-  node scripts/smoke-test.mjs
+  node scripts/smoke-test.mts
 ```
 
 ### Phases
 
 1. **verify-bundle** — full bundle verification (above).
 2. **apps-script ping** — only when `APPS_SCRIPT_URL` is set (env var or
-   `.env`). Spawns `scripts/test-handler.mjs ping`, captures stdout, and
+   `.env`). Spawns `scripts/test-handler.mts ping`, captures stdout, and
    asserts the response body has `ok: true`, `version: <string>`, and
    `serverTime: <string>`. When unset, the phase is explicitly skipped with a
    clear message — exit code stays `0`.

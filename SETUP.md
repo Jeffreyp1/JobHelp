@@ -52,7 +52,7 @@ JobHelp uses your own Google Apps Script project as its backend. It reads/writes
    - `cost.gs` — cost tracker
    - `seed.gs` — first-run rule file seeder
 
-   Paste the contents of each corresponding compiled file from `appsscript/src/` (after building with `node appsscript/scripts/build.mjs`).
+   Paste the contents of each corresponding compiled file from `appsscript/src/` (after building with `node appsscript/scripts/build.mts`).
 
    > **Note:** This step is the most manual part of setup. A future release will automate deployment via `clasp push`. For now, copy-paste each file.
 
@@ -75,7 +75,7 @@ JobHelp uses your own Google Apps Script project as its backend. It reads/writes
    ```bash
    cd /path/to/JobHelp
    npm install
-   node extension/scripts/build.mjs
+   node extension/scripts/build.mts
    ```
 2. Open **chrome://extensions** in Chrome → toggle **Developer mode** (top right)
 3. Click **Load unpacked** → select the `extension/public/` folder

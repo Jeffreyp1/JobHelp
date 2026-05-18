@@ -21,7 +21,7 @@ appsscript/src/
   lib/structuredLog.ts    leveled logger with secret redaction (USE THIS, not console.*)
   types/                  api-contract.ts (the wire shape), drive-ops.ts, claude-api.ts, job-insights.ts
 appsscript/tests/         vitest; mocks GAS globals
-appsscript/scripts/build.mjs   bundles -> appsscript/dist/Code.gs
+appsscript/scripts/build.mts   bundles -> appsscript/dist/Code.gs
 
 extension/src/
   sidepanel/tabs/         generate.ts (orchestration), settings.ts, files.ts
@@ -35,13 +35,13 @@ extension/src/
   types/                  api-contract.ts (SOURCE OF TRUTH; mirrored to the appsscript copy),
                           storage-schema.ts, jobhelp-config.ts, message-bus.ts
 extension/tests/          vitest; jsdom env; chrome mock helpers
-extension/scripts/build.mjs    bundles -> extension/public/{sidepanel/index.js, background.js, scraper.bundle.js}
+extension/scripts/build.mts    bundles -> extension/public/{sidepanel/index.js, background.js, scraper.bundle.js}
 
 prompts/shared/           15 rule files; 6 are load-bearing (flagged in frontmatter + H1)
 docs/                     CHANGELOG.md, v2-features.md, security.md, setup-for-new-users.md,
                           superpowers/plans/*, superpowers/reviews/* (audits), research/*
-scripts/                  test-handler.mjs (CLI to POST any action), verify-bundle.mjs,
-                          smoke-test.mjs, iterate-template.mjs, build-skills-dict.mjs
+scripts/                  test-handler.mts (CLI to POST any action), verify-bundle.mts,
+                          smoke-test.mts, iterate-template.mts, build-skills-dict.mts
 tests/contracts/, tests/smoke/   black-box wire-shape tests + post-build smoke
 vitest.config.ts          include globs: extension/tests/**, appsscript/tests/**, tests/**, prompts/**
 ```
@@ -50,9 +50,9 @@ vitest.config.ts          include globs: extension/tests/**, appsscript/tests/**
 
 - Tests: `npx vitest run` (run from the repo root — running from inside `extension/` or `appsscript/` picks up a different cwd and surfaces spurious failures).
 - Type check: `npx tsc --noEmit` (must be clean; run from repo root).
-- Build extension: `node extension/scripts/build.mjs`. Build Apps Script: `node appsscript/scripts/build.mjs`.
-- Post-build sanity: `node scripts/verify-bundle.mjs` (builds both + 12 checks: bundle sizes, manifest schema, version match against CHANGELOG, all action strings present in `Code.gs`).
-- Hit a deployed backend: `APPS_SCRIPT_URL=... node scripts/test-handler.mjs ping` (or any action).
+- Build extension: `node extension/scripts/build.mts`. Build Apps Script: `node appsscript/scripts/build.mts`.
+- Post-build sanity: `node scripts/verify-bundle.mts` (builds both + 12 checks: bundle sizes, manifest schema, version match against CHANGELOG, all action strings present in `Code.gs`).
+- Hit a deployed backend: `APPS_SCRIPT_URL=... node scripts/test-handler.mts ping` (or any action).
 
 A change isn't done until `npx vitest run` is fully green AND `npx tsc --noEmit` is clean AND both bundles build. State the actual command output before claiming success — don't assert, verify.
 

@@ -1,31 +1,10 @@
 #!/usr/bin/env node
-/**
- * verify-bundle.mjs — post-build state verifier.
- *
- * Runs both build pipelines (extension + Apps Script) and asserts the produced
- * artifacts are well-formed: present, non-empty, within size budgets, contain
- * the expected entry points and constants, and that manifest.json's version
- * matches the latest CHANGELOG entry.
- *
- * Exits 0 on all-pass, 1 on any failure. Designed to surface mis-shipped
- * builds quickly (e.g. version bump forgotten, TS leftover syntax, missing
- * VALID_ACTIONS entry).
- *
- * Node 18+ built-ins only — no dependencies.
- *
- * Usage:
- *   node scripts/verify-bundle.mjs
- *   node scripts/verify-bundle.mjs --no-build   (skip running build pipelines)
- */
+// Post-build state verifier: runs both build pipelines and asserts artifact shape.
 
 import { spawnSync } from 'node:child_process';
 import { readFile, stat } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Paths
-// ─────────────────────────────────────────────────────────────────────────────
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -40,18 +19,16 @@ const PATHS = {
   sidepanelCss: join(EXTENSION_PUBLIC, 'sidepanel', 'style.css'),
   codeGs: join(APPSSCRIPT_DIST, 'Code.gs'),
   changelog: join(ROOT, 'CHANGELOG.md'),
-};
+} as const;
 
 const SIZE_LIMITS = {
-  sidepanelJs: 2 * 1024 * 1024, // 2 MB
-  background: 500 * 1024, // 500 KB
-  codeGs: 200 * 1024, // 200 KB
-};
+  sidepanelJs: 2 * 1024 * 1024,
+  background: 500 * 1024,
+  codeGs: 200 * 1024,
+} as const;
 
-// All 15 actions accepted by the Apps Script router. Keep in sync with
-// appsscript/src/Code.ts VALID_ACTIONS — this verifier asserts every one
-// appears in the compiled Code.gs string.
-const VALID_ACTIONS = [
+// Must mirror appsscript/src/Code.ts VALID_ACTIONS.
+const VALID_ACTIONS: string[] = [
   'generate',
   'finalize',
   'list_files',
@@ -69,11 +46,7 @@ const VALID_ACTIONS = [
   'ping',
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ANSI (NO_COLOR-aware)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const USE_COLOR = process.stdout.isTTY && !process.env.NO_COLOR;
+const USE_COLOR: boolean = process.stdout.isTTY && !process.env.NO_COLOR;
 const ANSI = {
   reset: '\x1b[0m',
   bold: '\x1b[1m',
@@ -82,37 +55,35 @@ const ANSI = {
   green: '\x1b[32m',
   yellow: '\x1b[33m',
   cyan: '\x1b[36m',
-};
-const c = (code, s) => (USE_COLOR ? `${code}${s}${ANSI.reset}` : s);
+} as const;
+const c = (code: string, s: string): string => (USE_COLOR ? `${code}${s}${ANSI.reset}` : s);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Reporting
-// ─────────────────────────────────────────────────────────────────────────────
+interface CheckResult {
+  name: string;
+  ok: boolean;
+  msg: string;
+  durationMs: number;
+  detail?: string;
+}
 
-/**
- * @typedef {{ name: string, ok: boolean, msg: string, durationMs: number, detail?: string }} CheckResult
- */
+const results: CheckResult[] = [];
 
-/** @type {CheckResult[]} */
-const results = [];
-
-function formatBytes(n) {
+function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function formatMs(ms) {
+function formatMs(ms: number): string {
   if (ms < 1000) return `${ms} ms`;
   return `${(ms / 1000).toFixed(2)} s`;
 }
 
-/**
- * Run a single named check. If `fn` throws, the check is recorded as failed
- * with the error message; otherwise the returned string (if any) becomes the
- * pass message.
- */
-async function check(name, fn) {
+interface FailureError extends Error {
+  detail?: string;
+}
+
+async function check(name: string, fn: () => string | undefined | Promise<string | undefined>): Promise<void> {
   const started = Date.now();
   try {
     const msg = await fn();
@@ -120,24 +91,20 @@ async function check(name, fn) {
     results.push({ name, ok: true, msg: msg || 'ok', durationMs });
   } catch (err) {
     const durationMs = Date.now() - started;
-    const message = err && err.message ? err.message : String(err);
-    const detail = err && err.detail ? String(err.detail) : undefined;
+    const e = err as FailureError;
+    const message = e && e.message ? e.message : String(err);
+    const detail = e && e.detail ? String(e.detail) : undefined;
     results.push({ name, ok: false, msg: message, durationMs, detail });
   }
 }
 
-/** Throw a check failure with optional detail. */
-function fail(message, detail) {
-  const e = new Error(message);
+function fail(message: string, detail?: string): never {
+  const e: FailureError = new Error(message);
   if (detail) e.detail = detail;
   throw e;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Build runners
-// ─────────────────────────────────────────────────────────────────────────────
-
-function runBuild(label, scriptPath) {
+function runBuild(label: string, scriptPath: string): { durationMs: number } {
   const started = Date.now();
   const res = spawnSync(process.execPath, [scriptPath], {
     cwd: ROOT,
@@ -152,11 +119,7 @@ function runBuild(label, scriptPath) {
   return { durationMs };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// File-shape assertions
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function assertFileSize(path, { maxBytes, minBytes = 1 }) {
+async function assertFileSize(path: string, { maxBytes, minBytes = 1 }: { maxBytes?: number; minBytes?: number }): Promise<number> {
   let stats;
   try {
     stats = await stat(path);
@@ -176,28 +139,16 @@ async function assertFileSize(path, { maxBytes, minBytes = 1 }) {
   return size;
 }
 
-/**
- * Heuristic: does Code.gs start with code that the Apps Script V8 runtime
- * accepts? It must not contain TS-only constructs at the top (like an
- * `import type`, `interface`, or `: TypeName` after `function`). We allow a
- * leading block comment and then expect either `function`, `const`, `let`,
- * `var`, `class`, `async function`, `(`, `if`, `try`, or a Code.gs prelude
- * comment.
- */
-function assertCodeGsStartsValid(text) {
-  // Skip leading block/line comments + whitespace.
+function assertCodeGsStartsValid(text: string): void {
   let i = 0;
   while (i < text.length) {
-    // Whitespace
     while (i < text.length && /\s/.test(text[i])) i++;
-    // Block comment /* ... */
     if (text.startsWith('/*', i)) {
       const end = text.indexOf('*/', i + 2);
       if (end === -1) fail('Code.gs starts with an unterminated block comment');
       i = end + 2;
       continue;
     }
-    // Line comment // ...
     if (text.startsWith('//', i)) {
       const nl = text.indexOf('\n', i);
       if (nl === -1) {
@@ -209,7 +160,6 @@ function assertCodeGsStartsValid(text) {
     }
     break;
   }
-  // What's the next token?
   const rest = text.slice(i, i + 200);
   const validStart =
     /^(function|class|const|let|var|async\s+function|if|try|\(function|"use strict")\b/.test(
@@ -221,9 +171,8 @@ function assertCodeGsStartsValid(text) {
       `Got: ${rest.slice(0, 80).replace(/\n/g, '\\n')}`,
     );
   }
-  // Catch obvious TS leftovers anywhere in first ~2 KB.
   const head = text.slice(0, 2048);
-  const tsLeftovers = [
+  const tsLeftovers: { re: RegExp; label: string }[] = [
     { re: /^\s*import\s+type\b/m, label: 'import type' },
     { re: /^\s*export\s+(?!default\s|\*|\{)/m, label: 'top-level export keyword' },
     { re: /^\s*interface\s+\w/m, label: 'interface declaration' },
@@ -235,35 +184,34 @@ function assertCodeGsStartsValid(text) {
   }
 }
 
-/** Get the most recent semver from CHANGELOG.md (e.g. "0.2.1"). */
-async function readLatestChangelogVersion() {
+async function readLatestChangelogVersion(): Promise<string> {
   const text = await readFile(PATHS.changelog, 'utf8');
   const m = text.match(/^##\s*\[(\d+\.\d+\.\d+)\]/m);
   if (!m) fail('CHANGELOG.md has no `## [x.y.z]` heading');
   return m[1];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main
-// ─────────────────────────────────────────────────────────────────────────────
+interface Manifest {
+  manifest_version: number;
+  version: string;
+}
 
-async function main() {
+async function main(): Promise<void> {
   const skipBuild = process.argv.includes('--no-build');
 
-  console.log(c(ANSI.bold, '→ verify-bundle.mjs'));
+  console.log(c(ANSI.bold, '→ verify-bundle.mts'));
   console.log(`  ${c(ANSI.dim, 'root:')} ${ROOT}`);
   console.log('');
 
-  // ── Build step ────────────────────────────────────────────────────────────
   if (!skipBuild) {
     await check('build: extension', () => {
-      const { durationMs } = runBuild('extension', join(ROOT, 'extension', 'scripts', 'build.mjs'));
+      const { durationMs } = runBuild('extension', join(ROOT, 'extension', 'scripts', 'build.mts'));
       return `built in ${formatMs(durationMs)}`;
     });
     await check('build: appsscript', () => {
       const { durationMs } = runBuild(
         'appsscript',
-        join(ROOT, 'appsscript', 'scripts', 'build.mjs'),
+        join(ROOT, 'appsscript', 'scripts', 'build.mts'),
       );
       return `built in ${formatMs(durationMs)}`;
     });
@@ -272,7 +220,6 @@ async function main() {
     console.log('');
   }
 
-  // ── Extension artifact assertions ────────────────────────────────────────
   await check('extension: sidepanel/index.js', async () => {
     const size = await assertFileSize(PATHS.sidepanelJs, { maxBytes: SIZE_LIMITS.sidepanelJs });
     return `${formatBytes(size)} (limit ${formatBytes(SIZE_LIMITS.sidepanelJs)})`;
@@ -295,11 +242,11 @@ async function main() {
 
   await check('extension: manifest.json shape', async () => {
     const raw = await readFile(PATHS.manifest, 'utf8');
-    let manifest;
+    let manifest: Manifest;
     try {
-      manifest = JSON.parse(raw);
+      manifest = JSON.parse(raw) as Manifest;
     } catch (err) {
-      fail(`manifest.json is not valid JSON: ${err.message}`);
+      fail(`manifest.json is not valid JSON: ${(err as Error).message}`);
     }
     if (manifest.manifest_version !== 3) {
       fail(`manifest_version must be 3, got ${manifest.manifest_version}`);
@@ -312,7 +259,7 @@ async function main() {
 
   await check('extension: manifest.version matches CHANGELOG latest', async () => {
     const raw = await readFile(PATHS.manifest, 'utf8');
-    const manifest = JSON.parse(raw);
+    const manifest = JSON.parse(raw) as Manifest;
     const changelogVersion = await readLatestChangelogVersion();
     if (manifest.version !== changelogVersion) {
       fail(
@@ -323,13 +270,12 @@ async function main() {
     return `both at ${manifest.version}`;
   });
 
-  // ── Apps Script Code.gs assertions ───────────────────────────────────────
   await check('appsscript: Code.gs size', async () => {
     const size = await assertFileSize(PATHS.codeGs, { maxBytes: SIZE_LIMITS.codeGs });
     return `${formatBytes(size)} (limit ${formatBytes(SIZE_LIMITS.codeGs)})`;
   });
 
-  let codeGsText = null;
+  let codeGsText: string | null = null;
   await check('appsscript: Code.gs starts with valid JS', async () => {
     codeGsText = await readFile(PATHS.codeGs, 'utf8');
     assertCodeGsStartsValid(codeGsText);
@@ -338,7 +284,6 @@ async function main() {
 
   await check('appsscript: Code.gs contains doPost', async () => {
     if (codeGsText == null) codeGsText = await readFile(PATHS.codeGs, 'utf8');
-    // Must appear as a function/expression, not just inside a comment.
     if (!/\bfunction\s+doPost\b/.test(codeGsText)) {
       fail('Code.gs missing `function doPost` declaration');
     }
@@ -347,10 +292,8 @@ async function main() {
 
   await check('appsscript: Code.gs contains all 15 VALID_ACTIONS', async () => {
     if (codeGsText == null) codeGsText = await readFile(PATHS.codeGs, 'utf8');
-    const missing = [];
+    const missing: string[] = [];
     for (const action of VALID_ACTIONS) {
-      // Look for the action as a quoted string literal anywhere in the file.
-      // Apps Script bundle uses double quotes after esbuild rewrites.
       const re = new RegExp(`["']${action}["']`);
       if (!re.test(codeGsText)) missing.push(action);
     }
@@ -360,7 +303,6 @@ async function main() {
     return `all ${VALID_ACTIONS.length} actions present`;
   });
 
-  // ── Print report ─────────────────────────────────────────────────────────
   console.log('');
   const failed = results.filter(r => !r.ok);
   for (const r of results) {
@@ -389,7 +331,8 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error(c(ANSI.red, `Fatal: ${err.stack || err.message || err}`));
+main().catch((err: unknown) => {
+  const e = err as Error;
+  console.error(c(ANSI.red, `Fatal: ${e.stack || e.message || String(err)}`));
   process.exit(1);
 });
