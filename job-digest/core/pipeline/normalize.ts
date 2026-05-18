@@ -4,7 +4,7 @@ import { log } from '../lib/log.js';
 const MAX_DESCRIPTION_CHARS = 8000;
 
 function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function hasRequiredFields(job: NormalizedJob): boolean {
@@ -19,14 +19,6 @@ function hasRequiredFields(job: NormalizedJob): boolean {
   );
 }
 
-/**
- * Normalize a raw pool of jobs:
- *   - drop entries missing any required field (id, source, url, title, company, location, description)
- *   - trim whitespace on title/company/location
- *   - cap description at 8000 chars
- *
- * Malformed entries are logged at warn level and silently filtered out.
- */
 export async function normalize(
   jobs: readonly NormalizedJob[],
 ): Promise<readonly NormalizedJob[]> {

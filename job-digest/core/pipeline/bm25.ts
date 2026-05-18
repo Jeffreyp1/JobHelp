@@ -29,7 +29,7 @@ function sanitizeParams(p: BM25Params): BM25Params {
     warnings['b'] = b;
     b = DEFAULT_BM25_PARAMS.b;
   }
-  // minIdfFloor < 0 is intentionally permitted: Okapi BM25 allows negative idf for terms appearing in >50% of the corpus, which acts as a soft penalty for common words.
+  // minIdfFloor < 0 is intentionally permitted: Okapi BM25 allows negative idf for >50%-corpus terms as a soft penalty.
   if (!Number.isFinite(minIdfFloor)) {
     warnings['minIdfFloor'] = minIdfFloor;
     minIdfFloor = DEFAULT_BM25_PARAMS.minIdfFloor;
@@ -56,12 +56,6 @@ export interface BM25Doc {
 
 type Tokenizer = (s: string) => readonly string[];
 
-function uniqueTerms(tokens: readonly string[]): Set<string> {
-  const s = new Set<string>();
-  for (const t of tokens) s.add(t);
-  return s;
-}
-
 function termFreq(tokens: readonly string[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const t of tokens) {
@@ -70,18 +64,7 @@ function termFreq(tokens: readonly string[]): Map<string, number> {
   return m;
 }
 
-/**
- * Build a BM25F corpus from a pool of job documents.
- *
- * Records:
- * - `avgFieldLengths` — mean token count per field across the pool, used for
- *   length normalization.
- * - `df` — document frequency per term (collapsed across all fields).
- *   A term occurring in any field of a doc counts once toward that doc's df.
- * - `N` — total docs in pool.
- *
- * Empty corpus is valid; scoring against it yields 0.
- */
+// Build BM25F corpus: per-field avg lengths, doc-frequency per term (collapsed across fields), and N.
 export function buildCorpus(
   jobs: readonly BM25Doc[],
   tokenize: Tokenizer,
@@ -119,17 +102,7 @@ function idf(N: number, df: number, floor: number): number {
   return Math.max(floor, raw);
 }
 
-/**
- * Score a single doc against a query under BM25F (field-weighted BM25).
- *
- * For each query term q:
- *   weightedTf = sum_f [ (tf_f / (1 - b + b * len_f/avgLen_f)) * fieldWeight_f ]
- *   score += idf(q) * weightedTf * (k1 + 1) / (weightedTf + k1)
- *
- * IDF is applied once per query term (not once per field per term).
- * Empty queries score 0. Empty fields contribute 0 (length 0).
- * Terms not present in the corpus (df=0) still score via the IDF floor.
- */
+// BM25F score: per query term q, weightedTf = Σ_f (tf_f / lenNorm_f) * fieldWeight_f; score += idf(q) * weightedTf * (k1+1) / (weightedTf + k1).
 export function scoreBM25F(
   corpus: Corpus,
   job: BM25Doc,
@@ -157,7 +130,7 @@ export function scoreBM25F(
     location: locationToks.length,
   };
 
-  const querySet = uniqueTerms(queryTerms);
+  const querySet = new Set<string>(queryTerms);
   let total = 0;
   const { k1, b, fieldWeights, minIdfFloor } = sanitizeParams(params);
 

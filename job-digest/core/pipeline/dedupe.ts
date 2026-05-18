@@ -1,12 +1,7 @@
 import type { NormalizedJob } from '../types/index.js';
 
-/**
- * v0 dedupe: only removes exact-id duplicates.
- *
- * The first occurrence wins; later duplicates are dropped silently.
- *
- * TODO_FUTURE: URL canonicalization + title+company hash (spec §5 future-dedup)
- */
+// v0: exact-id dedupe only; first occurrence wins.
+// TODO_FUTURE: URL canonicalization + title+company hash (spec §5 future-dedup).
 export async function dedupe(
   jobs: readonly NormalizedJob[],
 ): Promise<readonly NormalizedJob[]> {

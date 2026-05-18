@@ -58,7 +58,7 @@ export function computeRecencyMultiplier(
     return 1.0;
   }
   const postedAt = job.postedAt;
-  // Empty string treated as absent (lenient): some adapters emit '' as a sentinel.
+  // Empty string treated as absent: some adapters emit '' as a sentinel.
   if (postedAt === undefined || postedAt === '') return 1.0;
   const nowMs = now.getTime();
   if (!Number.isFinite(nowMs)) {
@@ -142,11 +142,7 @@ export interface RankPrecomputed {
   readonly params: BM25Params;
 }
 
-/**
- * Build the once-per-pipeline-run state used by `rank`: alias map, canonical
- * tokenizer, corpus, canonicalized query terms, resolved BM25 params. Callable
- * from `runPipeline` so the corpus is computed once across all jobs.
- */
+// Once-per-pipeline-run state shared across all jobs: alias map, tokenizer, corpus, query terms, params.
 export function buildRankPrecomputed(
   jobs: readonly NormalizedJob[],
   config: JobDigestConfig,
@@ -167,24 +163,8 @@ export function buildRankPrecomputed(
   return { aliases, tokenize, corpus, queryTerms, params };
 }
 
-/**
- * Rank jobs by BM25F × recency multiplier × source-trust multiplier. Pure
- * deterministic — no LLM calls.
- *
- * BM25F (field-weighted BM25) scores each job against the canonicalized skill
- * query: title hits weighted ~3x description hits; TF saturation prevents
- * spammy repetition from winning; IDF down-weights common terms; per-field
- * length normalization prevents long descriptions from accumulating accidental
- * hits. The corpus + alias map are built once per `rank()` call and shared
- * across all jobs in the pool.
- *
- * Recency: half-life decay `2^(-ageDays / halfLifeDays)` clamped to [0, 1].
- * Source trust: per-source multiplier from `cfg.ranking.sourceTrust.weights`.
- * Both toggles default to `1.0` when disabled.
- *
- * Design B: ranking.useLlmFitScore is silently ignored. breakdown.llmFitScore
- * and llmRationale are always undefined.
- */
+// BM25F × recency half-life × source-trust, optionally fused with RRF. Pure deterministic, no LLM.
+// `ranking.useLlmFitScore` is silently ignored (Design B); llmFitScore/llmRationale stay undefined.
 export async function rank(
   jobs: readonly NormalizedJob[],
   config: JobDigestConfig,

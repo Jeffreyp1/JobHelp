@@ -174,11 +174,7 @@ export function getAliasMap(): AliasMap {
 
 export { buildAliasMap };
 
-/**
- * Canonicalize a single token. Accepts either pre-tokenized form (with `_`
- * separators in place of spaces) or a free-form phrase (with spaces). Always
- * returns a lowercased string. Unmapped tokens are returned lowercased.
- */
+// Accepts pre-tokenized (`_` separators) or free-form (spaces); unmapped tokens return lowercased.
 export function canonicalize(token: string, map: AliasMap): string {
   const key = toLookupKey(token);
   const direct = map.canonical.get(key);
@@ -186,9 +182,6 @@ export function canonicalize(token: string, map: AliasMap): string {
   return token.toLowerCase();
 }
 
-/**
- * Canonicalize an array of tokens, deduplicating the canonical result set.
- */
 export function canonicalizeAll(
   tokens: readonly string[],
   map: AliasMap,
