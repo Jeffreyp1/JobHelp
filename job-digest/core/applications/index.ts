@@ -69,3 +69,5 @@ export {
   listApplicationVersions,
   listRecentApplications,
 } from './store.js';
+export { bundleRerank } from './rerank.js';
+export type { RerankBundle, RerankOptions, RerankError } from './rerank.js';
