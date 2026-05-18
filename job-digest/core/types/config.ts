@@ -26,6 +26,12 @@ export interface ProfileConfig {
   readonly seniority: Seniority;
   /** Role families the candidate accepts, e.g. ["backend", "fullstack", "ai-engineer"]. */
   readonly roleFamily: readonly string[];
+  /**
+   * Canonical country labels (matching {@link detectCountryFromLocation} output,
+   * e.g. 'US', 'Canada', 'UK', 'EU'). When empty/undefined, no geo filter is applied.
+   * Loader has no defaults — absence means filter off.
+   */
+  readonly allowedCountries?: readonly string[];
 }
 
 export type Seniority = 'intern' | 'entry' | 'mid' | 'senior' | 'staff';
