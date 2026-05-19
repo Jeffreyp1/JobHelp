@@ -6,14 +6,20 @@ import { aiFilter, buildAIFilterPrompt, type AIJudgment, type Judger, type Tier 
 import type { JobDigestConfig, ProfileConfig, RankedJob } from '../core/types/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const TOKEN_FILE = join(__dirname, 'greenhouse-tokens.json');
-const greenhouseTokens: readonly string[] = existsSync(TOKEN_FILE)
-  ? (JSON.parse(readFileSync(TOKEN_FILE, 'utf8')) as readonly string[])
-  : ['stripe', 'anthropic', 'vercel'];
-const ASHBY_FILE = join(__dirname, 'ashby-slugs.json');
-const ashbyTokens: readonly string[] = existsSync(ASHBY_FILE)
-  ? (JSON.parse(readFileSync(ASHBY_FILE, 'utf8')) as readonly string[])
-  : ['ramp', 'notion', 'linear'];
+function loadSlugs(file: string, fallback: readonly string[]): readonly string[] {
+  const p = join(__dirname, file);
+  return existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')) as readonly string[]) : fallback;
+}
+const greenhouseTokens = loadSlugs('greenhouse-tokens.json', ['stripe', 'vercel']);
+const ashbyTokens = loadSlugs('ashby-slugs.json', ['ramp']);
+const leverSlugs = loadSlugs('lever-slugs.json', ['plaid']);
+const smartrecruitersTokens = loadSlugs('smartrecruiters-slugs.json', ['visa']);
+const workableTokens = loadSlugs('workable-slugs.json', ['polestar']);
+const recruiteeTokens = loadSlugs('recruitee-slugs.json', ['bunq']);
+const teamtailorTokens = loadSlugs('teamtailor-slugs.json', ['polestar']);
+const breezyTokens = loadSlugs('breezy-slugs.json', []);
+const pinpointTokens = loadSlugs('pinpoint-slugs.json', ['workwithus']);
+const personioTokens = loadSlugs('personio-slugs.json', ['personio']);
 
 const config: JobDigestConfig = {
   profile: {
@@ -32,7 +38,14 @@ const config: JobDigestConfig = {
   sources: {
     greenhouse: { tokens: greenhouseTokens },
     ashby: { tokens: ashbyTokens },
-    lever: { slugs: ['plaid', 'figma', 'mercury', 'ramp'] },
+    lever: { slugs: leverSlugs },
+    smartrecruiters: { tokens: smartrecruitersTokens },
+    workable: { tokens: workableTokens },
+    recruitee: { tokens: recruiteeTokens },
+    teamtailor: { tokens: teamtailorTokens },
+    breezy: { tokens: breezyTokens },
+    pinpoint: { tokens: pinpointTokens },
+    personio: { tokens: personioTokens },
     remoteok: {},
     remotive: { queries: ['typescript', 'python backend', 'fullstack engineer'] },
   },
@@ -97,8 +110,18 @@ console.log('\n─────────────────────�
 console.log('JobHelp digest — live run + AI final filter');
 console.log('──────────────────────────────────────────────────────');
 const { judger, mode } = pickJudger();
-console.log(`  greenhouse tokens: ${greenhouseTokens.length}`);
-console.log(`  ashby tokens:      ${ashbyTokens.length}`);
+const totalBoards = greenhouseTokens.length + ashbyTokens.length + leverSlugs.length + smartrecruitersTokens.length + workableTokens.length + recruiteeTokens.length + teamtailorTokens.length + breezyTokens.length + pinpointTokens.length + personioTokens.length;
+console.log(`  greenhouse:        ${greenhouseTokens.length}`);
+console.log(`  ashby:             ${ashbyTokens.length}`);
+console.log(`  lever:             ${leverSlugs.length}`);
+console.log(`  smartrecruiters:   ${smartrecruitersTokens.length}`);
+console.log(`  workable:          ${workableTokens.length}`);
+console.log(`  recruitee:         ${recruiteeTokens.length}`);
+console.log(`  teamtailor:        ${teamtailorTokens.length}`);
+console.log(`  breezy:            ${breezyTokens.length}`);
+console.log(`  pinpoint:          ${pinpointTokens.length}`);
+console.log(`  personio:          ${personioTokens.length}`);
+console.log(`  total boards:      ${totalBoards}`);
 console.log(`  AI judger:         ${mode}`);
 console.log('  Fetching jobs…');
 
