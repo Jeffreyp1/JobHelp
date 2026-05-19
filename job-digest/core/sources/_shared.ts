@@ -53,3 +53,37 @@ export function asIsoString(v: unknown): string | undefined {
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
 }
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function runWithConcurrency<T>(
+  tasks: ReadonlyArray<() => Promise<T>>,
+  options: { limit: number; throttleMs?: number },
+): Promise<readonly PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let index = 0;
+  const throttleMs = options.throttleMs;
+  async function worker(): Promise<void> {
+    while (true) {
+      const i = index;
+      index += 1;
+      if (i >= tasks.length) return;
+      const task = tasks[i];
+      if (task === undefined) return;
+      try {
+        const value = await task();
+        results[i] = { status: 'fulfilled', value };
+      } catch (err: unknown) {
+        results[i] = { status: 'rejected', reason: err };
+      }
+      if (throttleMs !== undefined && index < tasks.length) await sleep(throttleMs);
+    }
+  }
+  const workers: Promise<void>[] = [];
+  const n = Math.min(options.limit, tasks.length);
+  for (let i = 0; i < n; i += 1) workers.push(worker());
+  await Promise.all(workers);
+  return results;
+}
