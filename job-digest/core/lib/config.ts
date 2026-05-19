@@ -3,18 +3,28 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AdzunaConfig,
+  AshbyConfig,
+  BreezyConfig,
   GreenhouseConfig,
   JobDigestConfig,
   JSearchConfig,
   LeverConfig,
   OutputConfig,
+  PersonioConfig,
+  PinpointConfig,
   ProfileConfig,
   RankingConfig,
+  RecruiteeConfig,
+  RemoteOkConfig,
+  RemotiveConfig,
   RulesConfig,
   RulesMode,
   Seniority,
+  SmartRecruitersConfig,
   SourcesConfig,
+  TeamtailorConfig,
   UsaJobsConfig,
+  WorkableConfig,
 } from '../types/config.js';
 import {
   validateBM25,
@@ -221,21 +231,98 @@ function validateJSearch(raw: unknown): JSearchConfig {
   return { rapidApiKey: requireString(obj['rapidApiKey'], 'sources.jsearch.rapidApiKey') };
 }
 
+function validateAshby(raw: unknown): AshbyConfig {
+  const obj = requireRecord(raw, 'sources.ashby');
+  return { tokens: requireStringArray(obj['tokens'], 'sources.ashby.tokens') };
+}
+
+function validateBreezy(raw: unknown): BreezyConfig {
+  const obj = requireRecord(raw, 'sources.breezy');
+  return { tokens: requireStringArray(obj['tokens'], 'sources.breezy.tokens') };
+}
+
+function validatePersonio(raw: unknown): PersonioConfig {
+  const obj = requireRecord(raw, 'sources.personio');
+  return { tokens: requireStringArray(obj['tokens'], 'sources.personio.tokens') };
+}
+
+function validatePinpoint(raw: unknown): PinpointConfig {
+  const obj = requireRecord(raw, 'sources.pinpoint');
+  return { tokens: requireStringArray(obj['tokens'], 'sources.pinpoint.tokens') };
+}
+
+function validateRecruitee(raw: unknown): RecruiteeConfig {
+  const obj = requireRecord(raw, 'sources.recruitee');
+  return { tokens: requireStringArray(obj['tokens'], 'sources.recruitee.tokens') };
+}
+
+function validateRemoteOk(raw: unknown): RemoteOkConfig {
+  requireRecord(raw, 'sources.remoteok');
+  return {};
+}
+
+function validateRemotive(raw: unknown): RemotiveConfig {
+  const obj = requireRecord(raw, 'sources.remotive');
+  const out: { queries?: readonly string[]; limit?: number } = {};
+  if (obj['queries'] !== undefined) {
+    out.queries = requireStringArray(obj['queries'], 'sources.remotive.queries');
+  }
+  if (obj['limit'] !== undefined) {
+    out.limit = requireNumber(obj['limit'], 'sources.remotive.limit');
+  }
+  return out;
+}
+
+function validateSmartRecruiters(raw: unknown): SmartRecruitersConfig {
+  const obj = requireRecord(raw, 'sources.smartrecruiters');
+  return { tokens: requireStringArray(obj['tokens'], 'sources.smartrecruiters.tokens') };
+}
+
+function validateTeamtailor(raw: unknown): TeamtailorConfig {
+  const obj = requireRecord(raw, 'sources.teamtailor');
+  return { tokens: requireStringArray(obj['tokens'], 'sources.teamtailor.tokens') };
+}
+
+function validateWorkable(raw: unknown): WorkableConfig {
+  const obj = requireRecord(raw, 'sources.workable');
+  return { tokens: requireStringArray(obj['tokens'], 'sources.workable.tokens') };
+}
+
 function validateSources(raw: unknown): SourcesConfig {
   if (raw === undefined) return {};
   const obj = requireRecord(raw, 'sources');
   const out: {
     adzuna?: AdzunaConfig;
+    ashby?: AshbyConfig;
+    breezy?: BreezyConfig;
     greenhouse?: GreenhouseConfig;
-    lever?: LeverConfig;
-    usajobs?: UsaJobsConfig;
     jsearch?: JSearchConfig;
+    lever?: LeverConfig;
+    personio?: PersonioConfig;
+    pinpoint?: PinpointConfig;
+    recruitee?: RecruiteeConfig;
+    remoteok?: RemoteOkConfig;
+    remotive?: RemotiveConfig;
+    smartrecruiters?: SmartRecruitersConfig;
+    teamtailor?: TeamtailorConfig;
+    usajobs?: UsaJobsConfig;
+    workable?: WorkableConfig;
   } = {};
   if (obj['adzuna'] !== undefined) out.adzuna = validateAdzuna(obj['adzuna']);
+  if (obj['ashby'] !== undefined) out.ashby = validateAshby(obj['ashby']);
+  if (obj['breezy'] !== undefined) out.breezy = validateBreezy(obj['breezy']);
   if (obj['greenhouse'] !== undefined) out.greenhouse = validateGreenhouse(obj['greenhouse']);
-  if (obj['lever'] !== undefined) out.lever = validateLever(obj['lever']);
-  if (obj['usajobs'] !== undefined) out.usajobs = validateUsaJobs(obj['usajobs']);
   if (obj['jsearch'] !== undefined) out.jsearch = validateJSearch(obj['jsearch']);
+  if (obj['lever'] !== undefined) out.lever = validateLever(obj['lever']);
+  if (obj['personio'] !== undefined) out.personio = validatePersonio(obj['personio']);
+  if (obj['pinpoint'] !== undefined) out.pinpoint = validatePinpoint(obj['pinpoint']);
+  if (obj['recruitee'] !== undefined) out.recruitee = validateRecruitee(obj['recruitee']);
+  if (obj['remoteok'] !== undefined) out.remoteok = validateRemoteOk(obj['remoteok']);
+  if (obj['remotive'] !== undefined) out.remotive = validateRemotive(obj['remotive']);
+  if (obj['smartrecruiters'] !== undefined) out.smartrecruiters = validateSmartRecruiters(obj['smartrecruiters']);
+  if (obj['teamtailor'] !== undefined) out.teamtailor = validateTeamtailor(obj['teamtailor']);
+  if (obj['usajobs'] !== undefined) out.usajobs = validateUsaJobs(obj['usajobs']);
+  if (obj['workable'] !== undefined) out.workable = validateWorkable(obj['workable']);
   return out;
 }
 
