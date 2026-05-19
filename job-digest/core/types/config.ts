@@ -45,6 +45,13 @@ export interface SourcesConfig {
   readonly jsearch?: JSearchConfig;
   readonly remotive?: RemotiveConfig;
   readonly remoteok?: RemoteOkConfig;
+  readonly smartrecruiters?: SmartRecruitersConfig;
+  readonly workable?: WorkableConfig;
+  readonly recruitee?: RecruiteeConfig;
+  readonly teamtailor?: TeamtailorConfig;
+  readonly breezy?: BreezyConfig;
+  readonly pinpoint?: PinpointConfig;
+  readonly personio?: PersonioConfig;
 }
 
 export interface AdzunaConfig {
@@ -67,6 +74,41 @@ export interface LeverConfig {
 
 export interface AshbyConfig {
   /** Public Ashby job board tokens, e.g. ["ramp", "notion"]. */
+  readonly tokens: readonly string[];
+}
+
+export interface SmartRecruitersConfig {
+  /** Public SmartRecruiters company slugs, e.g. ["visa", "square"]. */
+  readonly tokens: readonly string[];
+}
+
+export interface WorkableConfig {
+  /** Public Workable account subdomains, e.g. ["polestar", "talkdesk"]. */
+  readonly tokens: readonly string[];
+}
+
+export interface RecruiteeConfig {
+  /** Public Recruitee subdomains, e.g. ["bunq"]. */
+  readonly tokens: readonly string[];
+}
+
+export interface TeamtailorConfig {
+  /** Public Teamtailor subdomains, e.g. ["polestar", "klarna"]. */
+  readonly tokens: readonly string[];
+}
+
+export interface BreezyConfig {
+  /** Public Breezy HR subdomains. */
+  readonly tokens: readonly string[];
+}
+
+export interface PinpointConfig {
+  /** Public Pinpoint subdomains, e.g. ["workwithus"]. */
+  readonly tokens: readonly string[];
+}
+
+export interface PersonioConfig {
+  /** Public Personio subdomains, e.g. ["traderepublic"]. */
   readonly tokens: readonly string[];
 }
 
