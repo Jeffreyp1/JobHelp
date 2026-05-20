@@ -7,6 +7,7 @@ import type {
   RecencyConfig,
 } from '../types/index.js';
 import { DEFAULT_MAX_AGE, DEFAULT_RECENCY } from '../lib/config-ranking.js';
+import { log } from '../lib/log.js';
 import { normalize } from './normalize.js';
 import { dedupe } from './dedupe.js';
 import { filter } from './filter.js';
@@ -53,9 +54,27 @@ export async function runPipeline(
   const effectiveConfig: JobDigestConfig = { ...config, ranking: effectiveRanking };
   const now = overrides.now ?? new Date();
 
+  const t0 = Date.now();
   const normalized = await normalize(jobs);
+  const t1 = Date.now();
   const deduped = await dedupe(normalized);
+  const t2 = Date.now();
   const filtered = await filter(deduped, effectiveConfig, now);
+  const t3 = Date.now();
   const precomputed = buildRankPrecomputed(filtered, effectiveConfig);
-  return await rank(filtered, effectiveConfig, precomputed, now);
+  const t4 = Date.now();
+  const ranked = await rank(filtered, effectiveConfig, precomputed, now);
+  const t5 = Date.now();
+  log('info', 'pipeline.timing', {
+    inputJobs: jobs.length,
+    afterNormalize: normalized.length,
+    afterDedupe: deduped.length,
+    afterFilter: filtered.length,
+    normalizeMs: t1 - t0,
+    dedupeMs: t2 - t1,
+    filterMs: t3 - t2,
+    buildCorpusMs: t4 - t3,
+    rankMs: t5 - t4,
+  });
+  return ranked;
 }
