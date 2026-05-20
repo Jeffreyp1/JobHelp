@@ -41,10 +41,17 @@ function sanitizeParams(p: BM25Params): BM25Params {
   return p;
 }
 
+// Per-doc tokens cached at corpus-build time so scoring never re-tokenizes.
+export interface DocTokens {
+  readonly fieldTokens: Record<FieldName, ReadonlyMap<string, number>>;
+  readonly fieldLens: Record<FieldName, number>;
+}
+
 export interface Corpus {
   readonly avgFieldLengths: Record<FieldName, number>;
   readonly df: ReadonlyMap<string, number>;
   readonly N: number;
+  readonly docs: readonly DocTokens[];
 }
 
 export interface BM25Doc {
@@ -56,30 +63,41 @@ export interface BM25Doc {
 
 type Tokenizer = (s: string) => readonly string[];
 
-function termFreq(tokens: readonly string[]): Map<string, number> {
-  const m = new Map<string, number>();
-  for (const t of tokens) {
-    m.set(t, (m.get(t) ?? 0) + 1);
-  }
-  return m;
-}
-
-// Build BM25F corpus: per-field avg lengths, doc-frequency per term (collapsed across fields), and N.
+// Build BM25F corpus: per-field avg lengths, doc-frequency per term, N, and
+// per-doc token-frequency maps cached so scoring reuses them (no re-tokenize).
+// queryTerms scopes the per-doc cache: scoring only looks up query terms, so
+// caching the full vocabulary per doc is wasteful (OOM on large pools). When
+// omitted, every term is cached (fine for small corpora / tests).
 export function buildCorpus(
   jobs: readonly BM25Doc[],
   tokenize: Tokenizer,
+  queryTerms?: readonly string[],
 ): Corpus {
   const N = jobs.length;
   const sums: Record<FieldName, number> = { title: 0, description: 0, company: 0, location: 0 };
   const df = new Map<string, number>();
+  const docs: DocTokens[] = [];
+  const querySet = queryTerms === undefined ? undefined : new Set<string>(queryTerms);
 
   for (const job of jobs) {
+    const fieldTokens: Record<FieldName, Map<string, number>> = {
+      title: new Map(), description: new Map(), company: new Map(), location: new Map(),
+    };
+    const fieldLens: Record<FieldName, number> = { title: 0, description: 0, company: 0, location: 0 };
     const docTerms = new Set<string>();
     for (const field of FIELDS) {
       const toks = tokenize(job[field]);
       sums[field] += toks.length;
-      for (const t of toks) docTerms.add(t);
+      fieldLens[field] = toks.length;
+      const cache = fieldTokens[field];
+      for (const t of toks) {
+        docTerms.add(t);
+        if (querySet === undefined || querySet.has(t)) {
+          cache.set(t, (cache.get(t) ?? 0) + 1);
+        }
+      }
     }
+    docs.push({ fieldTokens, fieldLens });
     for (const t of docTerms) {
       df.set(t, (df.get(t) ?? 0) + 1);
     }
@@ -92,7 +110,7 @@ export function buildCorpus(
     location: N === 0 ? 0 : sums.location / N,
   };
 
-  return { avgFieldLengths, df, N };
+  return { avgFieldLengths, df, N, docs };
 }
 
 function idf(N: number, df: number, floor: number): number {
@@ -102,33 +120,18 @@ function idf(N: number, df: number, floor: number): number {
   return Math.max(floor, raw);
 }
 
-// BM25F score: per query term q, weightedTf = Σ_f (tf_f / lenNorm_f) * fieldWeight_f; score += idf(q) * weightedTf * (k1+1) / (weightedTf + k1).
+// BM25F score for corpus.docs[docIndex]: per query term q, weightedTf =
+// Σ_f (tf_f / lenNorm_f) * fieldWeight_f; score += idf(q) * weightedTf * (k1+1) / (weightedTf + k1).
 export function scoreBM25F(
   corpus: Corpus,
-  job: BM25Doc,
+  docIndex: number,
   queryTerms: readonly string[],
-  tokenize: Tokenizer,
   params: BM25Params,
 ): number {
   if (queryTerms.length === 0) return 0;
   if (corpus.N === 0) return 0;
-
-  const titleToks = tokenize(job.title);
-  const descToks = tokenize(job.description);
-  const companyToks = tokenize(job.company);
-  const locationToks = tokenize(job.location);
-  const fieldTokens: Record<FieldName, Map<string, number>> = {
-    title: termFreq(titleToks),
-    description: termFreq(descToks),
-    company: termFreq(companyToks),
-    location: termFreq(locationToks),
-  };
-  const fieldLens: Record<FieldName, number> = {
-    title: titleToks.length,
-    description: descToks.length,
-    company: companyToks.length,
-    location: locationToks.length,
-  };
+  const doc = corpus.docs[docIndex];
+  if (doc === undefined) return 0;
 
   const querySet = new Set<string>(queryTerms);
   let total = 0;
@@ -137,10 +140,10 @@ export function scoreBM25F(
   for (const q of querySet) {
     let weightedTf = 0;
     for (const f of FIELDS) {
-      const tf = fieldTokens[f].get(q) ?? 0;
+      const tf = doc.fieldTokens[f].get(q) ?? 0;
       if (tf === 0) continue;
       const avgLen = corpus.avgFieldLengths[f];
-      const lenNorm = avgLen === 0 ? 1 : 1 - b + b * (fieldLens[f] / avgLen);
+      const lenNorm = avgLen === 0 ? 1 : 1 - b + b * (doc.fieldLens[f] / avgLen);
       weightedTf += (tf / lenNorm) * fieldWeights[f];
     }
     if (weightedTf === 0) continue;
