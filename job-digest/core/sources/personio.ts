@@ -6,7 +6,10 @@ import {
   asIsoString,
   classifyHttpStatus,
   detectRemoteMode,
+  runWithConcurrency,
 } from './_shared.js';
+
+const PERSONIO_CONCURRENCY = 10;
 
 export { SourceFetchError };
 
@@ -134,14 +137,16 @@ async function fetchBoard(slug: string): Promise<string> {
   return text;
 }
 
-async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void> {
+async function fetchSlugJobs(slug: string): Promise<NormalizedJob[]> {
   const xml = await fetchBoard(slug);
   const positions = extractAllTags(xml, 'position');
+  const out: NormalizedJob[] = [];
   for (const block of positions) {
     const parsed = parsePositionBlock(slug, block);
     if (parsed === undefined) continue;
     out.push(normalize(slug, parsed, block));
   }
+  return out;
 }
 
 export const personio: SourceAdapter = {
@@ -155,21 +160,27 @@ export const personio: SourceAdapter = {
     if (c === undefined) {
       throw new SourceFetchError('auth', 'personio config missing');
     }
+    const tokens = c.tokens;
+    const tasks = tokens.map((slug) => (): Promise<NormalizedJob[]> => fetchSlugJobs(slug));
+    const settled = await runWithConcurrency(tasks, { limit: PERSONIO_CONCURRENCY });
     const all: NormalizedJob[] = [];
-    let attempts = 0;
-    let failures = 0;
     let lastError: unknown;
-    for (const slug of c.tokens) {
-      attempts += 1;
-      try {
-        await fetchAndCollect(slug, all);
-      } catch (err: unknown) {
+    let failures = 0;
+    for (let i = 0; i < settled.length; i += 1) {
+      const r = settled[i];
+      if (r === undefined) continue;
+      if (r.status === 'fulfilled') {
+        for (const job of r.value) all.push(job);
+      } else {
         failures += 1;
-        lastError = err;
-        log('warn', 'personio fetch failed', { slug, error: err instanceof Error ? err.message : 'unknown' });
+        lastError = r.reason;
+        log('warn', 'personio fetch failed', {
+          slug: tokens[i],
+          error: r.reason instanceof Error ? r.reason.message : 'unknown',
+        });
       }
     }
-    if (attempts > 0 && failures === attempts) {
+    if (tokens.length > 0 && failures === tokens.length) {
       if (lastError instanceof Error) throw lastError;
       throw new SourceFetchError('unknown', 'personio: all tokens failed');
     }

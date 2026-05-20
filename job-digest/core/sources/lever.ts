@@ -8,7 +8,10 @@ import {
   classifyHttpStatus,
   detectRemoteMode as detectRemoteFromText,
   isRecord,
+  runWithConcurrency,
 } from './_shared.js';
+
+const LEVER_CONCURRENCY = 10;
 
 export { SourceFetchError };
 
@@ -119,16 +122,18 @@ async function fetchPostings(slug: string): Promise<unknown> {
   }
 }
 
-async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void> {
+async function fetchSlugJobs(slug: string): Promise<NormalizedJob[]> {
   const body = await fetchPostings(slug);
   if (!Array.isArray(body)) {
     throw new SourceFetchError('parse', 'lever response was not an array');
   }
+  const out: NormalizedJob[] = [];
   for (const rawPosting of body) {
     const parsed = parseLeverPosting(rawPosting);
     if (parsed === undefined) continue;
     out.push(normalize(slug, parsed, rawPosting));
   }
+  return out;
 }
 
 export const lever: SourceAdapter = {
@@ -142,21 +147,27 @@ export const lever: SourceAdapter = {
     if (c === undefined) {
       throw new SourceFetchError('auth', 'lever config missing');
     }
+    const slugs = c.slugs;
+    const tasks = slugs.map((slug) => (): Promise<NormalizedJob[]> => fetchSlugJobs(slug));
+    const settled = await runWithConcurrency(tasks, { limit: LEVER_CONCURRENCY });
     const all: NormalizedJob[] = [];
-    let attempts = 0;
-    let failures = 0;
     let lastError: unknown;
-    for (const slug of c.slugs) {
-      attempts += 1;
-      try {
-        await fetchAndCollect(slug, all);
-      } catch (err: unknown) {
+    let failures = 0;
+    for (let i = 0; i < settled.length; i += 1) {
+      const r = settled[i];
+      if (r === undefined) continue;
+      if (r.status === 'fulfilled') {
+        for (const job of r.value) all.push(job);
+      } else {
         failures += 1;
-        lastError = err;
-        log('warn', 'lever fetch failed', { slug, error: err instanceof Error ? err.message : 'unknown' });
+        lastError = r.reason;
+        log('warn', 'lever fetch failed', {
+          slug: slugs[i],
+          error: r.reason instanceof Error ? r.reason.message : 'unknown',
+        });
       }
     }
-    if (attempts > 0 && failures === attempts) {
+    if (slugs.length > 0 && failures === slugs.length) {
       if (lastError instanceof Error) throw lastError;
       throw new SourceFetchError('unknown', 'lever: all slugs failed');
     }
