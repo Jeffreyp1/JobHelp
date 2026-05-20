@@ -14,12 +14,31 @@ const greenhouseTokens = loadSlugs('greenhouse-tokens.json', ['stripe', 'vercel'
 const ashbyTokens = loadSlugs('ashby-slugs.json', ['ramp']);
 const leverSlugs = loadSlugs('lever-slugs.json', ['plaid']);
 const smartrecruitersTokens = loadSlugs('smartrecruiters-slugs.json', ['visa']);
-const workableTokens = loadSlugs('workable-slugs.json', ['polestar']);
 const recruiteeTokens = loadSlugs('recruitee-slugs.json', ['bunq']);
 const teamtailorTokens = loadSlugs('teamtailor-slugs.json', ['polestar']);
 const breezyTokens = loadSlugs('breezy-slugs.json', []);
 const pinpointTokens = loadSlugs('pinpoint-slugs.json', ['workwithus']);
 const personioTokens = loadSlugs('personio-slugs.json', ['personio']);
+
+// Adzuna auto-activates when ADZUNA_APP_ID + ADZUNA_APP_KEY are set; omitted otherwise.
+const adzunaAppId = process.env['ADZUNA_APP_ID'];
+const adzunaAppKey = process.env['ADZUNA_APP_KEY'];
+const adzunaSource = adzunaAppId !== undefined && adzunaAppKey !== undefined
+  ? { adzuna: { appId: adzunaAppId, appKey: adzunaAppKey, country: 'us', queries: ['software engineer', 'backend engineer', 'fullstack engineer'] } }
+  : {};
+
+// USAJobs auto-activates when USAJOBS_API_KEY + USAJOBS_EMAIL are set; omitted otherwise.
+const usajobsApiKey = process.env['USAJOBS_API_KEY'];
+const usajobsEmail = process.env['USAJOBS_EMAIL'];
+const usajobsSource = usajobsApiKey !== undefined && usajobsEmail !== undefined
+  ? { usajobs: { apiKey: usajobsApiKey, email: usajobsEmail, queries: ['software engineer', 'backend engineer', 'fullstack engineer'] } }
+  : {};
+
+// JSearch auto-activates when JSEARCH_API_KEY is set; omitted otherwise.
+const jsearchApiKey = process.env['JSEARCH_API_KEY'];
+const jsearchSource = jsearchApiKey !== undefined
+  ? { jsearch: { rapidApiKey: jsearchApiKey, queries: ['software engineer', 'backend engineer', 'fullstack engineer'] } }
+  : {};
 
 const config: JobDigestConfig = {
   profile: {
@@ -35,12 +54,12 @@ const config: JobDigestConfig = {
     seniority: 'mid',
     roleFamily: ['backend', 'fullstack', 'frontend'],
   },
+  // workable omitted: Cloudflare-blocks this IP. adzuna included only when its API keys are set.
   sources: {
     greenhouse: { tokens: greenhouseTokens },
     ashby: { tokens: ashbyTokens },
     lever: { slugs: leverSlugs },
     smartrecruiters: { tokens: smartrecruitersTokens },
-    workable: { tokens: workableTokens },
     recruitee: { tokens: recruiteeTokens },
     teamtailor: { tokens: teamtailorTokens },
     breezy: { tokens: breezyTokens },
@@ -48,6 +67,17 @@ const config: JobDigestConfig = {
     personio: { tokens: personioTokens },
     remoteok: {},
     remotive: { queries: ['typescript', 'python backend', 'fullstack engineer'] },
+    yc: { queries: ['software engineer', 'backend engineer', 'fullstack engineer'] },
+    weworkremotely: {
+      categories: [
+        'remote-full-stack-programming-jobs',
+        'remote-back-end-programming-jobs',
+        'remote-front-end-programming-jobs',
+      ],
+    },
+    ...adzunaSource,
+    ...usajobsSource,
+    ...jsearchSource,
   },
   ranking: { useLlmFitScore: false, topN: 200, digestK: 50 },
   rules: { userRulesDir: '/tmp/rules-demo', mode: 'additive' },
@@ -110,18 +140,22 @@ console.log('\n─────────────────────�
 console.log('JobHelp digest — live run + AI final filter');
 console.log('──────────────────────────────────────────────────────');
 const { judger, mode } = pickJudger();
-const totalBoards = greenhouseTokens.length + ashbyTokens.length + leverSlugs.length + smartrecruitersTokens.length + workableTokens.length + recruiteeTokens.length + teamtailorTokens.length + breezyTokens.length + pinpointTokens.length + personioTokens.length;
+const totalBoards = greenhouseTokens.length + ashbyTokens.length + leverSlugs.length + smartrecruitersTokens.length + recruiteeTokens.length + teamtailorTokens.length + breezyTokens.length + pinpointTokens.length + personioTokens.length;
 console.log(`  greenhouse:        ${greenhouseTokens.length}`);
 console.log(`  ashby:             ${ashbyTokens.length}`);
 console.log(`  lever:             ${leverSlugs.length}`);
 console.log(`  smartrecruiters:   ${smartrecruitersTokens.length}`);
-console.log(`  workable:          ${workableTokens.length}`);
 console.log(`  recruitee:         ${recruiteeTokens.length}`);
 console.log(`  teamtailor:        ${teamtailorTokens.length}`);
 console.log(`  breezy:            ${breezyTokens.length}`);
 console.log(`  pinpoint:          ${pinpointTokens.length}`);
 console.log(`  personio:          ${personioTokens.length}`);
 console.log(`  total boards:      ${totalBoards}`);
+console.log(`  yc:                on`);
+console.log(`  weworkremotely:    on`);
+console.log(`  adzuna:            ${Object.keys(adzunaSource).length > 0 ? 'enabled' : 'disabled'}`);
+console.log(`  usajobs:           ${Object.keys(usajobsSource).length > 0 ? 'enabled' : 'disabled'}`);
+console.log(`  jsearch:           ${Object.keys(jsearchSource).length > 0 ? 'enabled' : 'disabled'}`);
 console.log(`  AI judger:         ${mode}`);
 console.log('  Fetching jobs…');
 

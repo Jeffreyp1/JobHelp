@@ -8,6 +8,7 @@ import { adzuna } from './adzuna.js';
 import { ashby } from './ashby.js';
 import { breezy } from './breezy.js';
 import { greenhouse } from './greenhouse.js';
+import { jsearch } from './jsearch.js';
 import { lever } from './lever.js';
 import { personio } from './personio.js';
 import { pinpoint } from './pinpoint.js';
@@ -16,7 +17,10 @@ import { remoteok } from './remoteok.js';
 import { remotive } from './remotive.js';
 import { smartrecruiters } from './smartrecruiters.js';
 import { teamtailor } from './teamtailor.js';
+import { usajobs } from './usajobs.js';
+import { weworkremotely } from './weworkremotely.js';
 import { workable } from './workable.js';
+import { yc } from './yc.js';
 
 /** Registry of all built-in adapters. */
 export const ALL_ADAPTERS: readonly SourceAdapter[] = [
@@ -24,6 +28,7 @@ export const ALL_ADAPTERS: readonly SourceAdapter[] = [
   ashby,
   breezy,
   greenhouse,
+  jsearch,
   lever,
   personio,
   pinpoint,
@@ -32,7 +37,10 @@ export const ALL_ADAPTERS: readonly SourceAdapter[] = [
   remotive,
   smartrecruiters,
   teamtailor,
+  usajobs,
+  weworkremotely,
   workable,
+  yc,
 ] as const;
 
 export {
@@ -40,6 +48,7 @@ export {
   ashby,
   breezy,
   greenhouse,
+  jsearch,
   lever,
   personio,
   pinpoint,
@@ -48,5 +57,8 @@ export {
   remotive,
   smartrecruiters,
   teamtailor,
+  usajobs,
+  weworkremotely,
   workable,
+  yc,
 };

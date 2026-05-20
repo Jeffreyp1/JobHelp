@@ -24,7 +24,9 @@ import type {
   SourcesConfig,
   TeamtailorConfig,
   UsaJobsConfig,
+  WeWorkRemotelyConfig,
   WorkableConfig,
+  YcStartupConfig,
 } from '../types/config.js';
 import {
   validateBM25,
@@ -220,15 +222,43 @@ function validateLever(raw: unknown): LeverConfig {
 
 function validateUsaJobs(raw: unknown): UsaJobsConfig {
   const obj = requireRecord(raw, 'sources.usajobs');
-  return {
+  const out: { apiKey: string; email: string; queries?: string[] } = {
     apiKey: requireString(obj['apiKey'], 'sources.usajobs.apiKey'),
     email: requireString(obj['email'], 'sources.usajobs.email'),
   };
+  if (obj['queries'] !== undefined) {
+    out.queries = requireStringArray(obj['queries'], 'sources.usajobs.queries');
+  }
+  return out;
 }
 
 function validateJSearch(raw: unknown): JSearchConfig {
   const obj = requireRecord(raw, 'sources.jsearch');
-  return { rapidApiKey: requireString(obj['rapidApiKey'], 'sources.jsearch.rapidApiKey') };
+  const out: { rapidApiKey: string; queries?: string[] } = {
+    rapidApiKey: requireString(obj['rapidApiKey'], 'sources.jsearch.rapidApiKey'),
+  };
+  if (obj['queries'] !== undefined) {
+    out.queries = requireStringArray(obj['queries'], 'sources.jsearch.queries');
+  }
+  return out;
+}
+
+function validateYc(raw: unknown): YcStartupConfig {
+  const obj = requireRecord(raw, 'sources.yc');
+  const out: { queries?: string[] } = {};
+  if (obj['queries'] !== undefined) {
+    out.queries = requireStringArray(obj['queries'], 'sources.yc.queries');
+  }
+  return out;
+}
+
+function validateWeWorkRemotely(raw: unknown): WeWorkRemotelyConfig {
+  const obj = requireRecord(raw, 'sources.weworkremotely');
+  const out: { categories?: string[] } = {};
+  if (obj['categories'] !== undefined) {
+    out.categories = requireStringArray(obj['categories'], 'sources.weworkremotely.categories');
+  }
+  return out;
 }
 
 function validateAshby(raw: unknown): AshbyConfig {
@@ -306,7 +336,9 @@ function validateSources(raw: unknown): SourcesConfig {
     smartrecruiters?: SmartRecruitersConfig;
     teamtailor?: TeamtailorConfig;
     usajobs?: UsaJobsConfig;
+    weworkremotely?: WeWorkRemotelyConfig;
     workable?: WorkableConfig;
+    yc?: YcStartupConfig;
   } = {};
   if (obj['adzuna'] !== undefined) out.adzuna = validateAdzuna(obj['adzuna']);
   if (obj['ashby'] !== undefined) out.ashby = validateAshby(obj['ashby']);
@@ -322,7 +354,9 @@ function validateSources(raw: unknown): SourcesConfig {
   if (obj['smartrecruiters'] !== undefined) out.smartrecruiters = validateSmartRecruiters(obj['smartrecruiters']);
   if (obj['teamtailor'] !== undefined) out.teamtailor = validateTeamtailor(obj['teamtailor']);
   if (obj['usajobs'] !== undefined) out.usajobs = validateUsaJobs(obj['usajobs']);
+  if (obj['weworkremotely'] !== undefined) out.weworkremotely = validateWeWorkRemotely(obj['weworkremotely']);
   if (obj['workable'] !== undefined) out.workable = validateWorkable(obj['workable']);
+  if (obj['yc'] !== undefined) out.yc = validateYc(obj['yc']);
   return out;
 }
 
