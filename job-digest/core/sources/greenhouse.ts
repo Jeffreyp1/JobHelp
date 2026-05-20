@@ -9,9 +9,16 @@ import {
   classifyHttpStatus,
   detectRemoteMode,
   isRecord,
+  runWithConcurrency,
 } from './_shared.js';
 
 export { SourceFetchError };
+
+// CloudFront-fronted; concurrency 4 sustains ~18 rps (the per-IP ceiling).
+// A 406/429 trips backoff-retry, which self-limits the global rate.
+const GREENHOUSE_CONCURRENCY = 4;
+const GREENHOUSE_MAX_RETRIES = 3;
+const GREENHOUSE_BACKOFF_MS = 2000;
 
 function stripHtml(html: string): string {
   return html
@@ -109,27 +116,38 @@ function normalize(token: string, job: GreenhouseJob, raw: unknown): NormalizedJ
   return norm;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchBoard(token: string): Promise<unknown> {
   const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(token)}/jobs?content=true`;
-  let response: Response;
-  try {
-    response = await fetch(url);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'fetch failed';
-    throw new SourceFetchError('network', `greenhouse network error: ${msg}`);
-  }
-  if (!response.ok) {
-    throw new SourceFetchError(classifyHttpStatus(response.status), `greenhouse HTTP ${response.status}`);
-  }
-  const text = await response.text();
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new SourceFetchError('parse', 'greenhouse response was not valid JSON');
+  for (let attempt = 0; ; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetch(url);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'fetch failed';
+      throw new SourceFetchError('network', `greenhouse network error: ${msg}`);
+    }
+    // 406/429 = CloudFront rate-limit; back off and retry to self-throttle.
+    if ((response.status === 406 || response.status === 429) && attempt < GREENHOUSE_MAX_RETRIES) {
+      await sleep(GREENHOUSE_BACKOFF_MS * (attempt + 1));
+      continue;
+    }
+    if (!response.ok) {
+      throw new SourceFetchError(classifyHttpStatus(response.status), `greenhouse HTTP ${response.status}`);
+    }
+    const text = await response.text();
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      throw new SourceFetchError('parse', 'greenhouse response was not valid JSON');
+    }
   }
 }
 
-async function fetchAndCollect(token: string, out: NormalizedJob[]): Promise<void> {
+async function fetchTokenJobs(token: string): Promise<NormalizedJob[]> {
   const body = await fetchBoard(token);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'greenhouse response was not an object');
@@ -138,11 +156,13 @@ async function fetchAndCollect(token: string, out: NormalizedJob[]): Promise<voi
   if (!Array.isArray(jobs)) {
     throw new SourceFetchError('parse', 'greenhouse response.jobs was not an array');
   }
+  const out: NormalizedJob[] = [];
   for (const rawJob of jobs) {
     const parsed = parseGreenhouseJob(rawJob);
     if (parsed === undefined) continue;
     out.push(normalize(token, parsed, rawJob));
   }
+  return out;
 }
 
 export const greenhouse: SourceAdapter = {
@@ -156,21 +176,27 @@ export const greenhouse: SourceAdapter = {
     if (c === undefined) {
       throw new SourceFetchError('auth', 'greenhouse config missing');
     }
+    const tokens = c.tokens;
+    const tasks = tokens.map((token) => (): Promise<NormalizedJob[]> => fetchTokenJobs(token));
+    const settled = await runWithConcurrency(tasks, { limit: GREENHOUSE_CONCURRENCY });
     const all: NormalizedJob[] = [];
-    let attempts = 0;
-    let failures = 0;
     let lastError: unknown;
-    for (const token of c.tokens) {
-      attempts += 1;
-      try {
-        await fetchAndCollect(token, all);
-      } catch (err: unknown) {
+    let failures = 0;
+    for (let i = 0; i < settled.length; i += 1) {
+      const r = settled[i];
+      if (r === undefined) continue;
+      if (r.status === 'fulfilled') {
+        for (const job of r.value) all.push(job);
+      } else {
         failures += 1;
-        lastError = err;
-        log('warn', 'greenhouse fetch failed', { token, error: err instanceof Error ? err.message : 'unknown' });
+        lastError = r.reason;
+        log('warn', 'greenhouse fetch failed', {
+          token: tokens[i],
+          error: r.reason instanceof Error ? r.reason.message : 'unknown',
+        });
       }
     }
-    if (attempts > 0 && failures === attempts) {
+    if (tokens.length > 0 && failures === tokens.length) {
       if (lastError instanceof Error) throw lastError;
       throw new SourceFetchError('unknown', 'greenhouse: all tokens failed');
     }

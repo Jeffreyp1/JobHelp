@@ -9,7 +9,11 @@ import {
   classifyHttpStatus,
   detectRemoteMode,
   isRecord,
+  runWithConcurrency,
 } from './_shared.js';
+
+// Adzuna's free tier is rate-limited; keep query fan-out modest.
+const ADZUNA_CONCURRENCY = 5;
 
 export { SourceFetchError };
 
@@ -124,11 +128,7 @@ async function fetchOnePage(url: string): Promise<unknown> {
   }
 }
 
-async function fetchAndCollect(
-  url: string,
-  country: string,
-  out: NormalizedJob[],
-): Promise<void> {
+async function fetchQueryJobs(url: string, country: string): Promise<NormalizedJob[]> {
   const body = await fetchOnePage(url);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'adzuna response was not an object');
@@ -137,11 +137,13 @@ async function fetchAndCollect(
   if (!Array.isArray(results)) {
     throw new SourceFetchError('parse', 'adzuna response.results was not an array');
   }
+  const out: NormalizedJob[] = [];
   for (const rawResult of results) {
     const parsed = parseAdzunaResult(rawResult);
     if (parsed === undefined) continue;
     out.push(normalize(parsed, rawResult, country));
   }
+  return out;
 }
 
 export const adzuna: SourceAdapter = {
@@ -155,22 +157,28 @@ export const adzuna: SourceAdapter = {
     if (c === undefined) {
       throw new SourceFetchError('auth', 'adzuna config missing');
     }
+    const queries = c.queries;
+    const tasks = queries.map((query) => (): Promise<NormalizedJob[]> =>
+      fetchQueryJobs(buildUrl(c.country, query, c.appId, c.appKey), c.country));
+    const settled = await runWithConcurrency(tasks, { limit: ADZUNA_CONCURRENCY });
     const all: NormalizedJob[] = [];
-    let attempts = 0;
-    let failures = 0;
     let lastError: unknown;
-    for (const query of c.queries) {
-      attempts += 1;
-      const url = buildUrl(c.country, query, c.appId, c.appKey);
-      try {
-        await fetchAndCollect(url, c.country, all);
-      } catch (err: unknown) {
+    let failures = 0;
+    for (let i = 0; i < settled.length; i += 1) {
+      const r = settled[i];
+      if (r === undefined) continue;
+      if (r.status === 'fulfilled') {
+        for (const job of r.value) all.push(job);
+      } else {
         failures += 1;
-        lastError = err;
-        log('warn', 'adzuna fetch failed', { query, error: err instanceof Error ? err.message : 'unknown' });
+        lastError = r.reason;
+        log('warn', 'adzuna fetch failed', {
+          query: queries[i],
+          error: r.reason instanceof Error ? r.reason.message : 'unknown',
+        });
       }
     }
-    if (attempts > 0 && failures === attempts) {
+    if (queries.length > 0 && failures === queries.length) {
       if (lastError instanceof Error) throw lastError;
       throw new SourceFetchError('unknown', 'adzuna: all queries failed');
     }
