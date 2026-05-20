@@ -52,6 +52,8 @@ export interface SourcesConfig {
   readonly breezy?: BreezyConfig;
   readonly pinpoint?: PinpointConfig;
   readonly personio?: PersonioConfig;
+  readonly yc?: YcStartupConfig;
+  readonly weworkremotely?: WeWorkRemotelyConfig;
 }
 
 export interface AdzunaConfig {
@@ -115,10 +117,24 @@ export interface PersonioConfig {
 export interface UsaJobsConfig {
   readonly apiKey: string;
   readonly email: string;
+  /** Search keywords; if empty/missing, fetches a general listing. */
+  readonly queries?: readonly string[];
 }
 
 export interface JSearchConfig {
   readonly rapidApiKey: string;
+  /** Search keywords; if empty/missing, fetches a general listing. */
+  readonly queries?: readonly string[];
+}
+
+export interface YcStartupConfig {
+  /** Optional search keywords; if empty/missing, fetches the general WaaS feed. */
+  readonly queries?: readonly string[];
+}
+
+export interface WeWorkRemotelyConfig {
+  /** Optional RSS category slugs; if empty/missing, fetches the main remote-jobs feed. */
+  readonly categories?: readonly string[];
 }
 
 export interface RemotiveConfig {
