@@ -150,6 +150,7 @@ export function buildRankPrecomputed(
   const aliases = getAliasMap();
   const tokenize = makeCanonicalTokenizer(aliases);
   const params = resolveBM25Params(config);
+  const queryTerms = buildQueryTerms(config.profile.skills, aliases);
   const corpus = buildCorpus(
     jobs.map((j) => ({
       title: j.title,
@@ -158,8 +159,8 @@ export function buildRankPrecomputed(
       location: j.location,
     })),
     tokenize,
+    queryTerms,
   );
-  const queryTerms = buildQueryTerms(config.profile.skills, aliases);
   return { aliases, tokenize, corpus, queryTerms, params };
 }
 
@@ -183,22 +184,11 @@ export async function rank(
   const fusionCfg = config.ranking.fusion ?? DEFAULT_FUSION;
 
   const bm25Scores = new Map<string, number>();
-  const baseScored = jobs.map((job) => {
+  const baseScored = jobs.map((job, i) => {
     const keywordOverlap = keywordOverlapScore(job, config.profile.skills);
     const recencyBoost = computeRecencyMultiplier(job, recencyCfg, now);
     const sourceTrust = computeSourceTrustMultiplier(job, sourceTrustCfg);
-    const bm25f = scoreBM25F(
-      pc.corpus,
-      {
-        title: job.title,
-        description: job.description,
-        company: job.company,
-        location: job.location,
-      },
-      pc.queryTerms,
-      pc.tokenize,
-      pc.params,
-    );
+    const bm25f = scoreBM25F(pc.corpus, i, pc.queryTerms, pc.params);
     bm25Scores.set(job.id, bm25f);
     const productScore = bm25f * recencyBoost * sourceTrust;
     const breakdown: ScoreBreakdown = { keywordOverlap, recencyBoost, bm25f, sourceTrust };
