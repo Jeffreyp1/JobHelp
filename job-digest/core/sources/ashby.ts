@@ -9,7 +9,11 @@ import {
   classifyHttpStatus,
   detectRemoteMode as detectRemoteFromText,
   isRecord,
+  runWithConcurrency,
 } from './_shared.js';
+
+// Ashby has no observed rate limit; fetch boards aggressively in parallel.
+const ASHBY_CONCURRENCY = 35;
 
 export { SourceFetchError };
 
@@ -131,7 +135,7 @@ async function fetchBoard(token: string): Promise<unknown> {
   }
 }
 
-async function fetchAndCollect(token: string, out: NormalizedJob[]): Promise<void> {
+async function fetchTokenJobs(token: string): Promise<NormalizedJob[]> {
   const body = await fetchBoard(token);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'ashby response was not an object');
@@ -140,11 +144,13 @@ async function fetchAndCollect(token: string, out: NormalizedJob[]): Promise<voi
   if (!Array.isArray(jobs)) {
     throw new SourceFetchError('parse', 'ashby response.jobs was not an array');
   }
+  const out: NormalizedJob[] = [];
   for (const rawJob of jobs) {
     const parsed = parseAshbyJob(rawJob);
     if (parsed === undefined) continue;
     out.push(normalize(token, parsed, rawJob));
   }
+  return out;
 }
 
 export const ashby: SourceAdapter = {
@@ -158,21 +164,27 @@ export const ashby: SourceAdapter = {
     if (c === undefined) {
       throw new SourceFetchError('auth', 'ashby config missing');
     }
+    const tokens = c.tokens;
+    const tasks = tokens.map((token) => (): Promise<NormalizedJob[]> => fetchTokenJobs(token));
+    const settled = await runWithConcurrency(tasks, { limit: ASHBY_CONCURRENCY });
     const all: NormalizedJob[] = [];
-    let attempts = 0;
-    let failures = 0;
     let lastError: unknown;
-    for (const token of c.tokens) {
-      attempts += 1;
-      try {
-        await fetchAndCollect(token, all);
-      } catch (err: unknown) {
+    let failures = 0;
+    for (let i = 0; i < settled.length; i += 1) {
+      const r = settled[i];
+      if (r === undefined) continue;
+      if (r.status === 'fulfilled') {
+        for (const job of r.value) all.push(job);
+      } else {
         failures += 1;
-        lastError = err;
-        log('warn', 'ashby fetch failed', { token, error: err instanceof Error ? err.message : 'unknown' });
+        lastError = r.reason;
+        log('warn', 'ashby fetch failed', {
+          token: tokens[i],
+          error: r.reason instanceof Error ? r.reason.message : 'unknown',
+        });
       }
     }
-    if (attempts > 0 && failures === attempts) {
+    if (tokens.length > 0 && failures === tokens.length) {
       if (lastError instanceof Error) throw lastError;
       throw new SourceFetchError('unknown', 'ashby: all tokens failed');
     }
