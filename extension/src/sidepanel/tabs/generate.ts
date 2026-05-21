@@ -19,7 +19,11 @@
 import { renderJobInsightsCard } from '../components/jobInsights.js';
 import { renderToggleRow } from '../components/toggleRow.js';
 import { renderCostEstimator } from '../components/costEstimator.js';
-import { renderResumeEditor, type ResumeReviseEventDetail } from '../components/resumeEditor.js';
+import {
+  renderResumeEditor,
+  type ResumeReviseEventDetail,
+  type ResumeSaveResult,
+} from '../components/resumeEditor.js';
 import { estimateCost } from '../../lib/costCalculator.js';
 import { formatTokens } from '../../lib/tokenFormatter.js';
 import { get, set } from '../../lib/storage.js';
@@ -91,7 +95,15 @@ export interface GenerateTabController {
   applyScraperOutput(output: ScraperOutput): void;
   showResume(md: string): void;
   /** Show resume after a successful generate; also unlocks the finalize section. */
-  showGenerateResult(md: string, docUrl: string, jobFolderUrl: string, sheetRowUrl?: string): void;
+  showGenerateResult(
+    md: string,
+    docUrl: string,
+    jobFolderUrl: string,
+    sheetRowUrl?: string,
+    mdFileUrl?: string,
+  ): void;
+  /** Drive file id of the tailored-resume markdown, or null if unknown. */
+  getResumeFileId(): string | null;
   setBusy(busy: boolean, label?: string): void;
 }
 
@@ -106,7 +118,7 @@ export interface GenerateTabHooks {
   /** Invoked when the user clicks the Generate button. */
   onGenerate: (req: Omit<GenerateRequest, 'action'>) => void | Promise<void>;
   /** Invoked when the user clicks Save & Log on the resume editor. */
-  onSaveResume: (md: string) => void | Promise<void>;
+  onSaveResume: (md: string) => ResumeSaveResult | void | Promise<ResumeSaveResult | void>;
   /**
    * Invoked when the user clicks Convert to PDF or Convert to DOCX.
    * Should call apiClient.finalize and return the result.
@@ -149,6 +161,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     // Populated after a successful generate; needed by finalize.
     docId: null as string | null,
     jobFolderId: null as string | null,
+    // Drive file id of the tailored-resume markdown; used by Save & Log.
+    mdFileId: null as string | null,
     // Tracking-sheet row URL from the generate result — passed into the v2
     // post-gen calls (critique / cover letter / verify hooks) so they can
     // update the sheet's result columns.
@@ -769,7 +783,10 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     docUrl: string,
     jobFolderUrl: string,
     sheetRowUrl?: string,
+    mdFileUrl?: string,
   ): void {
+    // Set before showResume so the editor's Save & Log callback can read it.
+    state.mdFileId = mdFileUrl ? extractFileIdFromUrl(mdFileUrl) : null;
     showResume(md);
 
     const docId = extractDocId(docUrl);
@@ -1153,7 +1170,11 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     }
   })();
 
-  return { root, applyScraperOutput, showResume, showGenerateResult, setBusy };
+  function getResumeFileId(): string | null {
+    return state.mdFileId;
+  }
+
+  return { root, applyScraperOutput, showResume, showGenerateResult, getResumeFileId, setBusy };
 }
 
 function escapeHtml(s: string): string {
