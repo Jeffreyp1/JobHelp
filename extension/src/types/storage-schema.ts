@@ -15,7 +15,7 @@
  * them via `clearLegacySettings()`.
  */
 
-import type { ToggleConfig } from "./api-contract.js";
+import type { ToggleConfig, DiscoverAndRankResult } from "./api-contract.js";
 import type { JobInsights } from "./job-insights.js";
 
 export type OnboardingState = "noConfig" | "needsApiKey" | "needsFolders" | "seeding" | "ready";
@@ -31,6 +31,13 @@ export interface CachedJobInsights {
   url: string;
   insights: JobInsights;
   timestamp: number;
+}
+
+export interface CachedDigest {
+  /** The last successful discover-and-rank result, as the Jobs tab consumes it. */
+  result: DiscoverAndRankResult;
+  /** Epoch ms when the digest was run — used to show the list's age on reload. */
+  savedAt: number;
 }
 
 export interface V2TogglesState {
@@ -86,6 +93,9 @@ export interface StorageSchema {
   /** Last successful scrape — restores Job Insights card on re-open */
   lastJobInsights: CachedJobInsights | null;
 
+  /** Last successful digest — restores the Jobs tab list on re-open */
+  lastDigest: CachedDigest | null;
+
   /** Last-used v2 toggle state (per-feature enable + model + count). */
   v2Toggles: V2TogglesState | null;
 }
@@ -104,6 +114,7 @@ export const STORAGE_DEFAULTS: StorageSchema = {
   presets: [],
   onboardingState: "noConfig",
   lastJobInsights: null,
+  lastDigest: null,
   v2Toggles: null,
 };
 

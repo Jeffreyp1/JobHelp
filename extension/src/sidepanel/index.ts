@@ -25,6 +25,8 @@ import type { JobProfile, DiscoveryConfig, RankedJob, JobPipelineStatus } from '
 import { get, set } from '../lib/storage.js';
 import { loadConfigFromDrive } from '../lib/configLoader.js';
 import type { JobhelpConfig } from '../types/jobhelp-config.js';
+import type { CachedDigest } from '../types/storage-schema.js';
+import { loadDigest, saveDigest } from '../lib/digestCache.js';
 
 // ─── Runtime config (v2.1, Approach C) ────────────────────────────────────
 // Module-scoped cache of the JobhelpConfig loaded from the user's Drive on
@@ -220,7 +222,11 @@ async function getApiClient(): Promise<ApiClient | null> {
   return new ApiClient(url);
 }
 
-function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: false }): PanelControllers {
+function buildControllers(
+  opts: { autoOpenWizard: boolean; initialDigest?: CachedDigest | null } = {
+    autoOpenWizard: false,
+  },
+): PanelControllers {
   const generate = renderGenerateTab({
     onGenerate: (req) => {
       const c = getChrome();
@@ -417,6 +423,7 @@ function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: 
   });
 
   const jobs = renderJobsTab({
+    initialResult: opts.initialDigest ?? undefined,
     onExtractProfile: async () => {
       const client = await getApiClient();
       const cfg = getRuntimeConfig();
@@ -471,7 +478,9 @@ function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: 
         sheetId: cfg.sheetId,
       });
       if (!resp.ok) return { ok: false as const, message: resp.error.message };
-      return { ok: true as const, result: resp };
+      const { ok: _ok, ...result } = resp;
+      await saveDigest(result);
+      return { ok: true as const, result };
     },
     onTailorJob: (job: RankedJob) => {
       // Prefill the Generate tab with this job's JD/company/role, then switch
@@ -579,7 +588,9 @@ function init(): void {
     }
     const autoOpenWizard = !fileId;
 
-    const controllers = buildControllers({ autoOpenWizard });
+    // Restore the last cached digest so the Jobs tab isn't blank on re-open.
+    const initialDigest = await loadDigest();
+    const controllers = buildControllers({ autoOpenWizard, initialDigest });
     const panes: Record<TabName, HTMLElement> = {
       generate: controllers.generate.root,
       files: controllers.files.root,
