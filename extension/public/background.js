@@ -13,6 +13,7 @@ var STORAGE_DEFAULTS = {
   presets: [],
   onboardingState: "noConfig",
   lastJobInsights: null,
+  lastDigest: null,
   v2Toggles: null
 };
 
