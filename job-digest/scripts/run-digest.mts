@@ -79,7 +79,7 @@ const config: JobDigestConfig = {
     ...usajobsSource,
     ...jsearchSource,
   },
-  ranking: { useLlmFitScore: false, topN: 200, digestK: 50 },
+  ranking: { topN: 200, digestK: 50 },
   rules: { userRulesDir: '/tmp/rules-demo', mode: 'additive' },
   output: { dir: '/tmp/jobhelp-demo' },
 };

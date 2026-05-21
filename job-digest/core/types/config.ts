@@ -3,8 +3,6 @@
  * Validated at startup; all fields immutable after load.
  *
  * Design B (zero-API-key): no `anthropic` block. The MCP server never calls Claude.
- * `useLlmFitScore` retained for backward-compat with Phase 1's rank.ts shape but is
- * always forced to `false` by `loadConfig`.
  */
 export interface JobDigestConfig {
   readonly profile: ProfileConfig;
@@ -150,8 +148,6 @@ export interface RemoteOkConfig {
 }
 
 export interface RankingConfig {
-  /** Always coerced to `false` by `loadConfig` in Design B. Field retained for shape compat. */
-  readonly useLlmFitScore: boolean;
   /** Top-N survivors to send through expensive scoring. (LLM path disabled in Design B.) */
   readonly topN: number;
   /** Number of jobs in the final digest. */
