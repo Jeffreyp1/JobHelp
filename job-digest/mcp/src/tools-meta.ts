@@ -1,19 +1,20 @@
 import type { CoreDeps, ToolHandler } from './tools-types.js';
 import { buildHandler, unwrap } from './tools-helpers.js';
 import { parseRerankTopJobs, parseValidateSources } from './tools-parsers.js';
+import { ALL_SOURCE_NAMES } from '../../core/sources/index.js';
 
 export function createMetaTools(deps: CoreDeps): readonly ToolHandler[] {
   return [
     buildHandler({
       name: 'validate_sources',
       description:
-        'Ping each configured source adapter (Greenhouse tokens, Lever slugs, Adzuna credentials, Remotive, RemoteOK) and report per-source health: ok/failed, statusCode, jobCount, durationMs. Use this at config time to catch stale tokens, expired credentials, or rate limits before they silently produce empty digests.',
+        'Ping each configured source adapter (every source in the adapter registry) and report per-source health: ok/failed, statusCode, jobCount, durationMs. Use this at config time to catch stale tokens, expired credentials, or rate limits before they silently produce empty digests.',
       inputSchema: {
         type: 'object',
         properties: {
           source: {
             type: 'string',
-            enum: ['adzuna', 'greenhouse', 'lever', 'remotive', 'remoteok'],
+            enum: [...ALL_SOURCE_NAMES],
             description: 'Optional adapter name to validate only that source. Omit to validate all configured adapters.',
           },
         },

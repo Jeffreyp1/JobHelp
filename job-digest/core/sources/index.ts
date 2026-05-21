@@ -43,6 +43,9 @@ export const ALL_ADAPTERS: readonly SourceAdapter[] = [
   yc,
 ] as const;
 
+/** Canonical source-name list, derived from the registry so the MCP tool layer cannot drift. */
+export const ALL_SOURCE_NAMES: readonly string[] = ALL_ADAPTERS.map((a) => a.name);
+
 export {
   adzuna,
   ashby,
