@@ -80,7 +80,6 @@ function buildConfig(answers: Record<string, unknown>): Record<string, unknown> 
     },
     sources,
     ranking: {
-      useLlmFitScore: false,
       topN: 20,
       digestK: 10,
     },
