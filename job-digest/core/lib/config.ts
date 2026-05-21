@@ -147,7 +147,6 @@ function validateProfile(raw: unknown): ProfileConfig {
 function validateRanking(raw: unknown): RankingConfig {
   if (raw === undefined) {
     return {
-      useLlmFitScore: false,
       topN: 20,
       digestK: 10,
       bm25: validateBM25(undefined),
@@ -159,7 +158,6 @@ function validateRanking(raw: unknown): RankingConfig {
   }
   const obj = requireRecord(raw, 'ranking');
   return {
-    useLlmFitScore: false,
     topN: obj['topN'] !== undefined ? requireNumber(obj['topN'], 'ranking.topN') : 20,
     digestK: obj['digestK'] !== undefined ? requireNumber(obj['digestK'], 'ranking.digestK') : 10,
     bm25: validateBM25(obj['bm25']),

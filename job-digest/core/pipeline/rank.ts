@@ -165,7 +165,6 @@ export function buildRankPrecomputed(
 }
 
 // BM25F × recency half-life × source-trust, optionally fused with RRF. Pure deterministic, no LLM.
-// `ranking.useLlmFitScore` is silently ignored (Design B); llmFitScore/llmRationale stay undefined.
 export async function rank(
   jobs: readonly NormalizedJob[],
   config: JobDigestConfig,
@@ -173,10 +172,6 @@ export async function rank(
   now: Date = new Date(),
 ): Promise<readonly RankedJob[]> {
   if (jobs.length === 0) return [];
-
-  if (config.ranking.useLlmFitScore) {
-    log('debug', 'rank.llm_fit_score_ignored', {});
-  }
 
   const pc = precomputed ?? buildRankPrecomputed(jobs, config);
   const recencyCfg = config.ranking.recency ?? DEFAULT_RECENCY;
