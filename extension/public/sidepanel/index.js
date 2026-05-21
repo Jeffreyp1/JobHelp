@@ -17830,10 +17830,39 @@ function renderResumeEditor(props) {
   saveBtn.type = "button";
   saveBtn.className = "btn btn-primary resume-editor__save";
   saveBtn.textContent = "Save & Log";
+  const saveStatus = document.createElement("span");
+  saveStatus.className = "resume-editor__save-status";
+  saveStatus.setAttribute("role", "status");
+  saveStatus.setAttribute("aria-live", "polite");
   saveBtn.addEventListener("click", () => {
-    props.onSave(textarea.value);
+    const result = props.onSave(textarea.value);
+    if (!(result instanceof Promise)) return;
+    saveBtn.disabled = true;
+    saveStatus.textContent = "Saving\u2026";
+    saveStatus.className = "resume-editor__save-status is-saving";
+    void result.then((r) => {
+      if (r && r.ok === false) {
+        saveStatus.textContent = `Save failed: ${r.message}`;
+        saveStatus.className = "resume-editor__save-status is-error";
+      } else {
+        const at = r && r.ok ? r.savedAt : Date.now();
+        const time = new Date(at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+        saveStatus.textContent = `Saved ${time}`;
+        saveStatus.className = "resume-editor__save-status is-saved";
+      }
+    }).catch((err) => {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      saveStatus.textContent = `Save failed: ${message}`;
+      saveStatus.className = "resume-editor__save-status is-error";
+    }).finally(() => {
+      saveBtn.disabled = false;
+    });
   });
   actions.appendChild(saveBtn);
+  actions.appendChild(saveStatus);
   const wholeBtn = makeReviseButton("Revise whole resume", "revise-whole-resume", {});
   wholeBtn.classList.remove("revise-btn");
   wholeBtn.classList.add("btn", "btn-secondary", "revise-whole-resume");
@@ -18115,6 +18144,7 @@ var STORAGE_DEFAULTS = {
   presets: [],
   onboardingState: "noConfig",
   lastJobInsights: null,
+  lastDigest: null,
   v2Toggles: null
 };
 var LEGACY_SETTINGS_KEYS = [
@@ -18265,6 +18295,8 @@ function renderGenerateTab(hooks) {
     // Populated after a successful generate; needed by finalize.
     docId: null,
     jobFolderId: null,
+    // Drive file id of the tailored-resume markdown; used by Save & Log.
+    mdFileId: null,
     // Tracking-sheet row URL from the generate result — passed into the v2
     // post-gen calls (critique / cover letter / verify hooks) so they can
     // update the sheet's result columns.
@@ -18826,7 +18858,8 @@ function renderGenerateTab(hooks) {
       }
     });
   }
-  function showGenerateResult(md, docUrl, jobFolderUrl, sheetRowUrl) {
+  function showGenerateResult(md, docUrl, jobFolderUrl, sheetRowUrl, mdFileUrl) {
+    state.mdFileId = mdFileUrl ? extractFileIdFromUrl(mdFileUrl) : null;
     showResume(md);
     const docId = extractDocId(docUrl);
     const jobFolderId = extractFolderId(jobFolderUrl);
@@ -19138,7 +19171,10 @@ function renderGenerateTab(hooks) {
     } catch {
     }
   })();
-  return { root, applyScraperOutput, showResume, showGenerateResult, setBusy };
+  function getResumeFileId() {
+    return state.mdFileId;
+  }
+  return { root, applyScraperOutput, showResume, showGenerateResult, getResumeFileId, setBusy };
 }
 function escapeHtml3(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -19263,20 +19299,7 @@ function renderFileRow(f) {
   return li;
 }
 
-// extension/src/sidepanel/tabs/jobs.ts
-var HAIKU2 = "claude-haiku-4-5-20251001";
-var SONNET2 = "claude-sonnet-4-6";
-var OPUS2 = "claude-opus-4-7";
-var FIT_MODELS = [HAIKU2, SONNET2, OPUS2];
-var DAYS_OPTIONS = [
-  { value: 1, label: "past 24h" },
-  { value: 3, label: "past 3 days" },
-  { value: 7, label: "past 7 days" },
-  { value: 14, label: "past 14 days" },
-  { value: 30, label: "past 30 days" },
-  { value: 0, label: "any age" }
-];
-var TOPN_OPTIONS = [5, 10, 20, 40];
+// extension/src/sidepanel/tabs/jobs-row.ts
 function el2(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -19291,23 +19314,156 @@ function formatPostedAge(postedAt) {
   if (diffDays === 1) return "posted 1 day ago";
   return `posted ${diffDays} days ago`;
 }
+function formatDigestAge(savedAt) {
+  if (!Number.isFinite(savedAt)) return "unknown age";
+  const diffMs = Date.now() - savedAt;
+  if (diffMs < 0) return "just now";
+  const mins = Math.floor(diffMs / (1e3 * 60));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "1 day ago" : `${days} days ago`;
+}
 function formatScore(n) {
   const pct = Math.round(Math.max(0, Math.min(1, n)) * 100);
   return `${pct}%`;
 }
 function buildChip(text, muted = false) {
-  const chip = el2("span", `jobs-chip${muted ? " jobs-chip--muted" : ""}`, text);
-  return chip;
+  return el2("span", `jobs-chip${muted ? " jobs-chip--muted" : ""}`, text);
 }
-function renderJobsTab(hooks = {}) {
-  const root = el2("section", "tab-pane tab-pane--jobs");
-  let profile = null;
-  const state = {
-    maxDaysOld: 7,
-    topN: 10,
-    useFitScore: false,
-    fitScoreModel: HAIKU2
-  };
+function renderJobRow(job, view) {
+  const li = el2("li", "jobs-row");
+  li.dataset.jobId = job.id;
+  const summary = el2("div", "jobs-row__summary");
+  summary.setAttribute("role", "button");
+  summary.tabIndex = 0;
+  const titleParts = [];
+  if (job.company) titleParts.push(job.company);
+  if (job.title) titleParts.push(job.title);
+  if (job.location) titleParts.push(job.location);
+  summary.appendChild(el2("span", "jobs-row__title", titleParts.join(" \xB7 ")));
+  summary.appendChild(el2("span", "jobs-row__age", formatPostedAge(job.postedAt)));
+  const badge = el2("span", "jobs-row__score", formatScore(job.finalScore));
+  badge.setAttribute("aria-label", `fit score ${formatScore(job.finalScore)}`);
+  summary.appendChild(badge);
+  summary.appendChild(el2("span", "jobs-row__source", job.source));
+  li.appendChild(summary);
+  const detail = el2("div", "jobs-row__detail");
+  detail.hidden = true;
+  if (job.matchedSkills && job.matchedSkills.length) {
+    const matchedWrap = el2("div", "jobs-row__skills jobs-row__skills--matched");
+    matchedWrap.appendChild(el2("span", "jobs-row__skills-label", "Matched: "));
+    for (const s of job.matchedSkills) matchedWrap.appendChild(buildChip(s, false));
+    detail.appendChild(matchedWrap);
+  }
+  if (job.missingSkills && job.missingSkills.length) {
+    const missingWrap = el2("div", "jobs-row__skills jobs-row__skills--missing");
+    missingWrap.appendChild(el2("span", "jobs-row__skills-label", "Missing: "));
+    for (const s of job.missingSkills) missingWrap.appendChild(buildChip(s, true));
+    detail.appendChild(missingWrap);
+  }
+  const snippet = (job.descriptionText ?? "").slice(0, 400);
+  if (snippet) {
+    const snippetEl = el2("p", "jobs-row__snippet");
+    snippetEl.textContent = snippet + (job.descriptionText && job.descriptionText.length > 400 ? "\u2026" : "");
+    detail.appendChild(snippetEl);
+  }
+  const actions = el2("div", "jobs-row__actions");
+  const openLink = el2("a", "btn btn-ghost jobs-row__open", "Open posting");
+  openLink.href = job.url;
+  openLink.target = "_blank";
+  openLink.rel = "noopener noreferrer";
+  actions.appendChild(openLink);
+  const tailorBtn = el2("button", "btn btn-secondary jobs-row__tailor", "Tailor resume");
+  tailorBtn.type = "button";
+  tailorBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    if (!view.onTailorJob) {
+      view.showError("Generate not available \u2014 run setup in Settings first.");
+      return;
+    }
+    void view.onTailorJob(job);
+  });
+  actions.appendChild(tailorBtn);
+  const appliedBtn = el2("button", "btn btn-secondary jobs-row__applied", "Mark applied");
+  appliedBtn.type = "button";
+  appliedBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    if (!view.onMarkStatus) {
+      view.showError("Pipeline sheet not configured \u2014 run setup in Settings first.");
+      return;
+    }
+    void view.onMarkStatus(job.id, "applied");
+    appliedBtn.textContent = "Applied \u2713";
+    appliedBtn.disabled = true;
+  });
+  actions.appendChild(appliedBtn);
+  const dismissBtn = el2("button", "btn btn-ghost jobs-row__dismiss", "Dismiss");
+  dismissBtn.type = "button";
+  dismissBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    if (view.onMarkStatus) void view.onMarkStatus(job.id, "rejected");
+    li.remove();
+    if (!view.listEl.querySelector(".jobs-row")) {
+      view.emptyEl.hidden = false;
+      view.emptyEl.textContent = "No jobs left in this digest.";
+    }
+  });
+  actions.appendChild(dismissBtn);
+  detail.appendChild(actions);
+  li.appendChild(detail);
+  function toggleExpand() {
+    const willExpand = detail.hidden;
+    detail.hidden = !willExpand;
+    li.classList.toggle("jobs-row--expanded", willExpand);
+  }
+  summary.addEventListener("click", toggleExpand);
+  summary.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      toggleExpand();
+    }
+  });
+  return li;
+}
+function renderJobList(result, restoredAt, view) {
+  view.listEl.replaceChildren();
+  const jobs = result.jobs ?? [];
+  if (jobs.length === 0) {
+    view.emptyEl.hidden = false;
+    view.emptyEl.textContent = "No matching jobs in this digest.";
+  } else {
+    view.emptyEl.hidden = true;
+    for (const job of jobs) {
+      view.listEl.appendChild(renderJobRow(job, view));
+    }
+  }
+  view.footerEl.hidden = false;
+  const cost = result.cost?.totalUsd ?? 0;
+  const summary = `Last digest: ${result.discoveredCount} found, ${jobs.length} shown \xB7 cost $${cost.toFixed(4)}`;
+  view.footerEl.textContent = restoredAt !== void 0 ? `Restored \u2014 last refreshed ${formatDigestAge(restoredAt)} \xB7 ${summary}` : summary;
+}
+
+// extension/src/sidepanel/tabs/jobs-controls.ts
+var HAIKU2 = "claude-haiku-4-5-20251001";
+var SONNET2 = "claude-sonnet-4-6";
+var OPUS2 = "claude-opus-4-7";
+var FIT_MODELS = [HAIKU2, SONNET2, OPUS2];
+var DAYS_OPTIONS = [
+  { value: 1, label: "past 24h" },
+  { value: 3, label: "past 3 days" },
+  { value: 7, label: "past 7 days" },
+  { value: 14, label: "past 14 days" },
+  { value: 30, label: "past 30 days" },
+  { value: 0, label: "any age" }
+];
+var TOPN_OPTIONS = [5, 10, 20, 40];
+function createControlsState() {
+  return { maxDaysOld: 7, topN: 10, useFitScore: false, fitScoreModel: HAIKU2 };
+}
+function buildJobsHeader(state) {
   const header = el2("div", "jobs__header");
   const refreshBtn = el2("button", "btn btn-primary jobs__refresh", "Refresh digest");
   refreshBtn.type = "button";
@@ -19372,14 +19528,19 @@ function renderJobsTab(hooks = {}) {
   const reExtractLink = el2("button", "btn btn-ghost jobs__reextract", "Re-extract profile");
   reExtractLink.type = "button";
   header.appendChild(reExtractLink);
+  return { header, refreshBtn, reExtractLink, statusEl };
+}
+
+// extension/src/sidepanel/tabs/jobs.ts
+function renderJobsTab(hooks = {}) {
+  const root = el2("section", "tab-pane tab-pane--jobs");
+  let profile = null;
+  const state = createControlsState();
+  const { header, refreshBtn, reExtractLink, statusEl } = buildJobsHeader(state);
   root.appendChild(header);
   const listEl = el2("ul", "jobs__list");
   root.appendChild(listEl);
-  const emptyEl = el2(
-    "p",
-    "jobs__empty",
-    "No jobs yet \u2014 click Refresh digest."
-  );
+  const emptyEl = el2("p", "jobs__empty", "No jobs yet \u2014 click Refresh digest.");
   root.appendChild(emptyEl);
   const footerEl = el2("div", "jobs__footer");
   footerEl.hidden = true;
@@ -19403,6 +19564,14 @@ function renderJobsTab(hooks = {}) {
     statusEl.textContent = message;
     statusEl.className = "jobs__status";
   }
+  const view = {
+    listEl,
+    emptyEl,
+    footerEl,
+    showError,
+    onTailorJob: hooks.onTailorJob,
+    onMarkStatus: hooks.onMarkStatus
+  };
   async function runDigest() {
     if (!hooks.onRunDigest) {
       showError("Discovery sources not configured \u2014 set them in Settings.");
@@ -19419,7 +19588,7 @@ function renderJobsTab(hooks = {}) {
         showError(outcome.message);
         return;
       }
-      applyDigestResult(outcome.result);
+      renderJobList(outcome.result, void 0, view);
       showInfo("");
     } catch (e) {
       showError(`Digest failed: ${e.message ?? e}`);
@@ -19449,120 +19618,12 @@ function renderJobsTab(hooks = {}) {
   }
   refreshBtn.addEventListener("click", () => void runDigest());
   reExtractLink.addEventListener("click", () => void reExtractProfile());
-  function applyDigestResult(result) {
-    listEl.replaceChildren();
-    const jobs = result.jobs ?? [];
-    if (jobs.length === 0) {
-      emptyEl.hidden = false;
-      emptyEl.textContent = "No matching jobs in this digest.";
-    } else {
-      emptyEl.hidden = true;
-      for (const job of jobs) {
-        listEl.appendChild(renderJobRow(job));
-      }
-    }
-    footerEl.hidden = false;
-    const cost = result.cost?.totalUsd ?? 0;
-    footerEl.textContent = `Last digest: ${result.discoveredCount} found, ${jobs.length} shown \xB7 cost $${cost.toFixed(4)}`;
-  }
-  function renderJobRow(job) {
-    const li = el2("li", "jobs-row");
-    li.dataset.jobId = job.id;
-    const summary = el2("div", "jobs-row__summary");
-    summary.setAttribute("role", "button");
-    summary.tabIndex = 0;
-    const titleParts = [];
-    if (job.company) titleParts.push(job.company);
-    if (job.title) titleParts.push(job.title);
-    if (job.location) titleParts.push(job.location);
-    summary.appendChild(el2("span", "jobs-row__title", titleParts.join(" \xB7 ")));
-    summary.appendChild(el2("span", "jobs-row__age", formatPostedAge(job.postedAt)));
-    const badge = el2("span", "jobs-row__score", formatScore(job.finalScore));
-    badge.setAttribute("aria-label", `fit score ${formatScore(job.finalScore)}`);
-    summary.appendChild(badge);
-    summary.appendChild(el2("span", "jobs-row__source", job.source));
-    li.appendChild(summary);
-    const detail = el2("div", "jobs-row__detail");
-    detail.hidden = true;
-    if (job.matchedSkills && job.matchedSkills.length) {
-      const matchedWrap = el2("div", "jobs-row__skills jobs-row__skills--matched");
-      matchedWrap.appendChild(el2("span", "jobs-row__skills-label", "Matched: "));
-      for (const s of job.matchedSkills) matchedWrap.appendChild(buildChip(s, false));
-      detail.appendChild(matchedWrap);
-    }
-    if (job.missingSkills && job.missingSkills.length) {
-      const missingWrap = el2("div", "jobs-row__skills jobs-row__skills--missing");
-      missingWrap.appendChild(el2("span", "jobs-row__skills-label", "Missing: "));
-      for (const s of job.missingSkills) missingWrap.appendChild(buildChip(s, true));
-      detail.appendChild(missingWrap);
-    }
-    const snippet = (job.descriptionText ?? "").slice(0, 400);
-    if (snippet) {
-      const snippetEl = el2("p", "jobs-row__snippet");
-      snippetEl.textContent = snippet + (job.descriptionText && job.descriptionText.length > 400 ? "\u2026" : "");
-      detail.appendChild(snippetEl);
-    }
-    const actions = el2("div", "jobs-row__actions");
-    const openLink = el2("a", "btn btn-ghost jobs-row__open", "Open posting");
-    openLink.href = job.url;
-    openLink.target = "_blank";
-    openLink.rel = "noopener noreferrer";
-    actions.appendChild(openLink);
-    const tailorBtn = el2("button", "btn btn-secondary jobs-row__tailor", "Tailor resume");
-    tailorBtn.type = "button";
-    tailorBtn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      if (!hooks.onTailorJob) {
-        showError("Generate not available \u2014 run setup in Settings first.");
-        return;
-      }
-      void hooks.onTailorJob(job);
-    });
-    actions.appendChild(tailorBtn);
-    const appliedBtn = el2("button", "btn btn-secondary jobs-row__applied", "Mark applied");
-    appliedBtn.type = "button";
-    appliedBtn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      if (!hooks.onMarkStatus) {
-        showError("Pipeline sheet not configured \u2014 run setup in Settings first.");
-        return;
-      }
-      void hooks.onMarkStatus(job.id, "applied");
-      appliedBtn.textContent = "Applied \u2713";
-      appliedBtn.disabled = true;
-    });
-    actions.appendChild(appliedBtn);
-    const dismissBtn = el2("button", "btn btn-ghost jobs-row__dismiss", "Dismiss");
-    dismissBtn.type = "button";
-    dismissBtn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      if (hooks.onMarkStatus) void hooks.onMarkStatus(job.id, "rejected");
-      li.remove();
-      if (!listEl.querySelector(".jobs-row")) {
-        emptyEl.hidden = false;
-        emptyEl.textContent = "No jobs left in this digest.";
-      }
-    });
-    actions.appendChild(dismissBtn);
-    detail.appendChild(actions);
-    li.appendChild(detail);
-    function toggleExpand() {
-      const willExpand = detail.hidden;
-      detail.hidden = !willExpand;
-      li.classList.toggle("jobs-row--expanded", willExpand);
-    }
-    summary.addEventListener("click", toggleExpand);
-    summary.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter" || ev.key === " ") {
-        ev.preventDefault();
-        toggleExpand();
-      }
-    });
-    return li;
+  if (hooks.initialResult) {
+    renderJobList(hooks.initialResult.result, hooks.initialResult.savedAt, view);
   }
   return {
     root,
-    applyDigestResult,
+    applyDigestResult: (result) => renderJobList(result, void 0, view),
     setBusy,
     getProfile: () => profile,
     setProfile: (p) => {
@@ -20841,6 +20902,23 @@ function parseResumeMarkdown2(md) {
   return { name, contact, skills, experiences, projects, education };
 }
 
+// extension/src/lib/digestCache.ts
+async function saveDigest(result) {
+  try {
+    await set("lastDigest", { result, savedAt: Date.now() });
+  } catch (error) {
+    log("warn", "digest cache write failed", { error });
+  }
+}
+async function loadDigest() {
+  try {
+    return await get("lastDigest");
+  } catch (error) {
+    log("warn", "digest cache read failed", { error });
+    return null;
+  }
+}
+
 // extension/src/sidepanel/index.ts
 var runtimeConfig = null;
 function getRuntimeConfig() {
@@ -20959,7 +21037,9 @@ async function getApiClient() {
   if (!url) return null;
   return new ApiClient(url);
 }
-function buildControllers(opts = { autoOpenWizard: false }) {
+function buildControllers(opts = {
+  autoOpenWizard: false
+}) {
   const generate = renderGenerateTab({
     onGenerate: (req) => {
       const c = getChrome();
@@ -20973,8 +21053,27 @@ function buildControllers(opts = { autoOpenWizard: false }) {
       });
       generate.setBusy(true, "Generating\u2026");
     },
-    onSaveResume: (md) => {
-      console.info("Resume captured:", md.length, "chars");
+    onSaveResume: async (md) => {
+      const appsScriptUrl = await resolveAppsScriptUrl();
+      if (!appsScriptUrl) {
+        return {
+          ok: false,
+          message: "JobHelp config not loaded. Run setup in Settings first."
+        };
+      }
+      const fileId = generate.getResumeFileId();
+      if (!fileId) {
+        return {
+          ok: false,
+          message: "Could not determine the resume file to save to. Re-generate the resume."
+        };
+      }
+      const client = new ApiClient(appsScriptUrl);
+      const resp = await client.writeFile({ fileId, newContents: md });
+      if (!resp.ok) {
+        return { ok: false, message: resp.error.message };
+      }
+      return { ok: true, savedAt: resp.updatedAt };
     },
     onFinalize: async ({ format, markdown, docId, jobFolderId }) => {
       const appsScriptUrl = await resolveAppsScriptUrl();
@@ -21124,6 +21223,7 @@ function buildControllers(opts = { autoOpenWizard: false }) {
     }
   });
   const jobs = renderJobsTab({
+    initialResult: opts.initialDigest ?? void 0,
     onExtractProfile: async () => {
       const client = await getApiClient();
       const cfg = getRuntimeConfig();
@@ -21177,7 +21277,9 @@ function buildControllers(opts = { autoOpenWizard: false }) {
         sheetId: cfg.sheetId
       });
       if (!resp.ok) return { ok: false, message: resp.error.message };
-      return { ok: true, result: resp };
+      const { ok: _ok, ...result } = resp;
+      await saveDigest(result);
+      return { ok: true, result };
     },
     onTailorJob: (job) => {
       try {
@@ -21255,7 +21357,8 @@ function init() {
     } catch {
     }
     const autoOpenWizard = !fileId;
-    const controllers = buildControllers({ autoOpenWizard });
+    const initialDigest = await loadDigest();
+    const controllers = buildControllers({ autoOpenWizard, initialDigest });
     const panes = {
       generate: controllers.generate.root,
       files: controllers.files.root,
@@ -21347,7 +21450,8 @@ function handleMessage(message, controllers) {
           message.payload.resumeMd,
           message.payload.docUrl,
           message.payload.jobFolderUrl,
-          message.payload.sheetRowUrl
+          message.payload.sheetRowUrl,
+          message.payload.mdFileUrl
         );
       } else {
         const err = message.payload.error;
