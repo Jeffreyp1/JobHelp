@@ -234,12 +234,27 @@ function buildControllers(opts: { autoOpenWizard: boolean } = { autoOpenWizard: 
       });
       generate.setBusy(true, 'Generating…');
     },
-    onSaveResume: (md) => {
-      // v1: save & log is the same trip as generate's downstream — for now we
-      // just notify the user that the latest text is captured. The Apps Script
-      // call already saved the doc; subsequent edits stay client-side until
-      // we add a write_file path.
-      console.info('Resume captured:', md.length, 'chars');
+    onSaveResume: async (md) => {
+      const appsScriptUrl = await resolveAppsScriptUrl();
+      if (!appsScriptUrl) {
+        return {
+          ok: false as const,
+          message: 'JobHelp config not loaded. Run setup in Settings first.',
+        };
+      }
+      const fileId = generate.getResumeFileId();
+      if (!fileId) {
+        return {
+          ok: false as const,
+          message: 'Could not determine the resume file to save to. Re-generate the resume.',
+        };
+      }
+      const client = new ApiClient(appsScriptUrl);
+      const resp = await client.writeFile({ fileId, newContents: md });
+      if (!resp.ok) {
+        return { ok: false as const, message: resp.error.message };
+      }
+      return { ok: true as const, savedAt: resp.updatedAt };
     },
     onFinalize: async ({ format, markdown, docId, jobFolderId }) => {
       const appsScriptUrl = await resolveAppsScriptUrl();
@@ -697,6 +712,7 @@ function handleMessage(message: Message, controllers: PanelControllers): void {
           message.payload.docUrl,
           message.payload.jobFolderUrl,
           message.payload.sheetRowUrl,
+          message.payload.mdFileUrl,
         );
       } else {
         const err = message.payload.error;

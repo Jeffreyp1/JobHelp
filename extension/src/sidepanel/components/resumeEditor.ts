@@ -28,9 +28,19 @@
 import { marked } from 'marked';
 import type { ReviseTargetScope } from '../../types/api-contract.js';
 
+/** Outcome of a Save & Log round-trip. */
+export type ResumeSaveResult =
+  | { ok: true; savedAt: number }
+  | { ok: false; message: string };
+
 export interface ResumeEditorProps {
   initialMarkdown: string;
-  onSave: (md: string) => void;
+  /**
+   * Save handler. A returned `Promise` drives the inline save-status UI
+   * (Saving… → Saved / error); a synchronous return is treated as
+   * fire-and-forget and shows no status.
+   */
+  onSave: (md: string) => ResumeSaveResult | void | Promise<ResumeSaveResult | void>;
 }
 
 /** Detail payload of the 'resume:revise' CustomEvent. */
@@ -450,10 +460,44 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
   saveBtn.type = 'button';
   saveBtn.className = 'btn btn-primary resume-editor__save';
   saveBtn.textContent = 'Save & Log';
+
+  const saveStatus = document.createElement('span');
+  saveStatus.className = 'resume-editor__save-status';
+  saveStatus.setAttribute('role', 'status');
+  saveStatus.setAttribute('aria-live', 'polite');
+
   saveBtn.addEventListener('click', () => {
-    props.onSave(textarea.value);
+    const result = props.onSave(textarea.value);
+    if (!(result instanceof Promise)) return;
+    saveBtn.disabled = true;
+    saveStatus.textContent = 'Saving…';
+    saveStatus.className = 'resume-editor__save-status is-saving';
+    void result
+      .then((r) => {
+        if (r && r.ok === false) {
+          saveStatus.textContent = `Save failed: ${r.message}`;
+          saveStatus.className = 'resume-editor__save-status is-error';
+        } else {
+          const at = r && r.ok ? r.savedAt : Date.now();
+          const time = new Date(at).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          saveStatus.textContent = `Saved ${time}`;
+          saveStatus.className = 'resume-editor__save-status is-saved';
+        }
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        saveStatus.textContent = `Save failed: ${message}`;
+        saveStatus.className = 'resume-editor__save-status is-error';
+      })
+      .finally(() => {
+        saveBtn.disabled = false;
+      });
   });
   actions.appendChild(saveBtn);
+  actions.appendChild(saveStatus);
 
   const wholeBtn = makeReviseButton('Revise whole resume', 'revise-whole-resume', {});
   wholeBtn.classList.remove('revise-btn');
