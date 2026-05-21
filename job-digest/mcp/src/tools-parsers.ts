@@ -25,6 +25,7 @@ import {
   isString,
   isStringArray,
 } from './tools-helpers.js';
+import { ALL_SOURCE_NAMES } from '../../core/sources/index.js';
 
 function bad(message: string): Result<never, ToolError> {
   return { ok: false, error: { type: 'invalid_input', message } };
@@ -216,8 +217,6 @@ export function parseRerankTopJobs(
   return { ok: true, value: out };
 }
 
-const KNOWN_SOURCES = ['adzuna', 'greenhouse', 'lever', 'remotive', 'remoteok'] as const;
-
 export function parseValidateSources(
   obj: Record<string, unknown>,
 ): Result<ValidateSourcesArgs, ToolError> {
@@ -226,9 +225,9 @@ export function parseValidateSources(
     const raw = obj['source'];
     if (raw !== undefined) {
       if (!isString(raw)) return bad('source must be a string');
-      if (!(KNOWN_SOURCES as readonly string[]).includes(raw)) {
+      if (!ALL_SOURCE_NAMES.includes(raw)) {
         return bad(
-          `unknown source "${raw}"; valid options are: ${KNOWN_SOURCES.join(', ')}`,
+          `unknown source "${raw}"; valid options are: ${ALL_SOURCE_NAMES.join(', ')}`,
         );
       }
       out.source = raw;
