@@ -52,7 +52,10 @@ export function applyBulletEdit(
   const idx = findAnchorLine(lines, draftText, sectionName);
   const original = lines[idx];
   const leading = original.match(/^(\s*-\s+)/);
-  lines[idx] = (leading ? leading[1] : "- ") + replaceWith;
+  if (!leading) {
+    throw new Error(`Anchored line is not a bullet (no leading "- "): ${JSON.stringify(original).slice(0, 80)}`);
+  }
+  lines[idx] = leading[1] + replaceWith;
   return { next: lines.join("\n"), editedLineIndices: [idx] };
 }
 
