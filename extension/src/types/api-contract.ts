@@ -436,12 +436,9 @@ export interface AutoReviseResult {
 export type AutoReviseResponse = ApiResult<AutoReviseResult>;
 
 /**
- * Scoped auto-revise (action: "auto_revise_scoped"). Used for bullet and
- * section scopes. The model NEVER sees content outside the excerpt — byte
- * equality of out-of-scope text is therefore guaranteed by construction
- * rather than by post-hoc trust in the model.
- *
- * `whole-resume` continues to use the existing `auto_revise` action.
+ * Scoped auto-revise (action: "auto_revise_scoped"). The model never sees
+ * content outside the excerpt — byte equality of out-of-scope text is
+ * guaranteed by construction rather than by post-hoc trust in the model.
  */
 export interface AutoReviseScopedRequest {
   scope: "bullet" | "section";
@@ -454,7 +451,7 @@ export interface AutoReviseScopedRequest {
   /** User-supplied revision instruction. Whitespace-trimmed; rejected if empty. */
   instruction: string;
   model: string;
-  /** When true, runs a second checker agent over the proposal. Default true. */
+  /** When true, runs a second checker agent over the proposal. */
   useChecker: boolean;
 }
 
@@ -466,7 +463,6 @@ export interface AutoReviseScopedCheckerResult {
 }
 
 export interface AutoReviseScopedSuccess {
-  ok: true;
   /** For `scope:"bullet"` — a single replacement line (no leading "- ").
    *  For `scope:"section"` — an array of bullet lines (no leading "- "); the
    *  section heading itself is preserved verbatim by the client. */
@@ -476,7 +472,6 @@ export interface AutoReviseScopedSuccess {
   cost: CostBreakdown;
 }
 
-export type AutoReviseScopedResult = AutoReviseScopedSuccess;
 export type AutoReviseScopedResponse = ApiResult<AutoReviseScopedSuccess>;
 
 // ─── E3: cover_letter ───
