@@ -33,7 +33,7 @@ const INTERACTIVE_PROMPTS: readonly WizardPrompt[] = [
   },
   {
     key: 'profile.location',
-    question: 'What is your preferred job location? (e.g. "Irvine, CA" or "Remote (US)")',
+    question: 'What is your preferred job location? (e.g. "Austin, TX" or "Remote (US)")',
     type: 'string',
   },
   {

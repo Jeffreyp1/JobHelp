@@ -16,7 +16,7 @@ export interface ProfileConfig {
   /** Filesystem path to the candidate's resume dump markdown (supports ~ expansion). */
   readonly resumeDumpPath: string;
   readonly skills: readonly string[];
-  /** Human-readable location, e.g. "Irvine, CA". */
+  /** Human-readable location, e.g. "Austin, TX". */
   readonly location: string;
   readonly remoteOk: boolean;
   /** Minimum acceptable salary in USD. */

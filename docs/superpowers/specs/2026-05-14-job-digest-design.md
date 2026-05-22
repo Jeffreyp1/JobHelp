@@ -94,7 +94,7 @@ interface NormalizedJob {
   url: string;            // canonical apply URL
   title: string;
   company: string;
-  location: string;       // "Irvine, CA" or "Remote (US)"
+  location: string;       // "Austin, TX" or "Remote (US)"
   remote: 'remote' | 'hybrid' | 'onsite' | 'unknown';
   salaryMin?: number;     // USD
   salaryMax?: number;     // USD
@@ -277,7 +277,7 @@ User config: `~/.config/jobhelp/config.json` (XDG-friendly, override via `JOBHEL
   "profile": {
     "resume_dump_path": "~/Documents/resume-dump.md",
     "skills": ["typescript", "go", "python", "..."],
-    "location": "Irvine, CA",
+    "location": "Austin, TX",
     "remote_ok": true,
     "salary_floor": 100000,
     "seniority": "entry",

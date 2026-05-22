@@ -11,7 +11,7 @@ export interface NormalizedJob {
   readonly url: string;
   readonly title: string;
   readonly company: string;
-  /** "Irvine, CA" or "Remote (US)" — human-readable. */
+  /** "Austin, TX" or "Remote (US)" — human-readable. */
   readonly location: string;
   readonly remote: RemoteMode;
   readonly salaryMin?: number;

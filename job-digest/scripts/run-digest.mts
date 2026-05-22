@@ -48,7 +48,7 @@ const config: JobDigestConfig = {
       'backend', 'frontend', 'fullstack', 'distributed systems',
       'kubernetes', 'aws', 'postgres',
     ],
-    location: 'Irvine, CA',
+    location: 'Austin, TX',
     remoteOk: true,
     salaryFloor: 100000,
     seniority: 'mid',
