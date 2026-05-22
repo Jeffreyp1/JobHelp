@@ -435,6 +435,50 @@ export interface AutoReviseResult {
 }
 export type AutoReviseResponse = ApiResult<AutoReviseResult>;
 
+/**
+ * Scoped auto-revise (action: "auto_revise_scoped"). Used for bullet and
+ * section scopes. The model NEVER sees content outside the excerpt — byte
+ * equality of out-of-scope text is therefore guaranteed by construction
+ * rather than by post-hoc trust in the model.
+ *
+ * `whole-resume` continues to use the existing `auto_revise` action.
+ */
+export interface AutoReviseScopedRequest {
+  scope: "bullet" | "section";
+  /** ONLY the in-scope text. One bullet line for `bullet`; the section's
+   *  heading line + its bullets (joined by '\n') for `section`. */
+  excerpt: string;
+  /** Section heading text (e.g. "Experience", "Skills"). Provided as context
+   *  for the creator; the LLM is instructed NOT to modify it. */
+  sectionPath: string;
+  /** User-supplied revision instruction. Whitespace-trimmed; rejected if empty. */
+  instruction: string;
+  model: string;
+  /** When true, runs a second checker agent over the proposal. Default true. */
+  useChecker: boolean;
+}
+
+export interface AutoReviseScopedCheckerResult {
+  ok: boolean;
+  /** Empty when ok:true. Otherwise short human-readable issues, e.g.
+   *  "introduces a number that's not in the original bullet". */
+  issues: string[];
+}
+
+export interface AutoReviseScopedSuccess {
+  ok: true;
+  /** For `scope:"bullet"` — a single replacement line (no leading "- ").
+   *  For `scope:"section"` — an array of bullet lines (no leading "- "); the
+   *  section heading itself is preserved verbatim by the client. */
+  replaceWith: string | string[];
+  /** Null when useChecker was false; otherwise the checker's verdict. */
+  checker: AutoReviseScopedCheckerResult | null;
+  cost: CostBreakdown;
+}
+
+export type AutoReviseScopedResult = AutoReviseScopedSuccess;
+export type AutoReviseScopedResponse = ApiResult<AutoReviseScopedSuccess>;
+
 // ─── E3: cover_letter ───
 /** Voice preset for the generated cover letter. Defaults to "neutral" when omitted. */
 export type CoverLetterTone =
