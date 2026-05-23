@@ -33,6 +33,7 @@ import type {
   BenchmarkRoleRequest,
   CritiqueRequest,
   AutoReviseRequest,
+  AutoReviseScopedRequest,
   CoverLetterRequest,
   VerifyClHooksRequest,
   MultiVersionRequest,
@@ -48,6 +49,7 @@ import { handleResearchCompany, validateResearchCompany } from './handlers/resea
 import { handleBenchmarkRole, validateBenchmarkRole } from './handlers/benchmark.js';
 import { handleCritique, validateCritique } from './handlers/critique.js';
 import { handleAutoRevise, validateAutoRevise } from './handlers/autoRevise.js';
+import { handleAutoReviseScoped, validateAutoReviseScoped } from './handlers/autoReviseScoped.js';
 import { handleCoverLetter, validateCoverLetter } from './handlers/coverLetter.js';
 import { handleVerifyClHooks, validateVerifyClHooks } from './handlers/verifyHooks.js';
 import { handleMultiVersion, validateMultiVersion } from './handlers/multiVersion.js';
@@ -142,6 +144,7 @@ const VALID_ACTIONS: ApiAction[] = [
   'benchmark_role',
   'critique',
   'auto_revise',
+  'auto_revise_scoped' as ApiAction,
   'cover_letter',
   'verify_cl_hooks',
   'multi_version',
@@ -246,6 +249,12 @@ function route(body: unknown, deps: Deps): ApiResult<unknown> {
       return handleAutoRevise(deps, raw as unknown as AutoReviseRequest);
     }
 
+    case 'auto_revise_scoped' as ApiAction: {
+      const validateErr = validateAutoReviseScoped(raw);
+      if (validateErr) return validateErr;
+      return handleAutoReviseScoped(deps, raw as unknown as AutoReviseScopedRequest);
+    }
+
     case 'cover_letter': {
       const validateErr = validateCoverLetter(raw);
       if (validateErr) return validateErr;
@@ -283,6 +292,9 @@ function route(body: unknown, deps: Deps): ApiResult<unknown> {
       if (validateErr) return validateErr;
       return handleUpdateJobStatus(deps, raw as unknown as UpdateJobStatusRequest);
     }
+
+    default:
+      return validationError(`Unknown action: "${String(action)}"`);
   }
 }
 
