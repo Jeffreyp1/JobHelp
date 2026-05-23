@@ -1,13 +1,4 @@
-/**
- * Resume editor: single click-to-edit view of the generated resume.
- *
- * The structured render (sections, roles, bullets) is always visible. Clicking
- * a bullet swaps it for an inline textarea; blur or Enter commits, Esc reverts.
- * A collapsible <details> at the bottom exposes the raw markdown for power
- * users. The "Revise" buttons on bullets, sections, and the whole resume each
- * dispatch a bubbling CustomEvent 'resume:revise' on the editor root with
- * detail = { scope, currentMarkdown }.
- */
+// Dispatches a bubbling 'resume:revise' CustomEvent consumed by features/autoRevise.ts.
 
 import type { ReviseTargetScope } from '../../types/api-contract.js';
 import {
@@ -60,13 +51,6 @@ function deriveScope(btn: HTMLButtonElement): ReviseTargetScope | null {
       btn.closest<HTMLElement>('[data-section-name]')?.dataset.sectionName ??
       '';
     return sectionName ? { kind: 'section', sectionName } : null;
-  }
-  if (btn.classList.contains('revise-role')) {
-    const companyName =
-      btn.getAttribute('data-role-company') ??
-      btn.closest<HTMLElement>('[data-role-company]')?.dataset.roleCompany ??
-      '';
-    return companyName ? { kind: 'role', companyName } : null;
   }
   if (btn.classList.contains('revise-whole-resume')) {
     return { kind: 'whole-resume' };
@@ -188,7 +172,7 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
     const target = ev.target as HTMLElement | null;
     if (!target) return;
     const btn = target.closest<HTMLButtonElement>(
-      'button.revise-bullet, button.revise-section, button.revise-role, button.revise-whole-resume',
+      'button.revise-bullet, button.revise-section, button.revise-whole-resume',
     );
     if (!btn) return;
     const scope = deriveScope(btn);
