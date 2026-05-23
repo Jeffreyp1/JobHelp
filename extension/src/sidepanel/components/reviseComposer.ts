@@ -10,22 +10,24 @@ const TITLE_BY_SCOPE: Record<ReviseComposerProps["scope"], string> = {
   "whole-resume": "Revise whole resume",
 };
 
-export function mountReviseComposer(host: HTMLElement, props: ReviseComposerProps): void {
-  host.replaceChildren();
+export function renderReviseComposer(props: ReviseComposerProps): HTMLElement {
+  const title = TITLE_BY_SCOPE[props.scope];
+
   const wrap = document.createElement("div");
   wrap.className = "revise-composer";
-  wrap.setAttribute("role", "form");
-  wrap.setAttribute("aria-label", TITLE_BY_SCOPE[props.scope]);
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", title);
 
-  const title = document.createElement("div");
-  title.className = "revise-composer__title";
-  title.textContent = TITLE_BY_SCOPE[props.scope];
-  wrap.appendChild(title);
+  const titleEl = document.createElement("div");
+  titleEl.className = "revise-composer__title";
+  titleEl.textContent = title;
+  wrap.appendChild(titleEl);
 
   const ta = document.createElement("textarea");
   ta.className = "revise-composer__instruction";
   ta.placeholder = "e.g. tighten verbs, add a metric, focus on AI work";
   ta.rows = 3;
+  ta.setAttribute("aria-label", title);
   wrap.appendChild(ta);
 
   const actions = document.createElement("div");
@@ -42,11 +44,11 @@ export function mountReviseComposer(host: HTMLElement, props: ReviseComposerProp
   submit.className = "btn btn-primary";
   submit.setAttribute("data-action", "submit");
   submit.textContent = "Submit";
+  submit.disabled = true;
 
   actions.appendChild(cancel);
   actions.appendChild(submit);
   wrap.appendChild(actions);
-  host.appendChild(wrap);
 
   const trySubmit = (): void => {
     const v = ta.value.trim();
@@ -54,6 +56,9 @@ export function mountReviseComposer(host: HTMLElement, props: ReviseComposerProp
     props.onSubmit(v);
   };
 
+  ta.addEventListener("input", () => {
+    submit.disabled = ta.value.trim().length === 0;
+  });
   submit.addEventListener("click", trySubmit);
   cancel.addEventListener("click", () => props.onCancel());
   ta.addEventListener("keydown", (ev) => {
@@ -66,5 +71,7 @@ export function mountReviseComposer(host: HTMLElement, props: ReviseComposerProp
     }
   });
 
-  setTimeout(() => ta.focus(), 0);
+  queueMicrotask(() => ta.focus());
+
+  return wrap;
 }
