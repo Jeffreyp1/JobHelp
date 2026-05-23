@@ -144,7 +144,7 @@ const VALID_ACTIONS: ApiAction[] = [
   'benchmark_role',
   'critique',
   'auto_revise',
-  'auto_revise_scoped' as ApiAction,
+  'auto_revise_scoped',
   'cover_letter',
   'verify_cl_hooks',
   'multi_version',
@@ -249,7 +249,7 @@ function route(body: unknown, deps: Deps): ApiResult<unknown> {
       return handleAutoRevise(deps, raw as unknown as AutoReviseRequest);
     }
 
-    case 'auto_revise_scoped' as ApiAction: {
+    case 'auto_revise_scoped': {
       const validateErr = validateAutoReviseScoped(raw);
       if (validateErr) return validateErr;
       return handleAutoReviseScoped(deps, raw as unknown as AutoReviseScopedRequest);
@@ -292,9 +292,6 @@ function route(body: unknown, deps: Deps): ApiResult<unknown> {
       if (validateErr) return validateErr;
       return handleUpdateJobStatus(deps, raw as unknown as UpdateJobStatusRequest);
     }
-
-    default:
-      return validationError(`Unknown action: "${String(action)}"`);
   }
 }
 
