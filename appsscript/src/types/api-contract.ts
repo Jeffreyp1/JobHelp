@@ -31,6 +31,7 @@ export type ApiAction =
   | "benchmark_role"
   | "critique"
   | "auto_revise"
+  | "auto_revise_scoped"
   | "cover_letter"
   | "verify_cl_hooks"
   | "multi_version"
