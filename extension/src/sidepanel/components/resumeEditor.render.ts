@@ -1,8 +1,3 @@
-/**
- * DOM render helpers for the resume editor: turns ParsedNode[] into structured
- * DOM with data-* attrs and Revise buttons, with click-to-edit on bullets.
- */
-
 import type {
   ParsedBullet,
   ParsedNode,

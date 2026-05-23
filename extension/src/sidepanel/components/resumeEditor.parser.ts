@@ -1,13 +1,3 @@
-/**
- * Pure markdown parser for the JobHelp resume shape:
- *   ## H2 = section
- *   ### H3 = role
- *   - bullet
- *
- * Also exposes the deterministic CRC32-based bullet ID so re-rendering
- * identical markdown produces identical IDs across edits.
- */
-
 const CRC32_TABLE: number[] = (() => {
   const table: number[] = new Array(256);
   for (let i = 0; i < 256; i++) {
@@ -28,6 +18,9 @@ function crc32(str: string): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
+// The section-index salt is load-bearing: identical bullet text under different
+// H2 sections must produce distinct IDs so re-render maps each click target back
+// to the right markdown line.
 export function bulletIdFor(bulletText: string, sectionIndex: number): string {
   const trimmed = bulletText.trim();
   const hex = crc32(`${sectionIndex}:${trimmed}`).toString(16).padStart(8, '0');
@@ -143,11 +136,6 @@ export function parseResumeMarkdown(md: string): ParsedNode[] {
   return root;
 }
 
-/**
- * Update the bullet line in markdown identified by `bulletId`. Walks each line,
- * recomputes the section index, and replaces the matching bullet line with the
- * new text (preserving the original line's leading whitespace + bullet glyph).
- */
 export function updateBulletLine(md: string, bulletId: string, newText: string): string {
   const lines = md.split('\n');
   let sectionIndex = -1;
