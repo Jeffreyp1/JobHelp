@@ -136,6 +136,31 @@ export function parseResumeMarkdown(md: string): ParsedNode[] {
   return root;
 }
 
+export function lookupBullet(
+  md: string,
+  bulletId: string,
+): { text: string; sectionName: string } | null {
+  const lines = md.split('\n');
+  let sectionIndex = -1;
+  let currentSection = '';
+  for (const line of lines) {
+    const h2 = line.match(/^##\s+(.+?)\s*$/);
+    if (h2) {
+      sectionIndex += 1;
+      currentSection = h2[1].trim();
+      continue;
+    }
+    const m = line.match(/^[\s]*[-*]\s+(.*)$/);
+    if (m) {
+      const text = m[1].trim();
+      if (bulletIdFor(text, Math.max(0, sectionIndex)) === bulletId) {
+        return { text, sectionName: currentSection };
+      }
+    }
+  }
+  return null;
+}
+
 export function updateBulletLine(md: string, bulletId: string, newText: string): string {
   const lines = md.split('\n');
   let sectionIndex = -1;

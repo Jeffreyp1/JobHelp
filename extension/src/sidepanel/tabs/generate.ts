@@ -20,6 +20,7 @@ import { renderJobInsightsCard } from '../components/jobInsights.js';
 import { renderToggleRow } from '../components/toggleRow.js';
 import { renderCostEstimator } from '../components/costEstimator.js';
 import {
+  lookupBullet,
   renderResumeEditor,
   type ResumeReviseEventDetail,
   type ResumeSaveResult,
@@ -978,9 +979,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     scope: ReviseTargetScope,
     anchorEl: HTMLElement,
   ): Promise<void> {
-    const md = currentMarkdownGetter ? currentMarkdownGetter() : '';
-
     if (scope.kind === 'whole-resume') {
+      const md = currentMarkdownGetter ? currentMarkdownGetter() : '';
       await runWholeResumeRevise(md, anchorEl);
       return;
     }
@@ -1002,17 +1002,35 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       scope: scopeKind,
       onCancel: closeComposer,
       onSubmit: (instruction) => {
+        const md = currentMarkdownGetter ? currentMarkdownGetter() : '';
+        let bulletText: string | undefined;
+        let sectionPath: string;
+        if (scopeKind === 'bullet') {
+          const bulletId = anchorEl.dataset.bulletId ?? '';
+          const looked = bulletId ? lookupBullet(md, bulletId) : null;
+          if (!looked) {
+            composerHost.replaceChildren();
+            const err = document.createElement('div');
+            err.className = 'revise-error';
+            err.textContent =
+              'Could not locate the bullet in your resume. Try clicking Revise again after editing.';
+            composerHost.appendChild(err);
+            return;
+          }
+          bulletText = looked.text;
+          sectionPath = looked.sectionName;
+        } else {
+          sectionPath = scope.kind === 'section' ? scope.sectionName : '';
+        }
+
         composerHost.replaceChildren();
         void runScopedRevise({
           api: { autoReviseScoped: scopedHook },
           slot: composerHost,
           scope: scopeKind,
           currentMarkdown: md,
-          bulletText: scope.kind === 'bullet' ? extractBulletText(anchorEl) : undefined,
-          sectionPath:
-            scope.kind === 'section'
-              ? scope.sectionName
-              : extractSectionForBullet(anchorEl),
+          bulletText,
+          sectionPath,
           instruction,
           model: state.autoReviseModel,
           useChecker: true,
@@ -1081,16 +1099,6 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       },
     });
     composerHost.appendChild(composer);
-  }
-
-  function extractBulletText(bulletEl: HTMLElement): string {
-    const span = bulletEl.querySelector('.resume-bullet__text');
-    return span?.textContent?.trim() ?? '';
-  }
-
-  function extractSectionForBullet(bulletEl: HTMLElement): string {
-    const section = bulletEl.closest<HTMLElement>('[data-section-name]');
-    return section?.dataset.sectionName ?? '';
   }
 
   function renderMultiVersionResult(result: MultiVersionResponse): void {
