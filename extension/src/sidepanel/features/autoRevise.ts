@@ -20,7 +20,12 @@ export interface RunScopedReviseArgs {
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function loadingNode(): HTMLElement {
@@ -64,6 +69,13 @@ export async function runScopedRevise(args: RunScopedReviseArgs): Promise<void> 
 
   slot.replaceChildren(loadingNode());
 
+  const writeSlot = (node: Node | null): boolean => {
+    if (!slot.isConnected) return false;
+    if (node === null) slot.replaceChildren();
+    else slot.replaceChildren(node);
+    return true;
+  };
+
   let resp: AutoReviseScopedResponse;
   try {
     resp = await api.autoReviseScoped({
@@ -76,38 +88,42 @@ export async function runScopedRevise(args: RunScopedReviseArgs): Promise<void> 
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    slot.replaceChildren(errorNode(`Revise failed: ${msg}`));
+    writeSlot(errorNode(`Revise failed: ${msg}`));
     return;
   }
   if (!resp.ok) {
-    slot.replaceChildren(errorNode(`Revise failed: ${resp.error.message}`));
+    writeSlot(errorNode(`Revise failed: ${resp.error.message}`));
     return;
   }
 
   let next: string;
   let editedLineIndices: number[];
+  let replaceWithStr: string | null = null;
+  let replaceWithArr: string[] | null = null;
   try {
     if (scope === "bullet") {
       if (typeof resp.replaceWith !== "string") throw new Error("server returned non-string replaceWith for bullet");
-      const result = applyBulletEdit(currentMarkdown, bulletText ?? "", sectionPath, resp.replaceWith);
+      replaceWithStr = resp.replaceWith;
+      const result = applyBulletEdit(currentMarkdown, bulletText ?? "", sectionPath, replaceWithStr);
       next = result.next;
       editedLineIndices = result.editedLineIndices;
     } else {
       if (!Array.isArray(resp.replaceWith)) throw new Error("server returned non-array replaceWith for section");
-      const result = applySectionEdit(currentMarkdown, sectionPath, resp.replaceWith);
+      replaceWithArr = resp.replaceWith;
+      const result = applySectionEdit(currentMarkdown, sectionPath, replaceWithArr);
       next = result.next;
       editedLineIndices = result.editedLineIndices;
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    slot.replaceChildren(errorNode(`Could not locate the target in your resume: ${msg}`));
+    writeSlot(errorNode(`Could not locate the target in your resume: ${msg}`));
     return;
   }
 
   const replacements = Array.isArray(resp.replaceWith) ? resp.replaceWith : [resp.replaceWith];
   const validation = validateByteEqualityOutsideEdits(currentMarkdown, next, editedLineIndices, replacements);
   if (!validation.ok) {
-    slot.replaceChildren(errorNode(`Safety check failed: ${validation.errors.join("; ")}`));
+    writeSlot(errorNode(`Safety check failed: ${validation.errors.join("; ")}`));
     return;
   }
 
@@ -128,9 +144,9 @@ export async function runScopedRevise(args: RunScopedReviseArgs): Promise<void> 
   if (scope === "bullet") {
     row.innerHTML = `
       <div class="revise-diff__before">${escapeHtml(bulletText ?? "")}</div>
-      <div class="revise-diff__after">${escapeHtml(resp.replaceWith as string)}</div>`;
+      <div class="revise-diff__after">${escapeHtml(replaceWithStr!)}</div>`;
   } else {
-    const after = (resp.replaceWith as string[]).map((b) => `- ${escapeHtml(b)}`).join("<br>");
+    const after = replaceWithArr!.map((b) => `- ${escapeHtml(b)}`).join("<br>");
     row.classList.add("revise-diff__row--section");
     row.innerHTML = `
       <div class="revise-diff__before"><em>(section replaced)</em></div>
@@ -154,14 +170,14 @@ export async function runScopedRevise(args: RunScopedReviseArgs): Promise<void> 
   actions.appendChild(reject);
   diffBlock.appendChild(actions);
 
-  slot.replaceChildren(diffBlock);
+  if (!writeSlot(diffBlock)) return;
 
   accept.addEventListener("click", () => {
     onAccept(next);
-    slot.replaceChildren();
+    writeSlot(null);
   });
   reject.addEventListener("click", () => {
     onReject();
-    slot.replaceChildren();
+    writeSlot(null);
   });
 }
