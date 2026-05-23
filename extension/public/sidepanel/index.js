@@ -16415,6 +16415,27 @@ function parseResumeMarkdown(md) {
   }
   return root;
 }
+function lookupBullet(md, bulletId) {
+  const lines = md.split("\n");
+  let sectionIndex = -1;
+  let currentSection = "";
+  for (const line of lines) {
+    const h2 = line.match(/^##\s+(.+?)\s*$/);
+    if (h2) {
+      sectionIndex += 1;
+      currentSection = h2[1].trim();
+      continue;
+    }
+    const m = line.match(/^[\s]*[-*]\s+(.*)$/);
+    if (m) {
+      const text = m[1].trim();
+      if (bulletIdFor(text, Math.max(0, sectionIndex)) === bulletId) {
+        return { text, sectionName: currentSection };
+      }
+    }
+  }
+  return null;
+}
 function updateBulletLine(md, bulletId, newText) {
   const lines = md.split("\n");
   let sectionIndex = -1;
@@ -18085,8 +18106,8 @@ function renderGenerateTab(hooks) {
     `;
   }
   async function runAutoReviseScoped(scope, anchorEl) {
-    const md = currentMarkdownGetter ? currentMarkdownGetter() : "";
     if (scope.kind === "whole-resume") {
+      const md = currentMarkdownGetter ? currentMarkdownGetter() : "";
       await runWholeResumeRevise(md, anchorEl);
       return;
     }
@@ -18104,14 +18125,33 @@ function renderGenerateTab(hooks) {
       scope: scopeKind,
       onCancel: closeComposer,
       onSubmit: (instruction) => {
+        const md = currentMarkdownGetter ? currentMarkdownGetter() : "";
+        let bulletText;
+        let sectionPath;
+        if (scopeKind === "bullet") {
+          const bulletId = anchorEl.dataset.bulletId ?? "";
+          const looked = bulletId ? lookupBullet(md, bulletId) : null;
+          if (!looked) {
+            composerHost.replaceChildren();
+            const err = document.createElement("div");
+            err.className = "revise-error";
+            err.textContent = "Could not locate the bullet in your resume. Try clicking Revise again after editing.";
+            composerHost.appendChild(err);
+            return;
+          }
+          bulletText = looked.text;
+          sectionPath = looked.sectionName;
+        } else {
+          sectionPath = scope.kind === "section" ? scope.sectionName : "";
+        }
         composerHost.replaceChildren();
         void runScopedRevise({
           api: { autoReviseScoped: scopedHook },
           slot: composerHost,
           scope: scopeKind,
           currentMarkdown: md,
-          bulletText: scope.kind === "bullet" ? extractBulletText(anchorEl) : void 0,
-          sectionPath: scope.kind === "section" ? scope.sectionName : extractSectionForBullet(anchorEl),
+          bulletText,
+          sectionPath,
           instruction,
           model: state.autoReviseModel,
           useChecker: true,
@@ -18176,14 +18216,6 @@ function renderGenerateTab(hooks) {
       }
     });
     composerHost.appendChild(composer);
-  }
-  function extractBulletText(bulletEl) {
-    const span = bulletEl.querySelector(".resume-bullet__text");
-    return span?.textContent?.trim() ?? "";
-  }
-  function extractSectionForBullet(bulletEl) {
-    const section = bulletEl.closest("[data-section-name]");
-    return section?.dataset.sectionName ?? "";
   }
   function renderMultiVersionResult(result) {
     resumeSlot.replaceChildren();

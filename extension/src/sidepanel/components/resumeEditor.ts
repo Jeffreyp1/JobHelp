@@ -13,6 +13,7 @@ import {
 
 export {
   bulletIdFor,
+  lookupBullet,
   parseResumeMarkdown,
 } from './resumeEditor.parser.js';
 
