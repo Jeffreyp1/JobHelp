@@ -1,259 +1,167 @@
-/**
- * @file sidepanel/features/autoRevise.ts
- *
- * Feature: Auto-revise UI
- * Owner agent: E2 — Critique + Auto-revise
- *
- * Wires per-bullet edit buttons and the diff preview overlay in the resume
- * editor. Auto-revise is interactive — it is not a simple toggle. A "Revise"
- * button appears next to each bullet (or section heading); clicking it opens
- * an instruction textarea, which on submit calls the orchestrator's
- * onReviseRequest hook. The orchestrator is responsible for the network call;
- * after it returns, the orchestrator hands the response back to renderDiff()
- * so the user can Accept or Reject.
- *
- * Selector convention:
- *   - Bullets are expected to carry data-bullet-id="<id>" attributes.
- *   - Section headings carry data-section-name="<name>" attributes (optional).
- *   - Role headers (company headings) carry data-role-company="<name>" (optional).
- *   - The diff overlay container must be `[data-revise-diff]`.
- *
- * ⚠ CROSS-IMPACT: extension/src/sidepanel/tabs/generate.ts must (1) render
- * bullet/section/role data-attributes in the resume editor, (2) on
- * onReviseRequest call api.autoRevise() and pass the response to
- * renderRevisionDiff, (3) wire Accept/Reject to update the editor and the
- * stored markdown. Owner: orchestrator.
- */
+import { applyBulletEdit, applySectionEdit, validateByteEqualityOutsideEdits } from "../../lib/anchor-replace.js";
+import type { AutoReviseScopedRequest, AutoReviseScopedResponse } from "../../types/api-contract.js";
 
-import type {
-  AutoReviseRequest,
-  AutoReviseResponse,
-  AutoReviseDiff,
-  ReviseTargetScope,
-} from '../../types/api-contract.js';
-
-export type { AutoReviseRequest, AutoReviseResponse, AutoReviseDiff, ReviseTargetScope };
-
-const FEATURE_NAME = 'autoRevise';
-const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
-
-interface AutoReviseHooks {
-  onReviseRequest: (scope: ReviseTargetScope, instruction: string) => void;
-  onRevisionAccepted: (revisedMarkdown: string) => void;
-  onRevisionRejected: () => void;
-  onModelChange?: (feature: string, model: string) => void;
+interface ApiSurface {
+  autoReviseScoped: (req: AutoReviseScopedRequest) => Promise<AutoReviseScopedResponse>;
 }
 
-/**
- * Wire the auto-revise edit buttons and the diff overlay container. Repeated
- * calls remove prior listeners by cloning the relevant elements.
- */
-export function wireAutoReviseToggle(
-  panelRoot: Element,
-  hooks: AutoReviseHooks,
-  state: { currentMarkdown: string; autoReviseModel: string },
-): void {
-  // 1. Wire the model dropdown if present (used by orchestrator to pick model
-  //    when calling api.autoRevise).
-  const container = panelRoot.querySelector(`[data-feature="${FEATURE_NAME}"]`);
-  if (container) {
-    const modelSelect = container.querySelector<HTMLSelectElement>(
-      'select.model-select, select.toggle-row__model',
-    );
-    if (modelSelect) {
-      if (state.autoReviseModel) modelSelect.value = state.autoReviseModel;
-      if (hooks.onModelChange) {
-        modelSelect.addEventListener('change', () => {
-          hooks.onModelChange?.(FEATURE_NAME, modelSelect.value);
-        });
-      }
-    }
-  }
-
-  // 2. Wire revise buttons next to bullets.
-  const bulletButtons = panelRoot.querySelectorAll<HTMLButtonElement>(
-    '[data-bullet-id] .revise-btn, button.revise-bullet[data-bullet-id]',
-  );
-  bulletButtons.forEach((btn) => {
-    const wrapper = btn.closest<HTMLElement>('[data-bullet-id]');
-    const bulletId = btn.getAttribute('data-bullet-id') ?? wrapper?.dataset.bulletId;
-    if (!bulletId) return;
-    btn.addEventListener('click', () => openInstructionPrompt(panelRoot, hooks, {
-      kind: 'bullet',
-      bulletId,
-    }));
-  });
-
-  // 3. Wire revise buttons next to sections.
-  const sectionButtons = panelRoot.querySelectorAll<HTMLButtonElement>(
-    'button.revise-section[data-section-name]',
-  );
-  sectionButtons.forEach((btn) => {
-    const sectionName = btn.getAttribute('data-section-name');
-    if (!sectionName) return;
-    btn.addEventListener('click', () => openInstructionPrompt(panelRoot, hooks, {
-      kind: 'section',
-      sectionName,
-    }));
-  });
-
-  // 4. Wire revise buttons next to roles.
-  const roleButtons = panelRoot.querySelectorAll<HTMLButtonElement>(
-    'button.revise-role[data-role-company]',
-  );
-  roleButtons.forEach((btn) => {
-    const companyName = btn.getAttribute('data-role-company');
-    if (!companyName) return;
-    btn.addEventListener('click', () => openInstructionPrompt(panelRoot, hooks, {
-      kind: 'role',
-      companyName,
-    }));
-  });
-
-  // 5. Wire whole-resume button (if present).
-  const wholeBtn = panelRoot.querySelector<HTMLButtonElement>('button.revise-whole-resume');
-  if (wholeBtn) {
-    wholeBtn.addEventListener('click', () => openInstructionPrompt(panelRoot, hooks, {
-      kind: 'whole-resume',
-    }));
-  }
-}
-
-/**
- * Extract the current auto-revise model selection from the toggle DOM.
- */
-export function extractAutoReviseModel(toggles: Map<string, Element>): string {
-  const el = toggles.get(FEATURE_NAME);
-  if (!el) return DEFAULT_MODEL;
-  const select = el.querySelector<HTMLSelectElement>(
-    'select.model-select, select.toggle-row__model',
-  );
-  return select?.value || DEFAULT_MODEL;
-}
-
-/**
- * Open the instruction prompt overlay. The user enters an instruction and
- * confirms; on confirm we call hooks.onReviseRequest(scope, instruction).
- */
-function openInstructionPrompt(
-  panelRoot: Element,
-  hooks: AutoReviseHooks,
-  scope: ReviseTargetScope,
-): void {
-  const overlay = panelRoot.querySelector<HTMLElement>('[data-revise-instruction-overlay]');
-  if (!overlay) {
-    // Fallback: simple prompt() — not great UX but lets the flow function in
-    // environments where the orchestrator hasn't yet rendered the overlay.
-    if (typeof globalThis !== 'undefined' && (globalThis as { prompt?: (msg: string) => string | null }).prompt) {
-      const instruction = (globalThis as { prompt: (msg: string) => string | null })
-        .prompt('Enter revision instruction:');
-      if (instruction && instruction.trim()) {
-        hooks.onReviseRequest(scope, instruction.trim());
-      }
-    }
-    return;
-  }
-
-  // Wire the overlay textarea + submit button. Idempotent: clone to drop
-  // previous handlers.
-  const textarea = overlay.querySelector<HTMLTextAreaElement>('textarea');
-  const submit = overlay.querySelector<HTMLButtonElement>('button[data-action="submit"]');
-  const cancel = overlay.querySelector<HTMLButtonElement>('button[data-action="cancel"]');
-  if (!textarea || !submit) return;
-
-  // Show overlay
-  overlay.removeAttribute('hidden');
-  textarea.value = '';
-  textarea.focus();
-
-  const onSubmit = () => {
-    const instruction = textarea.value.trim();
-    if (!instruction) return;
-    hooks.onReviseRequest(scope, instruction);
-    overlay.setAttribute('hidden', 'true');
-    submit.removeEventListener('click', onSubmit);
-    cancel?.removeEventListener('click', onCancel);
-  };
-  const onCancel = () => {
-    overlay.setAttribute('hidden', 'true');
-    submit.removeEventListener('click', onSubmit);
-    cancel?.removeEventListener('click', onCancel);
-  };
-
-  submit.addEventListener('click', onSubmit);
-  cancel?.addEventListener('click', onCancel);
-}
-
-/**
- * Render a revision diff overlay so the user can review before accepting.
- *
- * If `unauthorizedChanges.length > 0`, a warning banner is rendered above the
- * diff and the Accept button is disabled by default (the caller can override
- * via state.allowUnauthorized).
- */
-export function renderRevisionDiff(
-  panelRoot: Element,
-  result: AutoReviseResponse,
-  hooks: AutoReviseHooks,
-): void {
-  const target = panelRoot.querySelector('[data-revise-diff]');
-  if (!target) return;
-
-  if (!result.ok) {
-    target.innerHTML = `<div class="revise-error">Revision failed: ${escapeHtml(result.error.message)}</div>`;
-    return;
-  }
-
-  const warning =
-    result.unauthorizedChanges.length > 0
-      ? `<div class="revise-warning"><strong>Warning:</strong> ${result.unauthorizedChanges.length} change(s) outside your requested scope. Review before accepting.</div>`
-      : '';
-
-  const diffRows = result.diff
-    .map(
-      (d) => `
-        <tr class="diff-row">
-          <td class="diff-line">${d.lineIndex}</td>
-          <td class="diff-before">${escapeHtml(d.before)}</td>
-          <td class="diff-after">${escapeHtml(d.after)}</td>
-        </tr>
-      `,
-    )
-    .join('');
-
-  target.innerHTML = `
-    ${warning}
-    <table class="revise-diff">
-      <thead><tr><th>Line</th><th>Before</th><th>After</th></tr></thead>
-      <tbody>${diffRows}</tbody>
-    </table>
-    <div class="revise-actions">
-      <button data-action="accept" class="revise-accept">Accept</button>
-      <button data-action="reject" class="revise-reject">Reject</button>
-    </div>
-  `;
-
-  const accept = target.querySelector<HTMLButtonElement>('button[data-action="accept"]');
-  const reject = target.querySelector<HTMLButtonElement>('button[data-action="reject"]');
-  if (accept) {
-    accept.addEventListener('click', () => {
-      hooks.onRevisionAccepted(result.revisedMarkdown);
-      target.innerHTML = '';
-    });
-  }
-  if (reject) {
-    reject.addEventListener('click', () => {
-      hooks.onRevisionRejected();
-      target.innerHTML = '';
-    });
-  }
-  target.removeAttribute('hidden');
+export interface RunScopedReviseArgs {
+  api: ApiSurface;
+  slot: HTMLElement;
+  scope: "bullet" | "section";
+  currentMarkdown: string;
+  bulletText?: string;
+  sectionPath: string;
+  instruction: string;
+  model: string;
+  useChecker?: boolean;
+  onAccept: (nextMarkdown: string) => void;
+  onReject: () => void;
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function loadingNode(): HTMLElement {
+  const n = document.createElement("div");
+  n.className = "revise-loading";
+  n.textContent = "Revising…";
+  return n;
+}
+
+function errorNode(msg: string): HTMLElement {
+  const n = document.createElement("div");
+  n.className = "revise-error";
+  n.textContent = msg;
+  return n;
+}
+
+function extractSectionExcerpt(md: string, sectionName: string): string {
+  const lines = md.split("\n");
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const h = lines[i].match(/^##\s+(.+?)\s*$/);
+    if (h && h[1].trim() === sectionName) {
+      start = i;
+      break;
+    }
+  }
+  if (start === -1) return "";
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^##\s+/.test(lines[i])) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(start, end).join("\n");
+}
+
+export async function runScopedRevise(args: RunScopedReviseArgs): Promise<void> {
+  const { api, slot, scope, currentMarkdown, bulletText, sectionPath, instruction, model, onAccept, onReject } = args;
+  const useChecker = args.useChecker ?? true;
+
+  slot.replaceChildren(loadingNode());
+
+  let resp: AutoReviseScopedResponse;
+  try {
+    resp = await api.autoReviseScoped({
+      scope,
+      excerpt: scope === "bullet" ? (bulletText ?? "") : extractSectionExcerpt(currentMarkdown, sectionPath),
+      sectionPath,
+      instruction,
+      model,
+      useChecker,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    slot.replaceChildren(errorNode(`Revise failed: ${msg}`));
+    return;
+  }
+  if (!resp.ok) {
+    slot.replaceChildren(errorNode(`Revise failed: ${resp.error.message}`));
+    return;
+  }
+
+  let next: string;
+  let editedLineIndices: number[];
+  try {
+    if (scope === "bullet") {
+      if (typeof resp.replaceWith !== "string") throw new Error("server returned non-string replaceWith for bullet");
+      const result = applyBulletEdit(currentMarkdown, bulletText ?? "", sectionPath, resp.replaceWith);
+      next = result.next;
+      editedLineIndices = result.editedLineIndices;
+    } else {
+      if (!Array.isArray(resp.replaceWith)) throw new Error("server returned non-array replaceWith for section");
+      const result = applySectionEdit(currentMarkdown, sectionPath, resp.replaceWith);
+      next = result.next;
+      editedLineIndices = result.editedLineIndices;
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    slot.replaceChildren(errorNode(`Could not locate the target in your resume: ${msg}`));
+    return;
+  }
+
+  const replacements = Array.isArray(resp.replaceWith) ? resp.replaceWith : [resp.replaceWith];
+  const validation = validateByteEqualityOutsideEdits(currentMarkdown, next, editedLineIndices, replacements);
+  if (!validation.ok) {
+    slot.replaceChildren(errorNode(`Safety check failed: ${validation.errors.join("; ")}`));
+    return;
+  }
+
+  const diffBlock = document.createElement("div");
+  diffBlock.className = "revise-diff";
+
+  if (resp.checker && resp.checker.ok === false) {
+    const warn = document.createElement("div");
+    warn.className = "revise-warning";
+    warn.innerHTML =
+      `<strong>Warnings:</strong> ` +
+      resp.checker.issues.map((s) => `<span class="warn-chip">${escapeHtml(s)}</span>`).join(" ");
+    diffBlock.appendChild(warn);
+  }
+
+  const row = document.createElement("div");
+  row.className = "revise-diff__row";
+  if (scope === "bullet") {
+    row.innerHTML = `
+      <div class="revise-diff__before">${escapeHtml(bulletText ?? "")}</div>
+      <div class="revise-diff__after">${escapeHtml(resp.replaceWith as string)}</div>`;
+  } else {
+    const after = (resp.replaceWith as string[]).map((b) => `- ${escapeHtml(b)}`).join("<br>");
+    row.classList.add("revise-diff__row--section");
+    row.innerHTML = `
+      <div class="revise-diff__before"><em>(section replaced)</em></div>
+      <div class="revise-diff__after">${after}</div>`;
+  }
+  diffBlock.appendChild(row);
+
+  const actions = document.createElement("div");
+  actions.className = "revise-actions";
+  const accept = document.createElement("button");
+  accept.type = "button";
+  accept.className = "btn btn-primary";
+  accept.setAttribute("data-action", "accept");
+  accept.textContent = "Accept";
+  const reject = document.createElement("button");
+  reject.type = "button";
+  reject.className = "btn btn-secondary";
+  reject.setAttribute("data-action", "reject");
+  reject.textContent = "Reject";
+  actions.appendChild(accept);
+  actions.appendChild(reject);
+  diffBlock.appendChild(actions);
+
+  slot.replaceChildren(diffBlock);
+
+  accept.addEventListener("click", () => {
+    onAccept(next);
+    slot.replaceChildren();
+  });
+  reject.addEventListener("click", () => {
+    onReject();
+    slot.replaceChildren();
+  });
 }
