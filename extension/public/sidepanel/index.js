@@ -20332,6 +20332,16 @@ function buildControllers(opts = {
       }
       return client.autoRevise(req);
     },
+    onAutoReviseScoped: async (req) => {
+      const client = await getApiClient();
+      if (!client) {
+        return {
+          ok: false,
+          error: { type: "validation", message: "Apps Script URL not configured.", retryable: false }
+        };
+      }
+      return client.autoReviseScoped(req);
+    },
     onCoverLetter: async (req) => {
       const client = await getApiClient();
       if (!client) {
