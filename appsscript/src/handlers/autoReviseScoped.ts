@@ -11,6 +11,10 @@ import type { ClaudeUsage } from "../types/claude-api.js";
 import { calculateCost } from "../cost.js";
 import { log } from "../lib/structuredLog.js";
 
+function neutraliseFences(s: string): string {
+  return s.replace(/```/g, "​`​`​`​");
+}
+
 function validationError(message: string): ApiErrorResponse {
   return { ok: false, error: { type: "validation", message, retryable: false } };
 }
@@ -63,14 +67,14 @@ function buildCreatorPrompt(req: AutoReviseScopedRequest, priorIssues: string[])
       ? `\n\nA prior attempt failed checks for these reasons — address them this time:\n- ${priorIssues.join("\n- ")}`
       : "";
   const user = [
-    `Section: ${req.sectionPath}`,
+    `Section: ${neutraliseFences(req.sectionPath)}`,
     "",
     isBullet ? "Original bullet:" : "Original section content:",
     "```",
-    req.excerpt,
+    neutraliseFences(req.excerpt),
     "```",
     "",
-    `Instruction: ${req.instruction}${issueAddendum}`,
+    `Instruction: ${neutraliseFences(req.instruction)}${issueAddendum}`,
   ].join("\n");
   return { system, user };
 }
@@ -87,12 +91,12 @@ function buildCheckerPrompt(req: AutoReviseScopedRequest, proposal: string | str
   const user = [
     "Original:",
     "```",
-    req.excerpt,
+    neutraliseFences(req.excerpt),
     "```",
     "",
     "Proposed rewrite:",
     "```",
-    proposalText,
+    neutraliseFences(proposalText),
     "```",
   ].join("\n");
   return { system, user };
@@ -110,7 +114,8 @@ function parseCreatorReply(scope: AutoReviseScopedRequest["scope"], text: string
   try {
     parsed = JSON.parse(t);
   } catch (e) {
-    throw new Error(`section scope: creator did not return valid JSON: ${(e as Error).message}`);
+    const reason = e instanceof Error ? e.message : String(e);
+    throw new Error(`section scope: creator did not return valid JSON: ${reason}`);
   }
   if (!Array.isArray(parsed) || !parsed.every((x) => typeof x === "string")) {
     throw new Error("section scope: creator JSON must be an array of strings");
@@ -193,7 +198,7 @@ export function handleAutoReviseScoped(
     }
     const msg = err instanceof Error ? err.message : String(err);
     log("error", "autoReviseScoped failure", { error: msg });
-    return { ok: false, error: { type: "server", message: msg, retryable: false } };
+    return { ok: false, error: { type: "server", message: msg, retryable: true } };
   }
 
   const cost = calculateCost(totalUsage, modelUsed);
