@@ -58,6 +58,7 @@ import type {
   AutoReviseScopedResponse,
 } from '../../types/api-contract.js';
 import { getRuntimeConfig } from '../index.js';
+import { log } from '../../lib/structuredLog.js';
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-4-6';
@@ -766,14 +767,15 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     resumeSlot.replaceChildren(editor);
     editor.addEventListener('resume:revise', (ev) => {
       const detail = (ev as CustomEvent<ResumeReviseEventDetail>).detail;
-      const target = (ev.target as HTMLElement | null) ?? editor;
+      const target = ev.target instanceof HTMLElement ? ev.target : editor;
+      // whole-resume has no per-element anchor; the composer renders below the editor wrapper
       const anchorEl =
         detail.scope.kind === 'bullet'
           ? target.closest<HTMLElement>('[data-bullet-id]') ?? target
           : detail.scope.kind === 'section'
           ? target.closest<HTMLElement>('[data-section-name]') ?? target
           : target;
-      void runAutoReviseScoped(detail.scope, detail.currentMarkdown, anchorEl);
+      void runAutoReviseScoped(detail.scope, anchorEl);
     });
     // Auto-scroll the panel to the new preview so the user sees it landed.
     requestAnimationFrame(() => {
@@ -847,9 +849,6 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     if (state.coverLetterEnabled && hooks.onCoverLetter && jobFolderId) {
       tasks.push(runCoverLetter(resumeMd, jobFolderId));
     }
-    // Auto-revise is now triggered by the resume editor's own "Revise…"
-    // buttons (which dispatch a 'resume:revise' CustomEvent). No redundant
-    // whole-resume button needed here.
 
     await Promise.allSettled(tasks);
   }
@@ -977,10 +976,9 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
 
   async function runAutoReviseScoped(
     scope: ReviseTargetScope,
-    currentMd: string,
     anchorEl: HTMLElement,
   ): Promise<void> {
-    const md = currentMarkdownGetter ? currentMarkdownGetter() : currentMd;
+    const md = currentMarkdownGetter ? currentMarkdownGetter() : '';
 
     if (scope.kind === 'whole-resume') {
       await runWholeResumeRevise(md, anchorEl);
@@ -994,6 +992,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
 
     const composerHost = document.createElement('div');
     composerHost.className = 'revise-composer-host';
+    const existing = anchorEl.nextElementSibling;
+    if (existing?.classList.contains('revise-composer-host')) existing.remove();
     anchorEl.insertAdjacentElement('afterend', composerHost);
 
     const closeComposer = (): void => composerHost.remove();
@@ -1028,10 +1028,13 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
   }
 
   async function runWholeResumeRevise(md: string, anchorEl: HTMLElement): Promise<void> {
-    if (!hooks.onAutoRevise) return;
+    const wholeHook = hooks.onAutoRevise;
+    if (!wholeHook) return;
 
     const composerHost = document.createElement('div');
     composerHost.className = 'revise-composer-host';
+    const existing = anchorEl.nextElementSibling;
+    if (existing?.classList.contains('revise-composer-host')) existing.remove();
     anchorEl.insertAdjacentElement('afterend', composerHost);
 
     const closeComposer = (): void => composerHost.remove();
@@ -1046,13 +1049,16 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
         loading.textContent = 'Revising whole resume…';
         composerHost.appendChild(loading);
         try {
-          const resp = await hooks.onAutoRevise!({
+          const resp = await wholeHook({
             currentMarkdown: md,
             targetScope: { kind: 'whole-resume' },
             instruction,
             model: state.autoReviseModel,
           });
-          if (!composerHost.isConnected) return;
+          if (!composerHost.isConnected) {
+            log('debug', 'whole-resume revise discarded: composer closed', { scope: 'whole-resume' });
+            return;
+          }
           if (!resp.ok) {
             const err = document.createElement('div');
             err.className = 'revise-error';
@@ -1063,7 +1069,10 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
           if (editorEl) setEditorMarkdown(editorEl, resp.revisedMarkdown);
           closeComposer();
         } catch (e) {
-          if (!composerHost.isConnected) return;
+          if (!composerHost.isConnected) {
+            log('debug', 'whole-resume revise discarded: composer closed', { scope: 'whole-resume' });
+            return;
+          }
           const err = document.createElement('div');
           err.className = 'revise-error';
           err.textContent = `Revise failed: ${e instanceof Error ? e.message : String(e)}`;
