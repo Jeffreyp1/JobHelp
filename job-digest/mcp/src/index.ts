@@ -24,7 +24,7 @@ export interface BuildServerOptions {
 }
 
 const DEFAULT_NAME = 'jobhelp-mcp';
-const DEFAULT_VERSION = '0.2.0-alpha.0';
+const DEFAULT_VERSION = '0.2.0';
 
 export function buildServer(opts: BuildServerOptions): ServerHandle {
   const tools = createTools(opts.coreDeps);
