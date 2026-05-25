@@ -1,4 +1,8 @@
 import type { Result } from '../../core/types/result.js';
+import {
+  createPromptResources,
+  PROMPT_RESOURCE_URIS,
+} from './prompts.js';
 
 export interface ResourceDescriptor {
   readonly uri: string;
@@ -50,6 +54,9 @@ export const RULES_MERGED_URI = 'jobhelp://rules/merged';
 export const RESUME_URI = 'jobhelp://resume';
 export const RECENT_DIGEST_URI = 'jobhelp://recent-digest';
 export const STATE_URI = 'jobhelp://state';
+export const PROMPT_TAILOR_RESUMES_URI = PROMPT_RESOURCE_URIS.tailor_resumes;
+export const PROMPT_TAILOR_RESUME_URI = PROMPT_RESOURCE_URIS.tailor_resume;
+export const PROMPT_VALIDATE_RESUME_URI = PROMPT_RESOURCE_URIS.validate_resume;
 
 function errorContent(uri: string, error: ResourceError): ResourceReadResponse {
   return {
@@ -88,6 +95,7 @@ function rulesResponse(
 
 export function createResources(deps: ResourceDeps): readonly ResourceHandler[] {
   return [
+    ...createPromptResources(),
     {
       descriptor: {
         uri: RULES_DEFAULTS_URI,
