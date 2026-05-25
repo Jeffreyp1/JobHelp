@@ -1,7 +1,9 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
+  GetPromptRequestSchema,
   ListResourcesRequestSchema,
+  ListPromptsRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -9,11 +11,14 @@ import type { CoreDeps, ToolHandler } from './tools.js';
 import { createTools } from './tools.js';
 import type { ResourceDeps, ResourceHandler } from './resources.js';
 import { createResources } from './resources.js';
+import type { PromptHandler } from './prompts.js';
+import { createPrompts } from './prompts.js';
 
 export interface ServerHandle {
   readonly server: Server;
   readonly tools: readonly ToolHandler[];
   readonly resources: readonly ResourceHandler[];
+  readonly prompts: readonly PromptHandler[];
 }
 
 export interface BuildServerOptions {
@@ -29,6 +34,7 @@ const DEFAULT_VERSION = '0.2.0';
 export function buildServer(opts: BuildServerOptions): ServerHandle {
   const tools = createTools(opts.coreDeps);
   const resources = createResources(opts.resourceDeps);
+  const prompts = createPrompts();
 
   const server = new Server(
     {
@@ -39,6 +45,7 @@ export function buildServer(opts: BuildServerOptions): ServerHandle {
       capabilities: {
         tools: {},
         resources: {},
+        prompts: {},
       },
     },
   );
@@ -48,6 +55,9 @@ export function buildServer(opts: BuildServerOptions): ServerHandle {
 
   const resourceByUri = new Map<string, ResourceHandler>();
   for (const r of resources) resourceByUri.set(r.descriptor.uri, r);
+
+  const promptByName = new Map<string, PromptHandler>();
+  for (const p of prompts) promptByName.set(p.definition.name, p);
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: tools.map((t) => ({
@@ -99,6 +109,23 @@ export function buildServer(opts: BuildServerOptions): ServerHandle {
     })),
   }));
 
+  server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+    _meta: {},
+    prompts: prompts.map((p) => ({
+      name: p.definition.name,
+      description: p.definition.description,
+      arguments: p.definition.arguments,
+    })),
+  }));
+
+  server.setRequestHandler(GetPromptRequestSchema, async (req) => {
+    const handler = promptByName.get(req.params.name);
+    if (handler === undefined) {
+      throw new Error(`unknown prompt: ${req.params.name}`);
+    }
+    return handler.get(req.params.arguments);
+  });
+
   server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
     const handler = resourceByUri.get(req.params.uri);
     if (handler === undefined) {
@@ -127,7 +154,7 @@ export function buildServer(opts: BuildServerOptions): ServerHandle {
     return { contents: response.contents };
   });
 
-  return { server, tools, resources };
+  return { server, tools, resources, prompts };
 }
 
 export async function runStdio(handle: ServerHandle): Promise<void> {
