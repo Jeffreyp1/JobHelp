@@ -9,6 +9,7 @@ const ENGINEER_LEVEL_RE = /\b(?:software\s+)?engineer\s+(?:II|III|IV)\b/i;
 const SENIOR_TITLE_RE = /\bsenior\b|\bsr\.?\b/i;
 const LEAD_TITLE_RE = /\blead\b/i;
 const INTERN_TITLE_RE = /\b(intern|internship|new ?grad)\b/i;
+const OBVIOUS_NON_SOFTWARE_TITLE_RE = /\b(?:registered\s+nurse|nurse|rn|lpn|physician|dentist|pharmacist|therapist|medical\s+assistant)\b/i;
 const MS_PER_DAY = 86_400_000;
 
 function seniorityIndex(level: Seniority): number {
@@ -39,7 +40,7 @@ function dropsForEngineerLevel(job: NormalizedJob, config: JobDigestConfig): boo
 }
 
 function dropsForSeniorInTitle(job: NormalizedJob, config: JobDigestConfig): boolean {
-  if (config.profile.seniority !== 'entry' && config.profile.seniority !== 'mid') return false;
+  if (config.profile.seniority !== 'entry') return false;
   return SENIOR_TITLE_RE.test(job.title);
 }
 
@@ -50,6 +51,10 @@ function dropsForLeadInTitle(job: NormalizedJob, config: JobDigestConfig): boole
 
 function dropsForRemote(job: NormalizedJob, config: JobDigestConfig): boolean {
   return job.remote === 'remote' && config.profile.remoteOk === false;
+}
+
+function dropsForObviousNonSoftware(job: NormalizedJob): boolean {
+  return OBVIOUS_NON_SOFTWARE_TITLE_RE.test(job.title);
 }
 
 // allowedCountries matches detectCountryFromLocation output LITERALLY; region buckets
@@ -123,6 +128,10 @@ export async function filter(
   for (const job of jobs) {
     if (isGhostJob(job)) {
       log('warn', 'filter.drop_ghost', { id: job.id, source: job.source, reason: 'ghost_or_template' });
+      continue;
+    }
+    if (dropsForObviousNonSoftware(job)) {
+      log('debug', 'filter.drop_obvious_non_software', { id: job.id, source: job.source, title: job.title });
       continue;
     }
     if (dropsForRoleFamily(job, config)) {
