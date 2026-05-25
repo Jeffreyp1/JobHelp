@@ -115,13 +115,28 @@ export function parseScoreBreakdown(raw: unknown): ScoreBreakdown | null {
   const rawBm25f = raw['bm25f'];
   const bm25f = typeof rawBm25f === 'number' ? rawBm25f : 0;
   const rawSourceTrust = raw['sourceTrust'];
-  const sourceTrust = typeof rawSourceTrust === 'number' ? rawSourceTrust : 1.0;
+  const sourceTrust = typeof rawSourceTrust === 'number' ? rawSourceTrust : undefined;
   const rawRrf = raw['rrf'];
   const rrf = typeof rawRrf === 'number' && Number.isFinite(rawRrf) ? rawRrf : undefined;
   const llmFitScore = raw['llmFitScore'];
-  if (llmFitScore === undefined) return { keywordOverlap, recencyBoost, bm25f, sourceTrust, ...(rrf !== undefined && { rrf }) };
+  if (llmFitScore === undefined) {
+    return {
+      keywordOverlap,
+      recencyBoost,
+      bm25f,
+      ...(sourceTrust !== undefined && { sourceTrust }),
+      ...(rrf !== undefined && { rrf }),
+    };
+  }
   if (typeof llmFitScore !== 'number') return null;
-  return { keywordOverlap, recencyBoost, bm25f, sourceTrust, ...(rrf !== undefined && { rrf }), llmFitScore };
+  return {
+    keywordOverlap,
+    recencyBoost,
+    bm25f,
+    ...(sourceTrust !== undefined && { sourceTrust }),
+    ...(rrf !== undefined && { rrf }),
+    llmFitScore,
+  };
 }
 
 export function parseRankedJob(raw: unknown): RankedJob | null {
