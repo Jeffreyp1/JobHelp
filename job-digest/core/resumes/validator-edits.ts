@@ -1,3 +1,5 @@
+import { validateByteEqualityOutsideEdits } from './validator-byte-equality.js';
+
 export type ValidationSeverity = 'supported' | 'fair-rephrase' | 'exaggerated' | 'made-up';
 
 export interface CritiqueFlag {
@@ -79,7 +81,6 @@ export function applyValidatorResumeEdits(input: ApplyValidatorEditsInput): Appl
   const byteCheck = validateByteEqualityOutsideEdits(
     input.prevContent,
     applied.content,
-    input.critique,
     input.edits,
     applied.editedLineIndices,
   );
@@ -143,6 +144,13 @@ export function applyEdits(prev: string, critique: Critique, edits: ValidatorEdi
     if (flag === undefined) throw new Error(`No critique flag for edit.flagId=${edit.flagId}`);
     return { edit, idx: findAnchorLine(lines, flag), flag };
   });
+  const targetLines = new Set<number>();
+  for (const { idx } of indexed) {
+    if (targetLines.has(idx)) {
+      throw new Error(`Multiple validator edits target line ${idx}; combine the fixes into one replacement before applying.`);
+    }
+    targetLines.add(idx);
+  }
 
   indexed.sort((a, b) => b.idx - a.idx);
 
@@ -157,43 +165,6 @@ export function applyEdits(prev: string, critique: Critique, edits: ValidatorEdi
   }
 
   return { content: lines.join('\n'), appliedFlagIds: applied, editedLineIndices };
-}
-
-export function validateByteEqualityOutsideEdits(
-  prev: string,
-  next: string,
-  _critique: Critique,
-  edits: ValidatorEdits,
-  editedLineIndices: readonly number[],
-): ValidationResult {
-  const editedSet = new Set(editedLineIndices);
-  const replacementBudget = new Map<string, number>();
-  for (const edit of edits.edits) {
-    if (typeof edit.replaceWith === 'string' && edit.replaceWith.length > 0) {
-      const key = stripBullet(edit.replaceWith);
-      replacementBudget.set(key, (replacementBudget.get(key) ?? 0) + 1);
-    }
-  }
-
-  const errors: string[] = [];
-  for (const op of alignLineDiff(prev.split('\n'), next.split('\n'))) {
-    if (op.kind === 'equal') continue;
-    if (op.kind === 'remove') {
-      if (!editedSet.has(op.prevIndex)) {
-        errors.push(`Removed line at prev index ${op.prevIndex} is not at a known edit site: ${quote(op.text)}`);
-      }
-      continue;
-    }
-    const key = stripBullet(op.text);
-    const remaining = replacementBudget.get(key) ?? 0;
-    if (remaining <= 0) {
-      errors.push(`Added line is not authorized by any edit.replaceWith: ${quote(op.text)}`);
-    } else {
-      replacementBudget.set(key, remaining - 1);
-    }
-  }
-
-  return { ok: errors.length === 0, errors };
 }
 
 function blocked(
@@ -288,12 +259,3 @@ function replaceAnchorInLine(line: string, anchor: string, replacement: string, 
   if (index < 0) throw new Error(`Anchor not found in line for flagId ${flagId}: "${anchor.slice(0, 60)}..."`);
   return `${line.slice(0, index)}${replacement}${line.slice(index + anchor.length)}`;
 }
-
-function stripBullet(value: string): string {
-  return value.replace(/^\s*[-*+]\s+/, '').trim();
-}
-
-function quote(value: string): string {
-  return JSON.stringify(value).slice(0, 200);
-}
-import { alignLineDiff } from './validator-line-diff.js';
