@@ -22,6 +22,7 @@ describe('createTools — surface', () => {
         'doctor',
         'list_application_versions',
         'list_recent_applications',
+        'prepare_batch_applications',
         'read_resume',
         'read_rules',
         'register_resume',

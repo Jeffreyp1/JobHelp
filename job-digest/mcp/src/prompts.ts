@@ -65,13 +65,13 @@ User input: ${input}
 You are the client AI orchestrator. Use MCP tools and resources to process every requested job. Do not invent experience.
 
 Inputs may be:
-- No explicit jobs: use get_latest_digest, or find_matching_jobs when the user asks for top N matching jobs.
-- One job id: use get_job for that job.
-- Many job ids: process each sequentially.
+- No explicit jobs: use prepare_batch_applications for top 25 by default, or find_matching_jobs first when the user asks for fresh top N matching jobs.
+- One job id: call prepare_batch_applications({ jobIds: [id] }) before tailoring.
+- Many job ids: call prepare_batch_applications with jobIds and process each ready item sequentially.
 - URLs or pasted job descriptions: if this client can fetch URLs, extract the JD; otherwise ask the user for the JD text.
 
 For each job:
-1. Call start_application.
+1. Use prepare_batch_applications for digest jobs; for pasted JD text, call start_application directly.
 2. Run the tailor_resume phase to create a resume draft.
 3. Run the validate_resume phase automatically.
 4. If validation returns BLOCK, give the machine-readable flagged claims back to tailor_resume as prevCritique.
@@ -100,7 +100,7 @@ Final response:
 - succeeded PASS count
 - BLOCK after 3 rounds count
 - skipped count
-- per-job output paths or clear failure reasons`;
+- per-job status and output paths or clear failure reasons`;
 }
 
 function tailorResumeText(args?: PromptArgs): string {

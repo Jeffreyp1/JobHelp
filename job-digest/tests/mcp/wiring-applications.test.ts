@@ -125,6 +125,65 @@ describe('mcp/wiring application flows — boot real server with temp JOBHELP_HO
     expect(typeof body.value?.['path']).toBe('string');
   });
 
+  it('prepare_batch_applications starts top digest jobs through the real server', async () => {
+    const persisted = await persistDigest({
+      date: '2026-05-15',
+      generatedAt: '2026-05-15T00:00:00.000Z',
+      totalDurationMs: 0,
+      sourceResults: [{ source: 'fixture', jobCount: 2, durationMs: 0 }],
+      jobs: [
+        {
+          rank: 1,
+          score: 0.9,
+          breakdown: { keywordOverlap: 0.9, recencyBoost: 1, bm25f: 2 },
+          job: {
+            id: 'fixture:1',
+            source: 'fixture',
+            url: 'https://example.test/jobs/1',
+            title: 'Backend Engineer',
+            company: 'Acme',
+            location: 'Remote',
+            remote: 'remote',
+            description: 'Build APIs.',
+          },
+        },
+        {
+          rank: 2,
+          score: 0.8,
+          breakdown: { keywordOverlap: 0.8, recencyBoost: 1, bm25f: 1 },
+          job: {
+            id: 'fixture:2',
+            source: 'fixture',
+            url: 'https://example.test/jobs/2',
+            title: 'Platform Engineer',
+            company: 'Beta',
+            location: 'Remote',
+            remote: 'remote',
+            description: 'Build platforms.',
+          },
+        },
+      ],
+    });
+    if (!persisted.ok) throw new Error(persisted.error.message);
+
+    const { coreDeps, resourceDeps } = await bootstrap();
+    const handle = buildServer({ coreDeps, resourceDeps });
+    const prepare = findTool(handle.tools, 'prepare_batch_applications');
+    const response = await prepare.invoke({ count: 2, basedOnResumeName: 'backend' });
+    const body = parseToolBody(response.content);
+    expect(body.ok).toBe(true);
+    expect(body.value).toMatchObject({
+      requestedCount: 2,
+      readyCount: 2,
+      failedCount: 0,
+      skippedCount: 0,
+    });
+    const items = body.value?.['items'] as Array<Record<string, unknown>> | undefined;
+    expect(items?.map((item) => item['jobId'])).toEqual(['fixture:1', 'fixture:2']);
+    expect(items?.[0]?.['applicationPath']).toEqual(expect.stringContaining('acme-backend-engineer'));
+    expect(items?.[0]?.['nextAction']).toBe('tailor_resume');
+  });
+
   it('start_application works from pasted job metadata without a digest match', async () => {
     const { coreDeps, resourceDeps } = await bootstrap();
     const handle = buildServer({ coreDeps, resourceDeps });
