@@ -83,6 +83,12 @@ export function applySectionEdit(
       break;
     }
   }
+  for (let i = startIdx + 1; i < endIdx; i++) {
+    const line = lines[i] ?? "";
+    if (line.trim().length === 0) continue;
+    if (/^\s*[-*]\s+/.test(line)) continue;
+    throw new Error(`Section "${sectionName}" is structured; section edits only support bullet-only sections`);
+  }
   const headingLine = lines[startIdx];
   const newBlock = [headingLine, "", ...replaceBullets.map((b) => `- ${b}`), ""];
   const before = lines.slice(0, startIdx);

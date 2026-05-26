@@ -1,6 +1,10 @@
-// Dispatches a bubbling 'resume:revise' CustomEvent consumed by features/autoRevise.ts.
-
+import { EditorState } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 import type { ReviseTargetScope } from '../../types/api-contract.js';
+import {
+  buildSelectionScope,
+  type SelectionReviseScope,
+} from '../../lib/resume-selection.js';
 import {
   parseResumeMarkdown,
   updateBulletLine,
@@ -32,9 +36,10 @@ export interface ResumeEditorProps {
   onSave: (md: string) => ResumeSaveResult | void | Promise<ResumeSaveResult | void>;
 }
 
-/** Detail payload of the 'resume:revise' CustomEvent. */
+export type ResumeReviseScope = ReviseTargetScope | SelectionReviseScope;
+
 export interface ResumeReviseEventDetail {
-  scope: ReviseTargetScope;
+  scope: ResumeReviseScope;
   currentMarkdown: string;
 }
 
@@ -64,10 +69,27 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
   wrap.className = 'resume-editor';
   wrap.setAttribute('aria-label', 'Resume editor');
 
+  let currentMarkdown = props.initialMarkdown;
+  let currentSelection: SelectionReviseScope | null = null;
+
   const heading = document.createElement('h3');
   heading.className = 'resume-editor__title';
   heading.textContent = 'Generated resume';
   wrap.appendChild(heading);
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'resume-editor__toolbar';
+  const selectionBtn = document.createElement('button');
+  selectionBtn.type = 'button';
+  selectionBtn.className = 'btn btn-secondary resume-editor__selection-revise';
+  selectionBtn.textContent = 'Revise selection';
+  selectionBtn.disabled = true;
+  toolbar.appendChild(selectionBtn);
+  wrap.appendChild(toolbar);
+
+  const editorHost = document.createElement('div');
+  editorHost.className = 'resume-editor__codemirror';
+  wrap.appendChild(editorHost);
 
   const preview = document.createElement('div');
   preview.className = 'resume-editor__preview';
@@ -107,15 +129,13 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
   actions.appendChild(wholeBtn);
 
   wrap.appendChild(actions);
-
-  let currentMarkdown = props.initialMarkdown;
   rawTextarea.value = currentMarkdown;
+
+  let view: EditorView;
 
   const ctx: BulletRenderCtx = {
     onCommit: (bulletId, newText) => {
-      currentMarkdown = updateBulletLine(currentMarkdown, bulletId, newText);
-      rawTextarea.value = currentMarkdown;
-      rerender();
+      setMarkdown(updateBulletLine(currentMarkdown, bulletId, newText));
     },
   };
 
@@ -133,9 +153,51 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
 
   rerender();
 
+  const updateSelection = (): void => {
+    const main = view.state.selection.main;
+    currentSelection = buildSelectionScope(currentMarkdown, main.from, main.to);
+    selectionBtn.disabled = currentSelection === null;
+  };
+
+  const setMarkdown = (md: string): void => {
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: md },
+    });
+  };
+
+  view = new EditorView({
+    parent: editorHost,
+    state: EditorState.create({
+      doc: currentMarkdown,
+      extensions: [
+        EditorView.lineWrapping,
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            currentMarkdown = update.state.doc.toString();
+            rawTextarea.value = currentMarkdown;
+            rerender();
+          }
+          if (update.selectionSet || update.docChanged) updateSelection();
+        }),
+      ],
+    }),
+  });
+
+  const emitRevise = (scope: ResumeReviseScope): void => {
+    wrap.dispatchEvent(
+      new CustomEvent<ResumeReviseEventDetail>('resume:revise', {
+        detail: { scope, currentMarkdown },
+        bubbles: true,
+      }),
+    );
+  };
+
   rawTextarea.addEventListener('input', () => {
-    currentMarkdown = rawTextarea.value;
-    rerender();
+    setMarkdown(rawTextarea.value);
+  });
+
+  selectionBtn.addEventListener('click', () => {
+    if (currentSelection) emitRevise(currentSelection);
   });
 
   saveBtn.addEventListener('click', () => {
@@ -178,24 +240,20 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
     if (!btn) return;
     const scope = deriveScope(btn);
     if (!scope) return;
-    const detail: ResumeReviseEventDetail = {
-      scope,
-      currentMarkdown,
-    };
-    wrap.dispatchEvent(
-      new CustomEvent<ResumeReviseEventDetail>('resume:revise', {
-        detail,
-        bubbles: true,
-      }),
-    );
+    emitRevise(scope);
   });
 
   wrap.addEventListener('resume:set-markdown', (ev) => {
     const md = (ev as CustomEvent<{ md: string }>).detail?.md;
     if (typeof md !== 'string') return;
-    currentMarkdown = md;
-    rawTextarea.value = md;
-    rerender();
+    setMarkdown(md);
+  });
+
+  wrap.addEventListener('resume:set-selection', (ev) => {
+    const detail = (ev as CustomEvent<{ from: unknown; to: unknown }>).detail;
+    if (typeof detail?.from !== 'number' || typeof detail.to !== 'number') return;
+    view.dispatch({ selection: { anchor: detail.from, head: detail.to } });
+    updateSelection();
   });
 
   return wrap;
@@ -203,4 +261,8 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
 
 export function setEditorMarkdown(editor: HTMLElement, md: string): void {
   editor.dispatchEvent(new CustomEvent('resume:set-markdown', { detail: { md } }));
+}
+
+export function setEditorSelection(editor: HTMLElement, from: number, to: number): void {
+  editor.dispatchEvent(new CustomEvent('resume:set-selection', { detail: { from, to } }));
 }
