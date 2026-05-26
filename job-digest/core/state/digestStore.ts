@@ -1,6 +1,6 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { getStateRoot } from './store.js';
+import { getStateRoot, updateState } from './store.js';
 import { type DigestError, type PersistedDigest } from './index.js';
 import { err, ok, type Result } from '../types/result.js';
 import type { RankedJob, SourceRunResult } from '../types/index.js';
@@ -10,6 +10,7 @@ import {
   parseSourceRunResult,
 } from './digestSchema.js';
 import { atomicWriteFile as atomicWriteFileImpl } from '../lib/atomicWrite.js';
+import { formatDigestCsv, formatDigestMarkdown } from '../digest/format.js';
 
 const DIGESTS_DIR_NAME = 'digests';
 const LATEST_POINTER_NAME = 'latest.json';
@@ -21,6 +22,14 @@ export function getDigestsDir(): string {
 
 export function getDigestPath(date: string): string {
   return join(getDigestsDir(), `digest-${date}.json`);
+}
+
+export function getDigestMarkdownPath(date: string): string {
+  return join(getDigestsDir(), `digest-${date}.md`);
+}
+
+export function getDigestCsvPath(date: string): string {
+  return join(getDigestsDir(), `digest-${date}.csv`);
 }
 
 export function getLatestPointerPath(): string {
@@ -89,7 +98,17 @@ async function atomicWriteDigest(
 
 export async function persistDigest(
   digest: PersistedDigest,
-): Promise<Result<{ readonly path: string; readonly latestPath: string }, DigestError>> {
+): Promise<
+  Result<
+    {
+      readonly path: string;
+      readonly latestPath: string;
+      readonly markdownPath: string;
+      readonly csvPath: string;
+    },
+    DigestError
+  >
+> {
   if (!DATE_RE.test(digest.date)) {
     return err({ type: 'validation', message: `digest.date must be YYYY-MM-DD: ${digest.date}` });
   }
@@ -102,6 +121,8 @@ export async function persistDigest(
   }
   const filePath = getDigestPath(digest.date);
   const latestPath = getLatestPointerPath();
+  const markdownPath = getDigestMarkdownPath(digest.date);
+  const csvPath = getDigestCsvPath(digest.date);
   const contents = `${JSON.stringify(digest, null, 2)}\n`;
   // Two-step write invariant: dated digest is the source of truth; latest.json
   // is a derived pointer. A crash between the two writes leaves a stale latest
@@ -111,7 +132,42 @@ export async function persistDigest(
   if (!write.ok) return err(write.error);
   const latestWrite = await atomicWriteDigest(latestPath, contents);
   if (!latestWrite.ok) return err(latestWrite.error);
-  return ok({ path: filePath, latestPath });
+  const meta = {
+    date: digest.date,
+    sourceResults: digest.sourceResults,
+    totalDurationMs: digest.totalDurationMs,
+  };
+  const markdownWrite = await atomicWriteDigest(
+    markdownPath,
+    formatDigestMarkdown(digest.jobs, meta),
+  );
+  if (!markdownWrite.ok) return err(markdownWrite.error);
+  const csvWrite = await atomicWriteDigest(csvPath, formatDigestCsv(digest.jobs));
+  if (!csvWrite.ok) return err(csvWrite.error);
+  const stateWrite = await updateState((state) => ({
+    ...state,
+    digests: [
+      {
+        date: digest.date,
+        path: filePath,
+        jobCount: digest.jobs.length,
+        createdAt: digest.generatedAt,
+      },
+      ...state.digests.filter((entry) => entry.date !== digest.date),
+    ],
+  }));
+  if (!stateWrite.ok) {
+    const type =
+      stateWrite.error.type === 'validation' || stateWrite.error.type === 'parse'
+        ? 'validation'
+        : 'io';
+    return err({
+      type,
+      ...(stateWrite.error.path !== undefined ? { path: stateWrite.error.path } : {}),
+      message: stateWrite.error.message,
+    });
+  }
+  return ok({ path: filePath, latestPath, markdownPath, csvPath });
 }
 
 async function readAndValidate(filePath: string): Promise<Result<PersistedDigest, DigestError>> {

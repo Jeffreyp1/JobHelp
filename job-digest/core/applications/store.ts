@@ -9,7 +9,8 @@ import {
   type WriteApplicationOutputInput,
   type WriteApplicationOutputResult,
 } from './index.js';
-import { buildApplicationDir, buildApplicationDirName } from './paths.js';
+import { buildApplicationDir } from './paths.js';
+import { directJobDirRole, validateDate } from './startHelpers.js';
 import { fileNameForKind, listVersions as listVersionsImpl, nextVersion } from './versioning.js';
 import type { ApplicationVersion } from './index.js';
 import { updateState, readState } from '../state/store.js';
@@ -17,10 +18,10 @@ import type { ApplicationEntry, JobHelpState } from '../state/index.js';
 import { err, ok, type Result } from '../types/result.js';
 import { atomicWriteFile as atomicWriteFileImpl } from '../lib/atomicWrite.js';
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const APP_LOCK_FILE = '.write.lock';
 const APP_LOCK_DEFAULT_TIMEOUT_MS = 5000;
 const APP_LOCK_RETRY_INTERVAL_MS = 25;
+const JOB_DESCRIPTION_FILE_NAME = 'job-description.md';
 
 function getStringCode(e: unknown): string | undefined {
   if (typeof e !== 'object' || e === null) return undefined;
@@ -47,13 +48,6 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
-function validateDate(date: string): Result<void, ApplicationError> {
-  if (!DATE_RE.test(date)) {
-    return err({ type: 'validation', message: `date must be YYYY-MM-DD: ${date}` });
-  }
-  return ok(undefined);
-}
-
 export async function startApplication(
   input: StartApplicationInput,
 ): Promise<Result<StartApplicationResult, ApplicationError>> {
@@ -68,12 +62,15 @@ export async function startApplication(
   if (input.jobId.trim().length === 0) {
     return err({ type: 'validation', message: 'jobId must be non-empty' });
   }
+  if (input.jobDescription !== undefined && input.jobDescription.length === 0) {
+    return err({ type: 'validation', message: 'jobDescription must be non-empty' });
+  }
 
   let dir: string;
   try {
     dir = buildApplicationDir({
       company: input.company,
-      role: input.role,
+      role: directJobDirRole(input.jobId, input.role),
       date: input.date,
     });
   } catch (e: unknown) {
@@ -98,6 +95,8 @@ export async function startApplication(
       role: input.role,
       date: input.date,
       dir,
+      ...(input.url !== undefined ? { url: input.url } : {}),
+      ...(input.location !== undefined ? { location: input.location } : {}),
     };
     if (existingIdx === -1) {
       const newEntry: ApplicationEntry =
@@ -119,6 +118,13 @@ export async function startApplication(
 
   if (!updated.ok) {
     return err({ type: 'state_error', message: updated.error.message });
+  }
+
+  if (input.jobDescription !== undefined) {
+    const jobDescriptionPath = join(dir, JOB_DESCRIPTION_FILE_NAME);
+    const write = await atomicWriteApp(jobDescriptionPath, input.jobDescription);
+    if (!write.ok) return err(write.error);
+    return ok({ dir, created: !existedBefore, jobDescriptionPath });
   }
 
   return ok({ dir, created: !existedBefore });
@@ -150,9 +156,7 @@ async function acquireAppLock(
       const release = async (): Promise<void> => {
         try {
           await rm(lockPath, { force: true });
-        } catch {
-          // best-effort
-        }
+        } catch {}
       };
       return ok(release);
     } catch (e: unknown) {
@@ -243,9 +247,17 @@ export async function writeApplicationOutput(
     return err({ type: 'state_error', message: updated.error.message });
   }
 
+  const fileName = fileNameForKind(input.kind, version);
+  const baseResult = {
+    path: filePath,
+    applicationDir: dir,
+    fileName,
+    kind: input.kind,
+    latestPath: filePath,
+  };
   return isVersionedKind(input.kind)
-    ? ok({ path: filePath, version })
-    : ok({ path: filePath });
+    ? ok({ ...baseResult, version })
+    : ok(baseResult);
 }
 
 function isVersionedKind(kind: ApplicationKind): boolean {
@@ -280,5 +292,3 @@ export async function listRecentApplications(
   const sliced = limit !== undefined ? sorted.slice(0, limit) : sorted;
   return ok(sliced);
 }
-
-export { buildApplicationDirName };

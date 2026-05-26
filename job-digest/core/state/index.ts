@@ -15,6 +15,8 @@ export interface ApplicationEntry {
   readonly role: string;
   readonly date: string;
   readonly dir: string;
+  readonly url?: string;
+  readonly location?: string;
   readonly basedOnResumeName?: string;
   readonly createdAt: string;
   readonly updatedAt: string;

@@ -68,11 +68,16 @@ Any tool call other than `init_config` returns a typed error if the config file 
 | Tool | What it does |
 |------|-------------|
 | `init_config` | First-run setup: walks through config fields, writes `~/.config/jobhelp/config.json` |
+| `apply_config_answers` | Write answers collected from `init_config` into the config file |
 | `register_resume` | Store a resume under a friendly name (e.g. `backend`, `ml-engineer`); markdown only, any number of resumes |
 | `set_active_resume` | Switch the active resume; with no name, lists registered resumes |
 | `find_matching_jobs` | Discover jobs from all enabled sources, score against the active resume, return ranked digest |
 | `get_latest_digest` | Return the most recent persisted digest without re-running discovery |
 | `get_job` | Return a full `NormalizedJob` (including description) by id |
+| `get_resume_outline` | Return stable section and bullet ids so clients can edit only selected resume parts |
+| `apply_scoped_resume_edits` | Apply section or bullet replacements by selection id while preserving untouched lines |
+| `apply_validator_resume_edits` | Apply validator-approved edits and return auditable PASS/BLOCK evidence |
+| `doctor` | Run read-only setup diagnostics with actionable next steps |
 | `read_rules` | Return rule files: `defaults`, `user`, or `merged` (default) |
 | `read_resume` | Return the active resume content |
 | `score_keyword_match` | Deterministic 0..1 keyword-overlap score between a resume and a job (ATS coverage check) |
@@ -80,6 +85,8 @@ Any tool call other than `init_config` returns a typed error if the config file 
 | `write_application_output` | Write a resume, cover letter, critique, or notes artifact; auto-versions resumes and cover letters |
 | `list_application_versions` | List versions of an artifact for diff or recovery |
 | `list_recent_applications` | Return application history from `~/jobhelp/state.json` |
+| `validate_sources` | Check configured source adapters for stale credentials, bad tokens, or rate limits |
+| `rerank_top_jobs` | Bundle top jobs, active resume, and rerank instructions for client-side AI judgment |
 
 ## Prompts
 

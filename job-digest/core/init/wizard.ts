@@ -1,5 +1,9 @@
 import { ok, err, type Result } from '../types/result.js';
-import { DEFAULT_RULES_MODE, DEFAULT_USER_RULES_DIR_HOME_RELATIVE } from './applyAnswers.js';
+import {
+  DEFAULT_ADZUNA_QUERIES,
+  DEFAULT_RULES_MODE,
+  DEFAULT_USER_RULES_DIR_HOME_RELATIVE,
+} from './applyAnswers.js';
 
 export type PromptType = 'string' | 'number' | 'boolean' | 'array';
 
@@ -98,6 +102,13 @@ const INTERACTIVE_PROMPTS: readonly WizardPrompt[] = [
     type: 'string',
     optional: true,
     default: 'us',
+  },
+  {
+    key: 'sources.adzuna.queries',
+    question: 'Adzuna search queries, comma-separated',
+    type: 'array',
+    optional: true,
+    default: DEFAULT_ADZUNA_QUERIES,
   },
   {
     key: 'sources.greenhouse.tokens',

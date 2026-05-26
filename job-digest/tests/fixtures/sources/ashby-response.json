@@ -1,0 +1,78 @@
+{
+  "jobs": [
+    {
+      "id": "11111111-aaaa-bbbb-cccc-222222222222",
+      "title": "Senior Distributed Systems Engineer",
+      "department": "Engineering",
+      "team": "Platform",
+      "employmentType": "FullTime",
+      "location": "Remote - US",
+      "secondaryLocations": [],
+      "publishedAt": "2026-05-13T18:00:00.000+00:00",
+      "isListed": true,
+      "isRemote": true,
+      "workplaceType": "Remote",
+      "address": {
+        "postalAddress": {
+          "addressRegion": "",
+          "addressCountry": "United States",
+          "addressLocality": ""
+        }
+      },
+      "jobUrl": "https://jobs.ashbyhq.com/acmecorp/11111111-aaaa-bbbb-cccc-222222222222",
+      "applyUrl": "https://jobs.ashbyhq.com/acmecorp/11111111-aaaa-bbbb-cccc-222222222222/application",
+      "descriptionHtml": "<p>Build distributed systems in <strong>Rust</strong> at Acme.</p><ul><li>5+ years experience</li></ul>",
+      "descriptionPlain": "Build distributed systems in Rust at Acme.\n\n• 5+ years experience",
+      "shouldDisplayCompensationOnJobPostings": true,
+      "compensation": {
+        "compensationTierSummary": "$180K - $240K",
+        "scrapeableCompensationSalarySummary": "$180,000 - $240,000 USD",
+        "compensationTiers": [
+          {
+            "id": "tier-1",
+            "tierSummary": "$180K - $240K",
+            "title": "Base salary",
+            "additionalInformation": "",
+            "components": [
+              {
+                "id": "comp-1",
+                "summary": "Salary range",
+                "componentType": "Salary",
+                "interval": "1 YEAR",
+                "currencyCode": "USD",
+                "minValue": 180000,
+                "maxValue": 240000
+              }
+            ]
+          }
+        ],
+        "summaryComponents": []
+      }
+    },
+    {
+      "id": "33333333-dddd-eeee-ffff-444444444444",
+      "title": "Software Engineer, New Grad",
+      "department": "Engineering",
+      "team": "Core",
+      "employmentType": "FullTime",
+      "location": "Irvine, CA",
+      "secondaryLocations": [],
+      "publishedAt": "2026-05-12T09:30:00.000+00:00",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "address": {
+        "postalAddress": {
+          "addressRegion": "CA",
+          "addressCountry": "United States",
+          "addressLocality": "Irvine"
+        }
+      },
+      "jobUrl": "https://jobs.ashbyhq.com/acmecorp/33333333-dddd-eeee-ffff-444444444444",
+      "applyUrl": "https://jobs.ashbyhq.com/acmecorp/33333333-dddd-eeee-ffff-444444444444/application",
+      "descriptionHtml": "<p>Entry-level role in Irvine, CA. Hybrid 3 days/week.</p>",
+      "descriptionPlain": "Entry-level role in Irvine, CA. Hybrid 3 days/week."
+    }
+  ],
+  "apiVersion": "1"
+}

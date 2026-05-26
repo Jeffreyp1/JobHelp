@@ -77,10 +77,11 @@ For each job:
 4. If validation returns BLOCK, give the machine-readable flagged claims back to tailor_resume as prevCritique.
 5. Repeat for a maximum of 3 rounds.
 6. Stop early when validate_resume returns PASS.
-7. For edit rounds, apply tailor_resume mode "edits" mechanically to the previous draft markdown.
-8. Write the revised markdown as a new resume version with write_application_output.
-9. Validate the exact revised markdown, not the stale prior draft.
-10. Write each resume and critique with write_application_output.
+7. For edit rounds, apply tailor_resume mode "edits" mechanically by calling apply_validator_resume_edits with payload fields resumeMarkdown (previous draft markdown), critique (validator critique JSON), and edits (tailor_resume edits JSON).
+8. If apply_validator_resume_edits returns BLOCK, do not write a new resume version; report its trust errors and revise the edits.
+9. If apply_validator_resume_edits returns PASS, write the returned content as a new resume version with write_application_output.
+10. Validate the exact revised markdown, not the stale prior draft.
+11. Write each resume and critique with write_application_output.
 
 Scoped edit flow:
 - When the user wants to view the resume and choose specific bullets or sections, call get_resume_outline first.

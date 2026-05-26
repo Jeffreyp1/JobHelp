@@ -1,15 +1,43 @@
 import type { NormalizedJob } from '../types/index.js';
 
-// v0: exact-id dedupe only; first occurrence wins.
-// TODO_FUTURE: URL canonicalization + title+company hash (spec §5 future-dedup).
+function normalizeText(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function canonicalUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    url.hash = '';
+    url.search = '';
+    if (url.pathname.endsWith('/') && url.pathname !== '/') {
+      url.pathname = url.pathname.slice(0, -1);
+    }
+    return url.toString().toLowerCase();
+  } catch {
+    return normalizeText(value.split(/[?#]/, 1)[0] ?? value);
+  }
+}
+
+function postingKey(job: NormalizedJob): string {
+  return [
+    normalizeText(job.company),
+    normalizeText(job.title),
+    canonicalUrl(job.url),
+  ].join('\u0000');
+}
+
 export async function dedupe(
   jobs: readonly NormalizedJob[],
 ): Promise<readonly NormalizedJob[]> {
-  const seen = new Map<string, NormalizedJob>();
+  const seenIds = new Set<string>();
+  const seenPostings = new Set<string>();
+  const deduped: NormalizedJob[] = [];
   for (const job of jobs) {
-    if (!seen.has(job.id)) {
-      seen.set(job.id, job);
-    }
+    const key = postingKey(job);
+    if (seenIds.has(job.id) || seenPostings.has(key)) continue;
+    seenIds.add(job.id);
+    seenPostings.add(key);
+    deduped.push(job);
   }
-  return Array.from(seen.values());
+  return deduped;
 }

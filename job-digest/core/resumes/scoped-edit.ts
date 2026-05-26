@@ -1,5 +1,8 @@
 import { err, ok, type Result } from '../types/result.js';
 
+export { applyValidatorResumeEdits } from './validator-edits.js';
+export type { Critique, ValidatorEdit, ValidatorEdits } from './validator-edits.js';
+
 export interface ResumeBulletSelection {
   readonly id: string;
   readonly text: string;
@@ -61,6 +64,12 @@ interface MutableBullet {
   text: string;
   startLine: number;
   endLine: number;
+}
+
+interface LineParts {
+  lines: string[];
+  delimiters: string[];
+  defaultNewline: string;
 }
 
 type Selection =
@@ -206,14 +215,23 @@ export function applyScopedResumeEdits(
     }
   }
 
-  const { lines, trailingNewline } = splitForLineOps(markdown);
+  const { lines, delimiters, defaultNewline } = splitForLineOps(markdown);
   const changedSelections: ChangedSelection[] = [];
   for (const item of pending) {
-    const replacementLines = splitReplacement(item.replacementMarkdown);
+    const replacement = splitReplacement(
+      item.replacementMarkdown,
+      defaultNewline,
+      delimiters[item.selection.endLine] ?? '',
+    );
     lines.splice(
       item.selection.startLine,
       item.selection.endLine - item.selection.startLine + 1,
-      ...replacementLines,
+      ...replacement.lines,
+    );
+    delimiters.splice(
+      item.selection.startLine,
+      item.selection.endLine - item.selection.startLine + 1,
+      ...replacement.delimiters,
     );
     changedSelections.push({
       id: item.selection.id,
@@ -224,23 +242,40 @@ export function applyScopedResumeEdits(
   }
 
   changedSelections.sort((a, b) => a.startLine - b.startLine);
-  return ok({ content: joinLines(lines, trailingNewline), changedSelections });
+  return ok({ content: joinLines(lines, delimiters), changedSelections });
 }
 
-function splitForLineOps(markdown: string): { lines: string[]; trailingNewline: boolean } {
-  const trailingNewline = markdown.endsWith('\n');
-  const body = trailingNewline ? markdown.slice(0, -1) : markdown;
-  if (body.length === 0) return { lines: [], trailingNewline };
-  return { lines: body.split('\n'), trailingNewline };
+function splitForLineOps(markdown: string): LineParts {
+  if (markdown.length === 0) return { lines: [], delimiters: [], defaultNewline: '\n' };
+  const lines: string[] = [];
+  const delimiters: string[] = [];
+  const newlineRe = /\r\n|\n|\r/g;
+  let start = 0;
+  let match: RegExpExecArray | null;
+  let defaultNewline = '\n';
+  while ((match = newlineRe.exec(markdown)) !== null) {
+    if (delimiters.length === 0) defaultNewline = match[0];
+    lines.push(markdown.slice(start, match.index));
+    delimiters.push(match[0]);
+    start = match.index + match[0].length;
+  }
+  if (start < markdown.length) {
+    lines.push(markdown.slice(start));
+    delimiters.push('');
+  }
+  return { lines, delimiters, defaultNewline };
 }
 
-function splitReplacement(markdown: string): string[] {
-  const body = markdown.endsWith('\n') ? markdown.slice(0, -1) : markdown;
-  return body.split('\n');
+function splitReplacement(markdown: string, defaultNewline: string, finalDelimiter: string): LineParts {
+  const parts = splitForLineOps(markdown);
+  if (parts.lines.length === 0) return { lines: [''], delimiters: [finalDelimiter], defaultNewline };
+  const delimiters = parts.delimiters.map((delimiter) => delimiter || defaultNewline);
+  delimiters[delimiters.length - 1] = finalDelimiter;
+  return { lines: parts.lines, delimiters, defaultNewline: parts.defaultNewline };
 }
 
-function joinLines(lines: readonly string[], trailingNewline: boolean): string {
-  return lines.join('\n') + (trailingNewline ? '\n' : '');
+function joinLines(lines: readonly string[], delimiters: readonly string[]): string {
+  return lines.map((line, index) => `${line}${delimiters[index] ?? ''}`).join('');
 }
 
 function slug(text: string): string {
