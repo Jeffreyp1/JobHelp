@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:job-digest:mcp": "npm --prefix job-digest test -- --run tests/mcp",
     "test:watch": "vitest"
   },
   "devDependencies": {

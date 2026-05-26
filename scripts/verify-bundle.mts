@@ -119,6 +119,21 @@ function runBuild(label: string, scriptPath: string): { durationMs: number } {
   return { durationMs };
 }
 
+function runCommand(label: string, command: string, args: string[]): { durationMs: number } {
+  const started = Date.now();
+  const res = spawnSync(command, args, {
+    cwd: ROOT,
+    stdio: 'pipe',
+    encoding: 'utf8',
+  });
+  const durationMs = Date.now() - started;
+  if (res.status !== 0) {
+    const tail = (res.stderr || res.stdout || '').split('\n').slice(-20).join('\n');
+    fail(`${label} failed with exit ${res.status} (${formatMs(durationMs)})`, tail);
+  }
+  return { durationMs };
+}
+
 async function assertFileSize(path: string, { maxBytes, minBytes = 1 }: { maxBytes?: number; minBytes?: number }): Promise<number> {
   let stats;
   try {
@@ -219,6 +234,18 @@ async function main(): Promise<void> {
     console.log(c(ANSI.yellow, '  (--no-build: skipping build pipelines)'));
     console.log('');
   }
+
+  await check('job-digest: MCP regression tests', () => {
+    const { durationMs } = runCommand('job-digest MCP tests', 'npm', [
+      '--prefix',
+      'job-digest',
+      'test',
+      '--',
+      '--run',
+      'tests/mcp',
+    ]);
+    return `passed in ${formatMs(durationMs)}`;
+  });
 
   await check('extension: sidepanel/index.js', async () => {
     const size = await assertFileSize(PATHS.sidepanelJs, { maxBytes: SIZE_LIMITS.sidepanelJs });
