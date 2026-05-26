@@ -39,6 +39,21 @@ describe('createPrompts', () => {
     expect(instruction).not.toContain('prevCritique');
   });
 
+  it('validate_resume documents the critique schema accepted by validator edit application', () => {
+    const prompt = getPrompt('validate_resume');
+    const text = prompt.get({ jobId: 'adzuna:1', draftMarkdown: '# R' }).messages[0]?.content.text ?? '';
+    expect(text).toContain('"schemaVersion":1');
+    expect(text).toContain('"jobId":"adzuna:1"');
+    expect(text).toContain('"resumeVersion"');
+    expect(text).toContain('"thresholdConfig"');
+    expect(text).toContain('"blockOn"');
+    expect(text).toContain('"flagged"');
+    expect(text).toContain('"draftText"');
+    expect(text).toContain('"originalEvidence"');
+    expect(text).toContain('"suggestedFix"');
+    expect(text).not.toContain('"flaggedIds"');
+  });
+
   it('tailor_resume is vendor-neutral and names MCP context primitives', () => {
     const prompt = getPrompt('tailor_resume');
     const text = prompt.get({ jobId: 'adzuna:1', jdText: 'Build APIs' }).messages[0]?.content.text ?? '';

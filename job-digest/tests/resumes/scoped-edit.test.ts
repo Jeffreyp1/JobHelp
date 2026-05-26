@@ -207,6 +207,38 @@ describe('applyValidatorResumeEdits', () => {
     });
   });
 
+  it('accepts markdown bullet replacements from tailor_resume edit rounds', () => {
+    const result = applyValidatorResumeEdits({
+      prevContent: '# R\n\n## Experience\n- Built APIs.\n- Claimed Kubernetes ownership.\n',
+      critique: {
+        schemaVersion: 1,
+        jobId: 'adzuna:1',
+        resumeVersion: 1,
+        verdict: 'BLOCK',
+        thresholdConfig: { blockOn: ['made-up', 'exaggerated'] },
+        counts: { supported: 1, 'fair-rephrase': 0, exaggerated: 0, 'made-up': 1, total: 2 },
+        flagged: [
+          {
+            id: 7,
+            severity: 'made-up',
+            location: 'Experience',
+            draftText: 'Claimed Kubernetes ownership.',
+            originalEvidence: null,
+            suggestedFix: 'Remove unsupported Kubernetes ownership.',
+          },
+        ],
+      },
+      edits: {
+        mode: 'edits',
+        edits: [{ flagId: 7, replaceWith: '- Built API health checks.' }],
+      },
+    });
+
+    expect(result.verdict).toBe('PASS');
+    expect(result.content).toBe('# R\n\n## Experience\n- Built APIs.\n- Built API health checks.\n');
+    expect(result.trust.errors).toEqual([]);
+  });
+
   it('returns BLOCK evidence when validator edits do not cover every flag', () => {
     const result = applyValidatorResumeEdits({
       prevContent: '# R\n\n## Experience\n- Claimed Kubernetes ownership.\n',

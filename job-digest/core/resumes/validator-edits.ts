@@ -151,7 +151,7 @@ export function applyEdits(prev: string, critique: Critique, edits: ValidatorEdi
     if (edit.replaceWith === null) {
       lines.splice(idx, 1);
     } else {
-      lines[idx] = replaceAnchorInLine(lines[idx] ?? '', flag.draftText, edit.replaceWith, edit.flagId);
+      lines[idx] = replaceFlagInLine(lines[idx] ?? '', flag, edit.replaceWith, edit.flagId);
     }
     applied.push(edit.flagId);
   }
@@ -260,6 +260,29 @@ function matchesPathPart(heading: string, part: string): boolean {
   return normalizedHeading === normalizedPart || normalizedHeading.startsWith(`${normalizedPart} `);
 }
 
+function replaceFlagInLine(
+  line: string,
+  flag: CritiqueFlag,
+  replacement: string,
+  flagId: number,
+): string {
+  if (isMarkdownBullet(replacement)) return replaceBulletLine(line, replacement);
+  return replaceAnchorInLine(line, flag.draftText, replacement, flagId);
+}
+
+function isMarkdownBullet(value: string): boolean { return /^\s*[-*+]\s+/.test(value); }
+
+function replaceBulletLine(line: string, replacement: string): string {
+  const replacementMatch = /^(\s*)([-*+]\s+)(.*)$/.exec(replacement);
+  if (replacementMatch === null) return replacement;
+  const lineMatch = /^(\s*)([-*+]\s+)(.*)$/.exec(line);
+  if (lineMatch === null) return replacement;
+  const indent = lineMatch[1] ?? '';
+  const marker = lineMatch[2] ?? '- ';
+  const text = replacementMatch[3] ?? '';
+  return `${indent}${marker}${text}`;
+}
+
 function replaceAnchorInLine(line: string, anchor: string, replacement: string, flagId: number): string {
   const index = line.indexOf(anchor);
   if (index < 0) throw new Error(`Anchor not found in line for flagId ${flagId}: "${anchor.slice(0, 60)}..."`);
@@ -267,7 +290,7 @@ function replaceAnchorInLine(line: string, anchor: string, replacement: string, 
 }
 
 function stripBullet(value: string): string {
-  return value.replace(/^\s*-\s+/, '').trim();
+  return value.replace(/^\s*[-*+]\s+/, '').trim();
 }
 
 function quote(value: string): string {

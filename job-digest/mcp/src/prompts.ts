@@ -190,11 +190,13 @@ Write exactly one critique artifact with write_application_output kind "critique
 Critique must include:
 - counts by verdict
 - PASS or BLOCK
-- every flagged claim with draft text, original evidence or null, and suggested fix
-- machine-readable JSON with flagged ids and suggested fixes
+- schemaVersion 1, jobId, and resumeVersion
+- thresholdConfig.blockOn set to ["made-up","exaggerated"]
+- every flagged claim with id, severity, location, draft text, original evidence or null, and suggested fix
+- machine-readable JSON in the exact shape below
 
 Return JSON:
-{"verdict":"PASS"|"BLOCK","counts":{"supported":<n>,"fair-rephrase":<n>,"exaggerated":<n>,"made-up":<n>,"total":<n>},"flaggedIds":[<id>]}`;
+{"schemaVersion":1,"jobId":"${jobId}","resumeVersion":<number>,"verdict":"PASS"|"BLOCK","thresholdConfig":{"blockOn":["made-up","exaggerated"]},"counts":{"supported":<n>,"fair-rephrase":<n>,"exaggerated":<n>,"made-up":<n>,"total":<n>},"flagged":[{"id":1,"severity":"made-up"|"exaggerated","location":"<section or role path>","draftText":"<exact draft text>","originalEvidence":"<supporting source text or null>","suggestedFix":"<grounded fix or removal>"}]}`;
 }
 
 const PROMPTS: readonly PromptHandler[] = [
