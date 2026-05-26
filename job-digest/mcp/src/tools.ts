@@ -4,6 +4,7 @@ import { createResumeTools } from './tools-resume.js';
 import { createScopedResumeTools } from './tools-scoped-resume.js';
 import { createJobTools } from './tools-job.js';
 import { createApplicationTools } from './tools-application.js';
+import { createBatchTools } from './tools-batch.js';
 import { createMetaTools } from './tools-meta.js';
 
 export type {
@@ -59,6 +60,7 @@ export function createTools(deps: CoreDeps): readonly ToolHandler[] {
     ...createResumeTools(deps),
     ...createScopedResumeTools(deps),
     ...createJobTools(deps),
+    ...createBatchTools(deps),
     ...createApplicationTools(deps),
     ...createMetaTools(deps),
   ];

@@ -78,6 +78,7 @@ Any tool call other than `init_config` returns a typed error if the config file 
 | `apply_scoped_resume_edits` | Apply section or bullet replacements by selection id while preserving untouched lines |
 | `apply_validator_resume_edits` | Apply validator-approved edits and return auditable PASS/BLOCK evidence |
 | `doctor` | Run read-only setup diagnostics with actionable next steps |
+| `prepare_batch_applications` | Start application folders for explicit digest job ids or the top digest jobs and return per-job status |
 | `read_rules` | Return rule files: `defaults`, `user`, or `merged` (default) |
 | `read_resume` | Return the active resume content |
 | `score_keyword_match` | Deterministic 0..1 keyword-overlap score between a resume and a job (ATS coverage check) |
@@ -117,7 +118,7 @@ AI:
   2. presents top 3 to user; user picks #1
   3. requests MCP prompt tailor_resumes with the selected job id and user emphasis
   4. follows tailor_resumes:
-     - start_application
+     - prepare_batch_applications({ jobIds: ["<selected job id>"] })
      - tailor_resume
      - validate_resume
      - revise up to 3 rounds if validation blocks

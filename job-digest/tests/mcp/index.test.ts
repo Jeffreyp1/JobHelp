@@ -89,7 +89,7 @@ describe('buildServer', () => {
       resourceDeps: stubResourceDeps(),
     });
     expect(handle.server).toBeDefined();
-    expect(handle.tools.length).toBe(20);
+    expect(handle.tools.length).toBe(21);
     expect(handle.resources.length).toBe(9);
     expect(handle.prompts.length).toBe(3);
   });
@@ -102,6 +102,7 @@ describe('buildServer', () => {
     const names = handle.tools.map((t) => t.definition.name);
     expect(names).toContain('init_config');
     expect(names).toContain('find_matching_jobs');
+    expect(names).toContain('prepare_batch_applications');
     expect(names).toContain('write_application_output');
   });
 
