@@ -415,6 +415,46 @@ main {
   font-weight: 600;
 }
 
+.resume-editor__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.resume-editor__codemirror {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.resume-editor__codemirror .cm-editor {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 260px;
+  font-size: 12px;
+}
+
+.resume-editor__codemirror .cm-editor.cm-focused {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.resume-editor__codemirror .cm-scroller {
+  font-family: var(--font-mono);
+  max-height: 360px;
+}
+
+.resume-editor__codemirror .cm-content {
+  padding: var(--space-2);
+}
+
+.resume-editor__codemirror .cm-line {
+  line-height: 1.5;
+}
+
 .resume-editor__split {
   display: grid;
   grid-template-columns: 1fr;

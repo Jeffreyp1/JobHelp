@@ -14,6 +14,13 @@ dist/
 .env
 .env.local
 .env.*.local
+jobhelp-config.json
+
+# Local/private AI workflow artifacts
+.codex/
+.agents/
+job-digest/scripts/companies-all.json
+job-digest/scripts/companies-report.md
 
 # Local user-specific Claude / extension config (contains permissioned commands list,
 # may contain personal paths — not appropriate for a shared repo)

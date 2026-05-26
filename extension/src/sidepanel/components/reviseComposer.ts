@@ -1,5 +1,5 @@
 export interface ReviseComposerProps {
-  scope: "bullet" | "section" | "whole-resume";
+  scope: "bullet" | "section" | "selection" | "whole-resume";
   onSubmit: (instruction: string) => void;
   onCancel: () => void;
 }
@@ -7,6 +7,7 @@ export interface ReviseComposerProps {
 const TITLE_BY_SCOPE: Record<ReviseComposerProps["scope"], string> = {
   bullet: "Revise this bullet",
   section: "Revise this section",
+  selection: "Revise selection",
   "whole-resume": "Revise whole resume",
 };
 
