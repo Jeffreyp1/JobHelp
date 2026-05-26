@@ -75,8 +75,8 @@ npm-debug.log*
 job-digest/mcp/dist/
 job-digest/dist/
 
-# Tests — maintained locally only, NOT pushed to GitHub
-# (test data in tests/fixtures/ is kept; only test code is excluded)
+# Legacy tests stay local-only unless explicitly re-included below.
+# job-digest tests are visible for MCP regression coverage; one sidepanel test is visible for UI selection coverage.
 appsscript/tests/
 extension/tests/
 job-digest/tests/
@@ -93,3 +93,7 @@ prompts/shared/_validate.test.ts
 **/*.test.mts
 **/*.test.js
 **/*.spec.ts
+!job-digest/tests/
+!job-digest/tests/**
+!tests/sidepanel/
+!tests/sidepanel/resumeEditor-selection.test.ts

@@ -154,15 +154,21 @@ describe('bootstrap (wired) — surface', () => {
     expect(typeof resourceDeps.readState).toBe('function');
   });
 
-  it('buildServer accepts wired deps and exposes 18 tools + 9 resources + 3 prompts', async () => {
+  it('buildServer accepts wired deps and exposes 20 tools + 9 resources + 3 prompts', async () => {
     const { coreDeps, resourceDeps } = await bootstrap();
     const handle = buildServer({ coreDeps, resourceDeps });
-    expect(handle.tools.length).toBe(18);
+    expect(handle.tools.length).toBe(20);
     expect(handle.resources.length).toBe(9);
     expect(handle.prompts.length).toBe(3);
     const toolNames = handle.tools.map((t) => t.definition.name).sort();
     expect(toolNames).toEqual(
-      [...EXPECTED_TOOL_NAMES, 'apply_scoped_resume_edits', 'get_resume_outline'].sort(),
+      [
+        ...EXPECTED_TOOL_NAMES,
+        'apply_scoped_resume_edits',
+        'apply_validator_resume_edits',
+        'doctor',
+        'get_resume_outline',
+      ].sort(),
     );
     const resourceUris = handle.resources.map((r) => r.descriptor.uri).sort();
     expect(resourceUris).toEqual(

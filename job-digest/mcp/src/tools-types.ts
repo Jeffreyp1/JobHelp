@@ -1,6 +1,24 @@
 import type { Result } from '../../core/types/result.js';
 import type { JobId, NormalizedJob } from '../../core/types/job.js';
-import type { RankedJob, ScoreBreakdown } from '../../core/types/pipeline.js';
+import type { RankedJob } from '../../core/types/pipeline.js';
+import type { WizardPrompt, WizardResult } from '../../core/init/index.js';
+import type {
+  RerankTopJobsArgs,
+  RerankTopJobsResult,
+  ValidateSourcesArgs,
+  ValidateSourcesResult,
+} from './tools-meta-types.js';
+export type {
+  DoctorCheck,
+  DoctorResult,
+  RerankJobSummary,
+  RerankTopJobsArgs,
+  RerankTopJobsResult,
+  SourceValidationResultItem,
+  ValidateSourcesArgs,
+  ValidateSourcesResult,
+  ValidateSourcesSummary,
+} from './tools-meta-types.js';
 
 export interface InitConfigArgs {
   readonly interactive?: boolean;
@@ -9,6 +27,8 @@ export interface InitConfigArgs {
 export interface InitConfigResult {
   readonly created: boolean;
   readonly path: string;
+  readonly nextStep?: WizardResult['nextStep'];
+  readonly prompts?: readonly WizardPrompt[];
 }
 
 export interface ApplyConfigAnswersArgs {
@@ -44,7 +64,7 @@ export interface SetActiveResumeResult {
 export interface FindMatchingJobsArgs {
   readonly resumeName?: string;
   readonly useAllResumes?: boolean;
-  readonly queries: readonly string[];
+  readonly queries?: readonly string[];
   readonly instructions?: string;
   readonly count?: number;
   /**
@@ -63,12 +83,16 @@ export interface SourceWarning {
 
 export interface FindMatchingJobsResult {
   readonly digestPath: string;
+  readonly markdownPath?: string;
+  readonly csvPath?: string;
   readonly jobs: readonly RankedJob[];
   readonly warnings: readonly SourceWarning[];
 }
 
 export interface GetLatestDigestResult {
   readonly path: string;
+  readonly markdownPath?: string;
+  readonly csvPath?: string;
   readonly jobs: readonly RankedJob[];
   readonly generatedAt: string;
 }
@@ -110,14 +134,21 @@ export interface ScoreKeywordMatchResult {
 }
 
 export interface StartApplicationArgs {
-  readonly jobId: string;
+  readonly jobId?: string;
+  readonly company?: string;
+  readonly role?: string;
+  readonly jobDescription?: string;
+  readonly url?: string;
+  readonly location?: string;
   readonly basedOnResumeName?: string;
 }
 
 export interface StartApplicationResult {
+  readonly jobId?: string;
   readonly path: string;
   readonly created: boolean;
   readonly basedOnResumeName?: string;
+  readonly jobDescriptionPath?: string;
 }
 
 export type ApplicationKind = 'resume' | 'cover-letter' | 'critique' | 'notes';
@@ -130,6 +161,10 @@ export interface WriteApplicationOutputArgs {
 
 export interface WriteApplicationOutputResult {
   readonly path: string;
+  readonly applicationDir?: string;
+  readonly fileName?: string;
+  readonly kind?: ApplicationKind;
+  readonly latestPath?: string;
   readonly version?: number;
 }
 
@@ -154,67 +189,13 @@ export interface RecentApplication {
   readonly company: string;
   readonly role: string;
   readonly startedAt: string;
+  readonly url?: string;
+  readonly location?: string;
   readonly basedOnResumeName?: string;
 }
 
 export interface ListRecentApplicationsResult {
   readonly applications: readonly RecentApplication[];
-}
-
-export interface RerankTopJobsArgs {
-  readonly topK?: number;
-  readonly instructions?: string;
-}
-
-export interface RerankJobSummary {
-  readonly id: string;
-  readonly title: string;
-  readonly company: string;
-  readonly location: string;
-  readonly remote: 'remote' | 'hybrid' | 'onsite' | 'unknown';
-  readonly postedAt?: string;
-  readonly url: string;
-  readonly description: string;
-  readonly score: number;
-  readonly breakdown: ScoreBreakdown;
-}
-
-export interface RerankTopJobsResult {
-  readonly jobs: readonly RerankJobSummary[];
-  readonly resume: { readonly name: string; readonly content: string };
-  readonly rerank_prompt: string;
-  readonly summary: {
-    readonly topK: number;
-    readonly resumeChars: number;
-    readonly totalJDBytes: number;
-    readonly digestDate: string;
-    readonly digestPath: string;
-  };
-}
-
-export interface ValidateSourcesArgs {
-  readonly source?: string;
-}
-
-export interface SourceValidationResultItem {
-  readonly source: string;
-  readonly label?: string;
-  readonly ok: boolean;
-  readonly jobCount?: number;
-  readonly statusCode?: number;
-  readonly error?: { readonly type: string; readonly message: string };
-  readonly durationMs: number;
-}
-
-export interface ValidateSourcesSummary {
-  readonly total: number;
-  readonly ok: number;
-  readonly failed: number;
-}
-
-export interface ValidateSourcesResult {
-  readonly results: readonly SourceValidationResultItem[];
-  readonly summary: ValidateSourcesSummary;
 }
 
 export interface ToolError {

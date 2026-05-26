@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyValidatorResumeEdits,
   applyScopedResumeEdits,
   getResumeOutline,
 } from '../../core/resumes/scoped-edit.js';
@@ -113,6 +114,37 @@ describe('applyScopedResumeEdits', () => {
     expect(result.value.content).toBe('# R\n\n## Experience\n- Built TypeScript APIs.\n- Wrote tests.\n');
   });
 
+  it('preserves CRLF newlines when replacing a selected bullet', () => {
+    const resume = '# R\r\n\r\n## Skills\r\n- Python\r\n- Go\r\n';
+    const result = applyScopedResumeEdits(resume, {
+      replacements: [
+        {
+          selectionId: 'section-1-skills-bullet-1',
+          replacementMarkdown: '- TypeScript',
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.content).toBe('# R\r\n\r\n## Skills\r\n- TypeScript\r\n- Go\r\n');
+    expect(result.value.content).not.toContain('- TypeScript\n');
+  });
+
+  it('preserves mixed newline delimiters outside a selected bullet', () => {
+    const resume = '# R\r\n\r\n## Skills\n- Python\r\n- Go\n';
+    const result = applyScopedResumeEdits(resume, {
+      replacements: [
+        {
+          selectionId: 'section-1-skills-bullet-1',
+          replacementMarkdown: '- TypeScript',
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.content).toBe('# R\r\n\r\n## Skills\n- TypeScript\r\n- Go\n');
+  });
+
   it('rejects overlapping section and bullet replacements', () => {
     const result = applyScopedResumeEdits(RESUME, {
       replacements: [
@@ -132,5 +164,77 @@ describe('applyScopedResumeEdits', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.message).toContain('unknown selectionId');
+  });
+});
+
+describe('applyValidatorResumeEdits', () => {
+  it('applies validator edits and returns auditable PASS evidence', () => {
+    const result = applyValidatorResumeEdits({
+      prevContent: '# R\n\n## Experience\n- Built APIs.\n- Claimed Kubernetes ownership.\n',
+      critique: {
+        schemaVersion: 1,
+        jobId: 'adzuna:1',
+        resumeVersion: 1,
+        verdict: 'BLOCK',
+        thresholdConfig: { blockOn: ['made-up', 'exaggerated'] },
+        counts: { supported: 1, 'fair-rephrase': 0, exaggerated: 0, 'made-up': 1, total: 2 },
+        flagged: [
+          {
+            id: 7,
+            severity: 'made-up',
+            location: 'Experience',
+            draftText: 'Claimed Kubernetes ownership.',
+            originalEvidence: null,
+            suggestedFix: 'Remove unsupported Kubernetes ownership.',
+          },
+        ],
+      },
+      edits: {
+        mode: 'edits',
+        edits: [{ flagId: 7, replaceWith: 'Built API health checks.' }],
+      },
+    });
+
+    expect(result.verdict).toBe('PASS');
+    expect(result.content).toBe('# R\n\n## Experience\n- Built APIs.\n- Built API health checks.\n');
+    expect(result.appliedFlagIds).toEqual([7]);
+    expect(result.trust).toEqual({
+      verdict: 'PASS',
+      stage: 'complete',
+      checkedFlagIds: [7],
+      appliedFlagIds: [7],
+      errors: [],
+    });
+  });
+
+  it('returns BLOCK evidence when validator edits do not cover every flag', () => {
+    const result = applyValidatorResumeEdits({
+      prevContent: '# R\n\n## Experience\n- Claimed Kubernetes ownership.\n',
+      critique: {
+        schemaVersion: 1,
+        jobId: 'adzuna:1',
+        resumeVersion: 1,
+        verdict: 'BLOCK',
+        thresholdConfig: { blockOn: ['made-up', 'exaggerated'] },
+        counts: { supported: 0, 'fair-rephrase': 0, exaggerated: 0, 'made-up': 1, total: 1 },
+        flagged: [
+          {
+            id: 7,
+            severity: 'made-up',
+            location: 'Experience',
+            draftText: 'Claimed Kubernetes ownership.',
+            originalEvidence: null,
+            suggestedFix: 'Remove unsupported Kubernetes ownership.',
+          },
+        ],
+      },
+      edits: { mode: 'edits', edits: [] },
+    });
+
+    expect(result.verdict).toBe('BLOCK');
+    expect(result.content).toBe('# R\n\n## Experience\n- Claimed Kubernetes ownership.\n');
+    expect(result.trust.stage).toBe('coverage');
+    expect(result.trust.checkedFlagIds).toEqual([7]);
+    expect(result.trust.errors).toEqual(['Missing edit for flagId 7']);
   });
 });

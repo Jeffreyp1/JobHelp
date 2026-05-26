@@ -26,7 +26,12 @@ async function handleInit(
   if (!wizard.ok) {
     return err({ type: 'invalid_input', message: wizard.error.message });
   }
-  return ok({ created: false, path: loadErr.path ?? getConfigPath() });
+  return ok({
+    created: false,
+    path: loadErr.path ?? getConfigPath(),
+    nextStep: wizard.value.nextStep,
+    prompts: wizard.value.prompts,
+  });
 }
 
 async function handleApply(

@@ -19,11 +19,24 @@ describe('createPrompts', () => {
     expect(text).toContain('validate_resume');
     expect(text).toContain('maximum of 3 rounds');
     expect(text).toContain('apply tailor_resume mode "edits" mechanically');
+    expect(text).toContain('apply_validator_resume_edits');
     expect(text).toContain('Validate the exact revised markdown');
     expect(text).toContain('validate_resume against the exact applied markdown');
     expect(text).toContain('get_resume_outline');
     expect(text).toContain('apply_scoped_resume_edits');
     expect(text).toContain('write_application_output');
+  });
+
+  it('tailor_resumes names apply_validator_resume_edits payload fields', () => {
+    const prompt = getPrompt('tailor_resumes');
+    const text = prompt.get({ input: 'top 25 jobs' }).messages[0]?.content.text ?? '';
+    const instruction = text
+      .split('\n')
+      .find((line) => line.includes('apply_validator_resume_edits')) ?? '';
+    expect(instruction).toContain('resumeMarkdown');
+    expect(instruction).toContain('critique');
+    expect(instruction).toContain('edits');
+    expect(instruction).not.toContain('prevCritique');
   });
 
   it('tailor_resume is vendor-neutral and names MCP context primitives', () => {

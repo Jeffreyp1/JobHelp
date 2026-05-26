@@ -80,25 +80,37 @@ export function parseSetActiveResume(
 export function parseFindMatchingJobs(
   obj: Record<string, unknown>,
 ): Result<FindMatchingJobsArgs, ToolError> {
-  const queries = obj['queries'];
-  if (!isStringArray(queries)) return bad('queries must be a string array');
   const out: {
-    queries: readonly string[];
+    queries?: readonly string[];
     resumeName?: string;
     useAllResumes?: boolean;
     instructions?: string;
     count?: number;
     maxAgeDays?: number | null;
     recencyEnabled?: boolean;
-  } = { queries };
+  } = {};
+  if ('queries' in obj) {
+    const queries = obj['queries'];
+    if (queries !== undefined) {
+      if (!isStringArray(queries)) return bad('queries must be a string array');
+      out.queries = queries;
+    }
+  }
   const resumeName = getOptional(obj, 'resumeName', isString);
   if (resumeName !== undefined) out.resumeName = resumeName;
   const useAllResumes = getOptional(obj, 'useAllResumes', isBoolean);
   if (useAllResumes !== undefined) out.useAllResumes = useAllResumes;
   const instructions = getOptional(obj, 'instructions', isString);
   if (instructions !== undefined) out.instructions = instructions;
-  const count = getOptional(obj, 'count', isNumber);
-  if (count !== undefined) out.count = count;
+  if ('count' in obj) {
+    const count = obj['count'];
+    if (count !== undefined) {
+      if (!isNumber(count) || !Number.isInteger(count) || count < 1) {
+        return bad('count must be a positive integer');
+      }
+      out.count = count;
+    }
+  }
   if ('maxAgeDays' in obj) {
     const raw = obj['maxAgeDays'];
     if (raw === null) {
@@ -145,8 +157,36 @@ export function parseScoreKeywordMatch(
 export function parseStartApplication(
   obj: Record<string, unknown>,
 ): Result<StartApplicationArgs, ToolError> {
-  if (!isString(obj['jobId']) || obj['jobId'].length === 0) return bad('jobId is required');
-  const out: { jobId: string; basedOnResumeName?: string } = { jobId: obj['jobId'] };
+  const jobId = getOptional(obj, 'jobId', isString);
+  const company = getOptional(obj, 'company', isString);
+  const role = getOptional(obj, 'role', isString) ?? getOptional(obj, 'title', isString);
+  const jobDescription =
+    getOptional(obj, 'jobDescription', isString) ?? getOptional(obj, 'description', isString);
+  if (jobId !== undefined && jobId.length === 0) return bad('jobId is required');
+  if (jobId === undefined) {
+    if (company === undefined || company.length === 0) return bad('company is required');
+    if (role === undefined || role.length === 0) return bad('role is required');
+    if (jobDescription === undefined || jobDescription.length === 0) {
+      return bad('jobDescription is required');
+    }
+  }
+  const out: {
+    jobId?: string;
+    company?: string;
+    role?: string;
+    jobDescription?: string;
+    url?: string;
+    location?: string;
+    basedOnResumeName?: string;
+  } = {};
+  if (jobId !== undefined) out.jobId = jobId;
+  if (company !== undefined) out.company = company;
+  if (role !== undefined) out.role = role;
+  if (jobDescription !== undefined) out.jobDescription = jobDescription;
+  const url = getOptional(obj, 'url', isString);
+  if (url !== undefined) out.url = url;
+  const location = getOptional(obj, 'location', isString);
+  if (location !== undefined) out.location = location;
   const basedOnResumeName = getOptional(obj, 'basedOnResumeName', isString);
   if (basedOnResumeName !== undefined) out.basedOnResumeName = basedOnResumeName;
   return { ok: true, value: out };
@@ -182,6 +222,12 @@ export function parseListApplicationVersions(
 }
 
 export function parseEmpty(_obj: Record<string, unknown>): Result<Record<string, never>, ToolError> {
+  return { ok: true, value: {} };
+}
+
+export function parseDoctor(
+  _obj: Record<string, unknown>,
+): Result<Record<string, never>, ToolError> {
   return { ok: true, value: {} };
 }
 
