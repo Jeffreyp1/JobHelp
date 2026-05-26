@@ -1,10 +1,8 @@
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import type { ReviseTargetScope } from '../../types/api-contract.js';
-import {
-  buildSelectionScope,
-  type SelectionReviseScope,
-} from '../../lib/resume-selection.js';
+import type { SelectionReviseScope } from '../../lib/resume-selection.js';
+import { log } from '../../lib/structuredLog.js';
 import {
   parseResumeMarkdown,
   updateBulletLine,
@@ -64,31 +62,41 @@ function deriveScope(btn: HTMLButtonElement): ReviseTargetScope | null {
   return null;
 }
 
+function elementFor(node: Node | null): Element | null {
+  if (node instanceof Element) return node;
+  const parent = node?.parentNode;
+  return parent instanceof Element ? parent : null;
+}
+
+function selectedBulletIn(preview: HTMLElement): HTMLElement | null {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.toString().trim() === '') return null;
+  if (!selection.anchorNode || !selection.focusNode) return null;
+  if (!preview.contains(selection.anchorNode) || !preview.contains(selection.focusNode)) {
+    return null;
+  }
+
+  const anchorBullet = elementFor(selection.anchorNode)?.closest<HTMLElement>('li[data-bullet-id]');
+  const focusBullet = elementFor(selection.focusNode)?.closest<HTMLElement>('li[data-bullet-id]');
+  return anchorBullet && anchorBullet === focusBullet ? anchorBullet : null;
+}
+
 export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
   const wrap = document.createElement('section');
   wrap.className = 'resume-editor';
   wrap.setAttribute('aria-label', 'Resume editor');
 
   let currentMarkdown = props.initialMarkdown;
-  let currentSelection: SelectionReviseScope | null = null;
 
   const heading = document.createElement('h3');
   heading.className = 'resume-editor__title';
   heading.textContent = 'Generated resume';
   wrap.appendChild(heading);
 
-  const toolbar = document.createElement('div');
-  toolbar.className = 'resume-editor__toolbar';
-  const selectionBtn = document.createElement('button');
-  selectionBtn.type = 'button';
-  selectionBtn.className = 'btn btn-secondary resume-editor__selection-revise';
-  selectionBtn.textContent = 'Revise selection';
-  selectionBtn.disabled = true;
-  toolbar.appendChild(selectionBtn);
-  wrap.appendChild(toolbar);
-
   const editorHost = document.createElement('div');
   editorHost.className = 'resume-editor__codemirror';
+  editorHost.hidden = true;
+  editorHost.setAttribute('aria-hidden', 'true');
   wrap.appendChild(editorHost);
 
   const preview = document.createElement('div');
@@ -143,7 +151,10 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
     try {
       const parsed = parseResumeMarkdown(currentMarkdown);
       renderParsedInto(preview, parsed, ctx);
-    } catch {
+    } catch (err: unknown) {
+      log('warn', 'resumeEditor: preview render failed; falling back to raw markdown', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       preview.replaceChildren();
       const p = document.createElement('pre');
       p.textContent = currentMarkdown;
@@ -152,12 +163,6 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
   };
 
   rerender();
-
-  const updateSelection = (): void => {
-    const main = view.state.selection.main;
-    currentSelection = buildSelectionScope(currentMarkdown, main.from, main.to);
-    selectionBtn.disabled = currentSelection === null;
-  };
 
   const setMarkdown = (md: string): void => {
     view.dispatch({
@@ -177,7 +182,6 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
             rawTextarea.value = currentMarkdown;
             rerender();
           }
-          if (update.selectionSet || update.docChanged) updateSelection();
         }),
       ],
     }),
@@ -194,10 +198,6 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
 
   rawTextarea.addEventListener('input', () => {
     setMarkdown(rawTextarea.value);
-  });
-
-  selectionBtn.addEventListener('click', () => {
-    if (currentSelection) emitRevise(currentSelection);
   });
 
   saveBtn.addEventListener('click', () => {
@@ -231,6 +231,12 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
       });
   });
 
+  preview.addEventListener('mouseup', () => {
+    const bullet = selectedBulletIn(preview);
+    const bulletId = bullet?.dataset.bulletId;
+    if (bulletId) emitRevise({ kind: 'bullet', bulletId });
+  });
+
   wrap.addEventListener('click', (ev) => {
     const target = ev.target as HTMLElement | null;
     if (!target) return;
@@ -253,7 +259,6 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
     const detail = (ev as CustomEvent<{ from: unknown; to: unknown }>).detail;
     if (typeof detail?.from !== 'number' || typeof detail.to !== 'number') return;
     view.dispatch({ selection: { anchor: detail.from, head: detail.to } });
-    updateSelection();
   });
 
   return wrap;
