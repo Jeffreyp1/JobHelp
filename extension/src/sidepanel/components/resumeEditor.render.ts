@@ -22,6 +22,17 @@ function inlineHtml(s: string): string {
     .replace(/(^|\s)\*([^*]+)\*/g, '$1<em>$2</em>');
 }
 
+function hasSelectionInside(el: HTMLElement): boolean {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.toString().trim() === '') return false;
+  return Boolean(
+    selection.anchorNode &&
+      selection.focusNode &&
+      el.contains(selection.anchorNode) &&
+      el.contains(selection.focusNode),
+  );
+}
+
 export function makeReviseButton(
   label: string,
   cls: string,
@@ -50,6 +61,7 @@ function renderBullet(b: ParsedBullet, ctx: BulletRenderCtx): HTMLLIElement {
   );
 
   span.addEventListener('click', () => {
+    if (hasSelectionInside(span)) return;
     const ta = document.createElement('textarea');
     ta.className = 'resume-bullet__editor';
     ta.value = b.text;

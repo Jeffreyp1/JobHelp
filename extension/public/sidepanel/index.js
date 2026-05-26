@@ -5411,7 +5411,7 @@ var require_dom = __commonJS({
        * @see https://dom.spec.whatwg.org/#concept-create-element
        */
       createElement: function(tagName) {
-        var node = new Element(PDC);
+        var node = new Element2(PDC);
         node.ownerDocument = this;
         if (this.type === "html") {
           tagName = tagName.toLowerCase();
@@ -5588,7 +5588,7 @@ var require_dom = __commonJS({
        */
       createElementNS: function(namespaceURI, qualifiedName) {
         var validated = validateAndExtract(namespaceURI, qualifiedName);
-        var node = new Element(PDC);
+        var node = new Element2(PDC);
         var attrs = node.attributes = new NamedNodeMap();
         node.childNodes = new NodeList();
         node.ownerDocument = this;
@@ -5621,11 +5621,11 @@ var require_dom = __commonJS({
       }
     };
     _extends(Document, Node);
-    function Element(symbol) {
+    function Element2(symbol) {
       checkSymbol(symbol);
       this._nsMap = /* @__PURE__ */ Object.create(null);
     }
-    Element.prototype = {
+    Element2.prototype = {
       nodeType: ELEMENT_NODE,
       /**
        * The attributes of this element.
@@ -5846,10 +5846,10 @@ var require_dom = __commonJS({
         });
       }
     };
-    Document.prototype.getElementsByClassName = Element.prototype.getElementsByClassName;
-    Document.prototype.getElementsByTagName = Element.prototype.getElementsByTagName;
-    Document.prototype.getElementsByTagNameNS = Element.prototype.getElementsByTagNameNS;
-    _extends(Element, Node);
+    Document.prototype.getElementsByClassName = Element2.prototype.getElementsByClassName;
+    Document.prototype.getElementsByTagName = Element2.prototype.getElementsByTagName;
+    Document.prototype.getElementsByTagNameNS = Element2.prototype.getElementsByTagNameNS;
+    _extends(Element2, Node);
     function Attr(symbol) {
       checkSymbol(symbol);
       this.namespaceURI = null;
@@ -6355,7 +6355,7 @@ var require_dom = __commonJS({
             }
           }
         });
-        Object.defineProperty(Element.prototype, "children", {
+        Object.defineProperty(Element2.prototype, "children", {
           get: function() {
             return new LiveNodeList(this, childrenRefresh);
           }
@@ -6385,7 +6385,7 @@ var require_dom = __commonJS({
     exports.DocumentFragment = DocumentFragment;
     exports.DocumentType = DocumentType;
     exports.DOMImplementation = DOMImplementation;
-    exports.Element = Element;
+    exports.Element = Element2;
     exports.Entity = Entity;
     exports.EntityReference = EntityReference;
     exports.LiveNodeList = LiveNodeList;
@@ -28140,57 +28140,121 @@ GutterMarker.prototype.mapMode = MapMode.TrackBefore;
 GutterMarker.prototype.startSide = GutterMarker.prototype.endSide = -1;
 GutterMarker.prototype.point = true;
 
-// extension/src/lib/resume-selection.ts
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
+// extension/src/lib/structuredLog.ts
+var minLevel = "debug";
+var LEVEL_RANK = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40
+};
+var SECRET_KEY_RE = /api[-_]?key|token|secret|password|authorization|x-api-key/i;
+var ANTHROPIC_KEY_RE = /^sk-ant-[A-Za-z0-9_-]{20,}$/;
+var MAX_STRING_BYTES = 2048;
+var MAX_REDACT_DEPTH = 6;
+function utf8ByteLength(s) {
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(s).length;
+  }
+  let bytes = 0;
+  for (let i = 0; i < s.length; i++) {
+    const code = s.charCodeAt(i);
+    if (code < 128) bytes += 1;
+    else if (code < 2048) bytes += 2;
+    else if (code >= 55296 && code <= 56319) {
+      bytes += 4;
+      i++;
+    } else bytes += 3;
+  }
+  return bytes;
 }
-function lineRanges(markdown) {
-  const ranges = [];
-  const newline = /\r\n|\n|\r/g;
-  let start = 0;
-  let match;
-  while ((match = newline.exec(markdown)) !== null) {
-    ranges.push({
-      from: start,
-      contentTo: match.index,
-      to: match.index + match[0].length
+function truncateLongString(s) {
+  const totalBytes = utf8ByteLength(s);
+  if (totalBytes <= MAX_STRING_BYTES) return s;
+  const head = s.slice(0, 200);
+  const remaining = totalBytes - utf8ByteLength(head);
+  return `${head} ... <truncated, ${remaining} more bytes>`;
+}
+function redact(value, depth) {
+  if (depth > MAX_REDACT_DEPTH) return "<max-depth>";
+  if (value === null || value === void 0) return value;
+  const t = typeof value;
+  if (t === "string") {
+    const s = value;
+    if (ANTHROPIC_KEY_RE.test(s)) return "<redacted>";
+    return truncateLongString(s);
+  }
+  if (t === "number" || t === "boolean") return value;
+  if (Array.isArray(value)) {
+    return value.map((v) => redact(v, depth + 1));
+  }
+  if (t === "object") {
+    const out = {};
+    for (const key of Object.keys(value)) {
+      if (SECRET_KEY_RE.test(key)) {
+        out[key] = "<redacted>";
+      } else {
+        out[key] = redact(value[key], depth + 1);
+      }
+    }
+    return out;
+  }
+  try {
+    return String(value);
+  } catch {
+    return "<unserialisable>";
+  }
+}
+function redactContext(ctx) {
+  if (!ctx) return void 0;
+  return redact(ctx, 0);
+}
+var RING_CAPACITY = 100;
+var ring = [];
+function buildEntry(level, msg, ctx) {
+  const ts = (/* @__PURE__ */ new Date()).toISOString();
+  const redacted = redactContext(ctx);
+  const entry = { ts, level, msg };
+  if (redacted !== void 0) entry.ctx = redacted;
+  return entry;
+}
+function formatEntry(entry) {
+  let body;
+  try {
+    body = JSON.stringify(entry);
+  } catch {
+    body = JSON.stringify({
+      ts: entry.ts,
+      level: entry.level,
+      msg: entry.msg,
+      ctx: { _logError: "JSON.stringify failed" }
     });
-    start = match.index + match[0].length;
   }
-  if (start < markdown.length) {
-    ranges.push({ from: start, contentTo: markdown.length, to: markdown.length });
+  return `[JobHelp] ${body}`;
+}
+function consoleFor(level) {
+  const c = globalThis.console ?? console;
+  switch (level) {
+    case "debug":
+      return (c.log ?? c.info ?? c.warn).bind(c);
+    case "info":
+      return (c.info ?? c.log).bind(c);
+    case "warn":
+      return (c.warn ?? c.log).bind(c);
+    case "error":
+      return (c.error ?? c.log).bind(c);
   }
-  return ranges;
 }
-function sectionNameForOffset(markdown, ranges, offset) {
-  let sectionName = "";
-  for (const line of ranges) {
-    if (line.from > offset) break;
-    const text = markdown.slice(line.from, line.contentTo);
-    const h2 = text.match(/^##\s+(.+?)\s*$/);
-    if (h2) sectionName = h2[1].trim();
-  }
-  return sectionName;
+function pushRing(entry) {
+  ring.push(entry);
+  while (ring.length > RING_CAPACITY) ring.shift();
 }
-function buildSelectionScope(markdown, selectionFrom, selectionTo) {
-  const from = clamp(Math.min(selectionFrom, selectionTo), 0, markdown.length);
-  const to = clamp(Math.max(selectionFrom, selectionTo), 0, markdown.length);
-  if (from === to) return null;
-  const excerpt = markdown.slice(from, to);
-  if (excerpt.trim().length === 0) return null;
-  const ranges = lineRanges(markdown);
-  return {
-    kind: "selection",
-    from,
-    to,
-    excerpt,
-    sectionName: sectionNameForOffset(markdown, ranges, from)
-  };
-}
-function replaceMarkdownRange(markdown, range, replacementMarkdown) {
-  const from = clamp(range.from, 0, markdown.length);
-  const to = clamp(range.to, from, markdown.length);
-  return `${markdown.slice(0, from)}${replacementMarkdown}${markdown.slice(to)}`;
+function log(level, msg, ctx) {
+  const entry = buildEntry(level, msg, ctx);
+  pushRing(entry);
+  if (LEVEL_RANK[level] < LEVEL_RANK[minLevel]) return;
+  const line = formatEntry(entry);
+  consoleFor(level)(line);
 }
 
 // extension/src/sidepanel/components/resumeEditor.parser.ts
@@ -28332,6 +28396,13 @@ function escapeText(s) {
 function inlineHtml(s) {
   return escapeText(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|\s)\*([^*]+)\*/g, "$1<em>$2</em>");
 }
+function hasSelectionInside(el3) {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.toString().trim() === "") return false;
+  return Boolean(
+    selection.anchorNode && selection.focusNode && el3.contains(selection.anchorNode) && el3.contains(selection.focusNode)
+  );
+}
 function makeReviseButton(label, cls, attrs) {
   const btn = document.createElement("button");
   btn.type = "button";
@@ -28354,6 +28425,7 @@ function renderBullet(b, ctx) {
     makeReviseButton("Revise", "revise-bullet", { "data-bullet-id": b.bulletId })
   );
   span.addEventListener("click", () => {
+    if (hasSelectionInside(span)) return;
     const ta = document.createElement("textarea");
     ta.className = "resume-bullet__editor";
     ta.value = b.text;
@@ -28485,27 +28557,35 @@ function deriveScope(btn) {
   }
   return null;
 }
+function elementFor(node) {
+  if (node instanceof Element) return node;
+  const parent = node?.parentNode;
+  return parent instanceof Element ? parent : null;
+}
+function selectedBulletIn(preview) {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.toString().trim() === "") return null;
+  if (!selection.anchorNode || !selection.focusNode) return null;
+  if (!preview.contains(selection.anchorNode) || !preview.contains(selection.focusNode)) {
+    return null;
+  }
+  const anchorBullet = elementFor(selection.anchorNode)?.closest("li[data-bullet-id]");
+  const focusBullet = elementFor(selection.focusNode)?.closest("li[data-bullet-id]");
+  return anchorBullet && anchorBullet === focusBullet ? anchorBullet : null;
+}
 function renderResumeEditor(props) {
   const wrap = document.createElement("section");
   wrap.className = "resume-editor";
   wrap.setAttribute("aria-label", "Resume editor");
   let currentMarkdown = props.initialMarkdown;
-  let currentSelection = null;
   const heading = document.createElement("h3");
   heading.className = "resume-editor__title";
   heading.textContent = "Generated resume";
   wrap.appendChild(heading);
-  const toolbar = document.createElement("div");
-  toolbar.className = "resume-editor__toolbar";
-  const selectionBtn = document.createElement("button");
-  selectionBtn.type = "button";
-  selectionBtn.className = "btn btn-secondary resume-editor__selection-revise";
-  selectionBtn.textContent = "Revise selection";
-  selectionBtn.disabled = true;
-  toolbar.appendChild(selectionBtn);
-  wrap.appendChild(toolbar);
   const editorHost = document.createElement("div");
   editorHost.className = "resume-editor__codemirror";
+  editorHost.hidden = true;
+  editorHost.setAttribute("aria-hidden", "true");
   wrap.appendChild(editorHost);
   const preview = document.createElement("div");
   preview.className = "resume-editor__preview";
@@ -28549,7 +28629,10 @@ function renderResumeEditor(props) {
     try {
       const parsed = parseResumeMarkdown(currentMarkdown);
       renderParsedInto(preview, parsed, ctx);
-    } catch {
+    } catch (err) {
+      log("warn", "resumeEditor: preview render failed; falling back to raw markdown", {
+        error: err instanceof Error ? err.message : String(err)
+      });
       preview.replaceChildren();
       const p = document.createElement("pre");
       p.textContent = currentMarkdown;
@@ -28557,11 +28640,6 @@ function renderResumeEditor(props) {
     }
   };
   rerender();
-  const updateSelection = () => {
-    const main = view.state.selection.main;
-    currentSelection = buildSelectionScope(currentMarkdown, main.from, main.to);
-    selectionBtn.disabled = currentSelection === null;
-  };
   const setMarkdown = (md) => {
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: md }
@@ -28579,7 +28657,6 @@ function renderResumeEditor(props) {
             rawTextarea.value = currentMarkdown;
             rerender();
           }
-          if (update.selectionSet || update.docChanged) updateSelection();
         })
       ]
     })
@@ -28594,9 +28671,6 @@ function renderResumeEditor(props) {
   };
   rawTextarea.addEventListener("input", () => {
     setMarkdown(rawTextarea.value);
-  });
-  selectionBtn.addEventListener("click", () => {
-    if (currentSelection) emitRevise(currentSelection);
   });
   saveBtn.addEventListener("click", () => {
     const result = props.onSave(currentMarkdown);
@@ -28625,6 +28699,11 @@ function renderResumeEditor(props) {
       saveBtn.disabled = false;
     });
   });
+  preview.addEventListener("mouseup", () => {
+    const bullet = selectedBulletIn(preview);
+    const bulletId = bullet?.dataset.bulletId;
+    if (bulletId) emitRevise({ kind: "bullet", bulletId });
+  });
   wrap.addEventListener("click", (ev) => {
     const target = ev.target;
     if (!target) return;
@@ -28645,129 +28724,11 @@ function renderResumeEditor(props) {
     const detail = ev.detail;
     if (typeof detail?.from !== "number" || typeof detail.to !== "number") return;
     view.dispatch({ selection: { anchor: detail.from, head: detail.to } });
-    updateSelection();
   });
   return wrap;
 }
 function setEditorMarkdown(editor, md) {
   editor.dispatchEvent(new CustomEvent("resume:set-markdown", { detail: { md } }));
-}
-
-// extension/src/lib/structuredLog.ts
-var minLevel = "debug";
-var LEVEL_RANK = {
-  debug: 10,
-  info: 20,
-  warn: 30,
-  error: 40
-};
-var SECRET_KEY_RE = /api[-_]?key|token|secret|password|authorization|x-api-key/i;
-var ANTHROPIC_KEY_RE = /^sk-ant-[A-Za-z0-9_-]{20,}$/;
-var MAX_STRING_BYTES = 2048;
-var MAX_REDACT_DEPTH = 6;
-function utf8ByteLength(s) {
-  if (typeof TextEncoder !== "undefined") {
-    return new TextEncoder().encode(s).length;
-  }
-  let bytes = 0;
-  for (let i = 0; i < s.length; i++) {
-    const code = s.charCodeAt(i);
-    if (code < 128) bytes += 1;
-    else if (code < 2048) bytes += 2;
-    else if (code >= 55296 && code <= 56319) {
-      bytes += 4;
-      i++;
-    } else bytes += 3;
-  }
-  return bytes;
-}
-function truncateLongString(s) {
-  const totalBytes = utf8ByteLength(s);
-  if (totalBytes <= MAX_STRING_BYTES) return s;
-  const head = s.slice(0, 200);
-  const remaining = totalBytes - utf8ByteLength(head);
-  return `${head} ... <truncated, ${remaining} more bytes>`;
-}
-function redact(value, depth) {
-  if (depth > MAX_REDACT_DEPTH) return "<max-depth>";
-  if (value === null || value === void 0) return value;
-  const t = typeof value;
-  if (t === "string") {
-    const s = value;
-    if (ANTHROPIC_KEY_RE.test(s)) return "<redacted>";
-    return truncateLongString(s);
-  }
-  if (t === "number" || t === "boolean") return value;
-  if (Array.isArray(value)) {
-    return value.map((v) => redact(v, depth + 1));
-  }
-  if (t === "object") {
-    const out = {};
-    for (const key of Object.keys(value)) {
-      if (SECRET_KEY_RE.test(key)) {
-        out[key] = "<redacted>";
-      } else {
-        out[key] = redact(value[key], depth + 1);
-      }
-    }
-    return out;
-  }
-  try {
-    return String(value);
-  } catch {
-    return "<unserialisable>";
-  }
-}
-function redactContext(ctx) {
-  if (!ctx) return void 0;
-  return redact(ctx, 0);
-}
-var RING_CAPACITY = 100;
-var ring = [];
-function buildEntry(level, msg, ctx) {
-  const ts = (/* @__PURE__ */ new Date()).toISOString();
-  const redacted = redactContext(ctx);
-  const entry = { ts, level, msg };
-  if (redacted !== void 0) entry.ctx = redacted;
-  return entry;
-}
-function formatEntry(entry) {
-  let body;
-  try {
-    body = JSON.stringify(entry);
-  } catch {
-    body = JSON.stringify({
-      ts: entry.ts,
-      level: entry.level,
-      msg: entry.msg,
-      ctx: { _logError: "JSON.stringify failed" }
-    });
-  }
-  return `[JobHelp] ${body}`;
-}
-function consoleFor(level) {
-  const c = globalThis.console ?? console;
-  switch (level) {
-    case "debug":
-      return (c.log ?? c.info ?? c.warn).bind(c);
-    case "info":
-      return (c.info ?? c.log).bind(c);
-    case "warn":
-      return (c.warn ?? c.log).bind(c);
-    case "error":
-      return (c.error ?? c.log).bind(c);
-  }
-}
-function pushRing(entry) {
-  ring.push(entry);
-  while (ring.length > RING_CAPACITY) ring.shift();
-}
-function log(level, msg, ctx) {
-  const entry = buildEntry(level, msg, ctx);
-  pushRing(entry);
-  if (LEVEL_RANK[level] < LEVEL_RANK[minLevel]) return;
-  const line = formatEntry(entry);
-  consoleFor(level)(line);
 }
 
 // extension/src/lib/costCalculator.ts
@@ -29077,6 +29038,16 @@ function alignDiff(prev, next) {
     j++;
   }
   return ops;
+}
+
+// extension/src/lib/resume-selection.ts
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+function replaceMarkdownRange(markdown, range, replacementMarkdown) {
+  const from = clamp(range.from, 0, markdown.length);
+  const to = clamp(range.to, from, markdown.length);
+  return `${markdown.slice(0, from)}${replacementMarkdown}${markdown.slice(to)}`;
 }
 
 // extension/src/sidepanel/features/autoRevise.ts
