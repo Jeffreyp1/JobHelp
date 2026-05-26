@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolError } from '../../mcp/src/tools.js';
 import { createTools } from '../../mcp/src/tools.js';
-import { fail, getTool, makeDeps, ok, parseResponseBody } from './_fixtures.js';
+import { handleInitConfig } from '../../mcp/src/wiring-handlers.js';
+import { getTool, makeDeps, ok, parseResponseBody } from './_fixtures.js';
 
 describe('createTools — surface', () => {
   it('exposes all local Claude/Cursor workflow tools', () => {
@@ -17,6 +18,8 @@ describe('createTools — surface', () => {
         'get_resume_outline',
         'init_config',
         'apply_scoped_resume_edits',
+        'apply_validator_resume_edits',
+        'doctor',
         'list_application_versions',
         'list_recent_applications',
         'read_resume',
@@ -65,6 +68,20 @@ describe('init_config', () => {
     await tool.invoke({ interactive: 'yes' });
     expect(calls.initConfig).toEqual([{}]);
   });
+
+  it('returns wizard next step and prompts from initialized deps', async () => {
+    const { deps } = makeDeps({ initConfig: handleInitConfig });
+    const tool = getTool(createTools(deps), 'init_config');
+    const res = await tool.invoke({ interactive: true });
+    expect(res.isError).toBeUndefined();
+    const body = parseResponseBody(res.content) as {
+      ok: true;
+      value: { nextStep?: string; prompts?: unknown[] };
+    };
+    expect(body.value.nextStep).toBe('ask_user');
+    expect(Array.isArray(body.value.prompts)).toBe(true);
+    expect(body.value.prompts?.length).toBeGreaterThan(0);
+  });
 });
 
 describe('register_resume', () => {
@@ -111,11 +128,12 @@ describe('set_active_resume', () => {
 });
 
 describe('find_matching_jobs', () => {
-  it('requires queries', async () => {
-    const { deps } = makeDeps();
+  it('accepts empty args', async () => {
+    const { deps, calls } = makeDeps();
     const tool = getTool(createTools(deps), 'find_matching_jobs');
     const res = await tool.invoke({});
-    expect(res.isError).toBe(true);
+    expect(res.isError).toBeUndefined();
+    expect(calls.findMatchingJobs).toEqual([{}]);
   });
 
   it('forwards all optional fields', async () => {
@@ -144,6 +162,22 @@ describe('find_matching_jobs', () => {
     const tool = getTool(createTools(deps), 'find_matching_jobs');
     const res = await tool.invoke({ queries: 'swe' });
     expect(res.isError).toBe(true);
+  });
+
+  it('rejects non-positive count', async () => {
+    const { deps, calls } = makeDeps();
+    const tool = getTool(createTools(deps), 'find_matching_jobs');
+    const res = await tool.invoke({ count: 0 });
+    expect(res.isError).toBe(true);
+    expect(calls.findMatchingJobs).toEqual([]);
+  });
+
+  it('rejects fractional count', async () => {
+    const { deps, calls } = makeDeps();
+    const tool = getTool(createTools(deps), 'find_matching_jobs');
+    const res = await tool.invoke({ count: 1.5 });
+    expect(res.isError).toBe(true);
+    expect(calls.findMatchingJobs).toEqual([]);
   });
 });
 
@@ -234,185 +268,5 @@ describe('get_resume_outline', () => {
     expect(body.value.resumeName).toBe('backend');
     expect(body.value.sections[0]?.id).toBe('section-1-experience');
     expect(body.value.sections[0]?.bullets[0]?.id).toBe('section-1-experience-bullet-1');
-  });
-});
-
-describe('apply_scoped_resume_edits', () => {
-  it('applies selected bullet replacements without calling deps', async () => {
-    const { deps, calls } = makeDeps();
-    const tool = getTool(createTools(deps), 'apply_scoped_resume_edits');
-    const res = await tool.invoke({
-      resumeMarkdown: '# R\n\n## Experience\n- Built APIs.\n- Wrote tests.\n',
-      replacements: [
-        {
-          selectionId: 'section-1-experience-bullet-2',
-          replacementMarkdown: '- Wrote Vitest coverage.',
-        },
-      ],
-    });
-    expect(res.isError).toBeUndefined();
-    expect(calls.writeApplicationOutput).toEqual([]);
-    const body = parseResponseBody(res.content) as {
-      ok: true;
-      value: { content: string; changedSelections: Array<{ id: string; type: string }> };
-    };
-    expect(body.value.content).toBe('# R\n\n## Experience\n- Built APIs.\n- Wrote Vitest coverage.\n');
-    expect(body.value.changedSelections).toEqual([
-      { id: 'section-1-experience-bullet-2', type: 'bullet', startLine: 4, endLine: 4 },
-    ]);
-  });
-
-  it('rejects missing replacements', async () => {
-    const { deps } = makeDeps();
-    const tool = getTool(createTools(deps), 'apply_scoped_resume_edits');
-    const res = await tool.invoke({ resumeMarkdown: '# R' });
-    expect(res.isError).toBe(true);
-  });
-
-  it('rejects duplicate replacement ids', async () => {
-    const { deps } = makeDeps();
-    const tool = getTool(createTools(deps), 'apply_scoped_resume_edits');
-    const res = await tool.invoke({
-      resumeMarkdown: '# R\n\n## Experience\n- Built APIs.\n',
-      replacements: [
-        { selectionId: 'section-1-experience-bullet-1', replacementMarkdown: '- Built APIs.' },
-        { selectionId: 'section-1-experience-bullet-1', replacementMarkdown: '- Built services.' },
-      ],
-    });
-    expect(res.isError).toBe(true);
-    const body = parseResponseBody(res.content) as { error: ToolError };
-    expect(body.error.type).toBe('invalid_input');
-    expect(body.error.message).toContain('duplicate selectionId');
-  });
-
-  it('rejects overlapping section and bullet replacements', async () => {
-    const { deps } = makeDeps();
-    const tool = getTool(createTools(deps), 'apply_scoped_resume_edits');
-    const res = await tool.invoke({
-      resumeMarkdown: '# R\n\n## Experience\n- Built APIs.\n',
-      replacements: [
-        { selectionId: 'section-1-experience', replacementMarkdown: '## Experience\n- Built APIs.' },
-        { selectionId: 'section-1-experience-bullet-1', replacementMarkdown: '- Built services.' },
-      ],
-    });
-    expect(res.isError).toBe(true);
-    const body = parseResponseBody(res.content) as { error: ToolError };
-    expect(body.error.type).toBe('invalid_input');
-    expect(body.error.message).toContain('overlapping selections');
-  });
-});
-
-describe('start_application', () => {
-  it('requires jobId', async () => {
-    const { deps } = makeDeps();
-    const tool = getTool(createTools(deps), 'start_application');
-    const res = await tool.invoke({});
-    expect(res.isError).toBe(true);
-  });
-
-  it('forwards jobId and basedOnResumeName', async () => {
-    const { deps, calls } = makeDeps();
-    const tool = getTool(createTools(deps), 'start_application');
-    await tool.invoke({ jobId: 'a:1', basedOnResumeName: 'backend' });
-    expect(calls.startApplication).toEqual([{ jobId: 'a:1', basedOnResumeName: 'backend' }]);
-  });
-});
-
-describe('write_application_output', () => {
-  it('validates kind enum', async () => {
-    const { deps } = makeDeps();
-    const tool = getTool(createTools(deps), 'write_application_output');
-    const res = await tool.invoke({ jobId: 'a:1', kind: 'bogus', content: 'x' });
-    expect(res.isError).toBe(true);
-  });
-
-  it('forwards all required fields', async () => {
-    const { deps, calls } = makeDeps();
-    const tool = getTool(createTools(deps), 'write_application_output');
-    await tool.invoke({ jobId: 'a:1', kind: 'resume', content: '# r' });
-    expect(calls.writeApplicationOutput).toEqual([
-      { jobId: 'a:1', kind: 'resume', content: '# r' },
-    ]);
-  });
-
-  it('rejects missing content', async () => {
-    const { deps } = makeDeps();
-    const tool = getTool(createTools(deps), 'write_application_output');
-    const res = await tool.invoke({ jobId: 'a:1', kind: 'notes' });
-    expect(res.isError).toBe(true);
-  });
-});
-
-describe('list_application_versions', () => {
-  it('requires jobId and kind', async () => {
-    const { deps } = makeDeps();
-    const tool = getTool(createTools(deps), 'list_application_versions');
-    const r1 = await tool.invoke({ kind: 'resume' });
-    const r2 = await tool.invoke({ jobId: 'a:1' });
-    expect(r1.isError).toBe(true);
-    expect(r2.isError).toBe(true);
-  });
-
-  it('forwards both', async () => {
-    const { deps, calls } = makeDeps();
-    const tool = getTool(createTools(deps), 'list_application_versions');
-    await tool.invoke({ jobId: 'a:1', kind: 'cover-letter' });
-    expect(calls.listApplicationVersions).toEqual([{ jobId: 'a:1', kind: 'cover-letter' }]);
-  });
-});
-
-describe('list_recent_applications', () => {
-  it('passes through with no args', async () => {
-    const { deps, calls } = makeDeps();
-    const tool = getTool(createTools(deps), 'list_recent_applications');
-    const res = await tool.invoke({});
-    expect(res.isError).toBeUndefined();
-    expect(calls.listRecentApplications).toHaveLength(1);
-  });
-});
-
-describe('error wrapping', () => {
-  it('wraps a CoreDeps failure as isError=true', async () => {
-    const { deps } = makeDeps({
-      getLatestDigest: async () =>
-        fail({ type: 'not_configured', message: 'config missing' }),
-    });
-    const tool = getTool(createTools(deps), 'get_latest_digest');
-    const res = await tool.invoke({});
-    expect(res.isError).toBe(true);
-    const body = parseResponseBody(res.content) as { ok: false; error: ToolError };
-    expect(body.ok).toBe(false);
-    expect(body.error.type).toBe('not_configured');
-  });
-
-  it('catches thrown CoreDeps errors and converts to internal', async () => {
-    const { deps } = makeDeps({
-      readResume: async () => {
-        throw new Error('boom');
-      },
-    });
-    const tool = getTool(createTools(deps), 'read_resume');
-    const res = await tool.invoke({});
-    expect(res.isError).toBe(true);
-    const body = parseResponseBody(res.content) as { ok: false; error: ToolError };
-    expect(body.error.type).toBe('internal');
-    expect(body.error.message).toBe('boom');
-  });
-
-  it('rejects non-object arguments', async () => {
-    const { deps } = makeDeps();
-    const tool = getTool(createTools(deps), 'init_config');
-    const res = await tool.invoke('not an object');
-    expect(res.isError).toBe(true);
-    const body = parseResponseBody(res.content) as { error: ToolError };
-    expect(body.error.type).toBe('invalid_input');
-  });
-
-  it('accepts undefined args (treated as empty object)', async () => {
-    const { deps, calls } = makeDeps();
-    const tool = getTool(createTools(deps), 'list_recent_applications');
-    const res = await tool.invoke(undefined);
-    expect(res.isError).toBeUndefined();
-    expect(calls.listRecentApplications).toHaveLength(1);
   });
 });

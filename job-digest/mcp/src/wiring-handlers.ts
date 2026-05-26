@@ -1,51 +1,38 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { JobDigestConfig } from '../../core/types/config.js';
-import type { JobId, NormalizedJob } from '../../core/types/job.js';
-import type { RankedJob } from '../../core/types/pipeline.js';
 import { err, ok, type Result } from '../../core/types/result.js';
 import { applyConfigAnswers as coreApplyConfigAnswers, initConfig as coreInitConfig } from '../../core/init/index.js';
 import type { Registry } from '../../core/resumes/registry.js';
 import { readState } from '../../core/state/store.js';
-import { persistDigest, getLatestDigest, getLatestPointerPath } from '../../core/state/digestStore.js';
 import {
   startApplication as coreStartApplication, writeApplicationOutput as coreWriteApplicationOutput,
   listApplicationVersions as coreListApplicationVersions,
   listRecentApplications as coreListRecentApplications,
 } from '../../core/applications/store.js';
-import { ALL_ADAPTERS } from '../../core/sources/index.js';
-import { runPipeline, type PipelineOverrides } from '../../core/pipeline/index.js';
+import { slugify } from '../../core/applications/slugify.js';
 import type {
   ApplyConfigAnswersArgs, ApplyConfigAnswersResult,
-  FindMatchingJobsArgs, FindMatchingJobsResult, GetJobResult, GetLatestDigestResult,
   InitConfigArgs, InitConfigResult, ListApplicationVersionsArgs, ListApplicationVersionsResult,
   ListRecentApplicationsResult, ReadResumeResult, ReadRulesResult, RegisterResumeArgs,
-  RegisterResumeResult, RulesMode as ToolRulesMode, ScoreKeywordMatchArgs, ScoreKeywordMatchResult,
+  RegisterResumeResult, RulesMode as ToolRulesMode,
   SetActiveResumeArgs, SetActiveResumeResult, StartApplicationArgs, StartApplicationResult,
   ToolError, WriteApplicationOutputArgs, WriteApplicationOutputResult,
 } from './tools-types.js';
+import { findJobInLatestDigest } from './wiring-handlers-job.js';
+export {
+  findJobInLatestDigest,
+  handleFindMatchingJobs,
+  handleGetJob,
+  handleGetLatestDigest,
+  handleScoreKeywordMatch,
+} from './wiring-handlers-job.js';
 export { handleValidateSources } from './wiring-handlers-validate.js';
 export { handleRerankTopJobs } from './wiring-handlers-rerank.js';
 import {
-  extractSkillsFromMarkdown, getConfigPath, loadRulesByMode, rulesToReadRulesResult,
-  runAdapterIsolated, scoreOverlap, todayIsoDate, toToolError,
+  getConfigPath, loadRulesByMode, rulesToReadRulesResult,
+  todayIsoDate, toToolError,
 } from './wiring-helpers.js';
-
-export async function findJobInLatestDigest(
-  id: string,
-): Promise<Result<NormalizedJob, ToolError>> {
-  const latest = await getLatestDigest();
-  if (!latest.ok) {
-    if (latest.error.type === 'not_found') {
-      return err({ type: 'not_found', message: latest.error.message });
-    }
-    return err(toToolError(latest.error));
-  }
-  const ranked = latest.value.jobs.find((r: RankedJob) => r.job.id === id);
-  if (ranked === undefined) {
-    return err({ type: 'not_found', message: `job not found in latest digest: ${id}` });
-  }
-  return ok(ranked.job);
-}
 
 export async function handleInitConfig(
   args: InitConfigArgs,
@@ -53,7 +40,12 @@ export async function handleInitConfig(
   const interactive = args.interactive !== false;
   const wizard = coreInitConfig({ interactive });
   if (!wizard.ok) return err({ type: 'invalid_input', message: wizard.error.message });
-  return ok({ created: false, path: getConfigPath() });
+  return ok({
+    created: false,
+    path: getConfigPath(),
+    nextStep: wizard.value.nextStep,
+    prompts: wizard.value.prompts,
+  });
 }
 
 export async function handleApplyConfigAnswers(
@@ -113,77 +105,6 @@ export async function handleSetActiveResume(
   return ok({ active: args.name, registered });
 }
 
-export async function handleFindMatchingJobs(
-  config: JobDigestConfig,
-  args: FindMatchingJobsArgs,
-): Promise<Result<FindMatchingJobsResult, ToolError>> {
-  const now = new Date();
-  const outcomes = await Promise.all(
-    ALL_ADAPTERS.map((a) => runAdapterIsolated(a, config)),
-  );
-  const pool: NormalizedJob[] = [];
-  const warnings: { source: string; message: string }[] = [];
-  for (const o of outcomes) {
-    for (const j of o.jobs) pool.push(j);
-    if (o.error !== undefined) warnings.push({ source: o.source, message: o.error.message });
-  }
-  if (pool.length === 0 && warnings.length === ALL_ADAPTERS.length) {
-    return err({
-      type: 'all_sources_failed',
-      message: 'all source adapters failed or are unconfigured',
-    });
-  }
-  const overrides: PipelineOverrides = {
-    now,
-    ...(args.maxAgeDays === null || typeof args.maxAgeDays === 'number'
-      ? { maxAgeDays: args.maxAgeDays }
-      : {}),
-    ...(args.recencyEnabled !== undefined ? { recencyEnabled: args.recencyEnabled } : {}),
-  };
-  const ranked = await runPipeline(pool, config, overrides);
-  const topK = ranked.slice(0, config.ranking.digestK);
-  const date = todayIsoDate(now);
-  const persisted = await persistDigest({
-    date,
-    generatedAt: now.toISOString(),
-    totalDurationMs: 0,
-    sourceResults: outcomes.map((o) => ({
-      source: o.source,
-      jobCount: o.jobs.length,
-      durationMs: 0,
-      ...(o.error !== undefined
-        ? { error: { type: 'unknown' as const, message: o.error.message } }
-        : {}),
-    })),
-    jobs: topK,
-  });
-  if (!persisted.ok) return err(toToolError(persisted.error));
-  return ok({ digestPath: persisted.value.path, jobs: topK, warnings });
-}
-
-export async function handleGetLatestDigest(): Promise<
-  Result<GetLatestDigestResult, ToolError>
-> {
-  const r = await getLatestDigest();
-  if (!r.ok) {
-    if (r.error.type === 'not_found') {
-      return err({ type: 'not_found', message: r.error.message });
-    }
-    return err(toToolError(r.error));
-  }
-  return ok({
-    path: getLatestPointerPath(),
-    jobs: r.value.jobs,
-    generatedAt: r.value.generatedAt,
-  });
-}
-
-export async function handleGetJob(id: JobId): Promise<Result<GetJobResult, ToolError>> {
-  const job = await findJobInLatestDigest(id);
-  if (!job.ok) return err(job.error);
-  return ok({ job: job.value });
-}
-
 export async function handleReadRules(
   config: JobDigestConfig,
   mode: ToolRulesMode,
@@ -206,28 +127,61 @@ export async function handleReadResume(
   return ok({ name, content: content.value });
 }
 
-export async function handleScoreKeywordMatch(
-  args: ScoreKeywordMatchArgs,
-): Promise<Result<ScoreKeywordMatchResult, ToolError>> {
-  const job = await findJobInLatestDigest(args.jobId);
-  if (!job.ok) return err(job.error);
-  const skills = extractSkillsFromMarkdown(args.resumeMarkdown);
-  const jobText = `${job.value.title} ${job.value.description}`;
-  const { score, matched, missing } = scoreOverlap(jobText, skills);
-  return ok({ score, matched, missing });
+function directJobIdentity(args: StartApplicationArgs): string {
+  const source =
+    args.url !== undefined && args.url.length > 0
+      ? `url:${args.url}`
+      : `jobDescription:${args.jobDescription ?? ''}`;
+  return createHash('sha256').update(source, 'utf8').digest('hex').slice(0, 16);
 }
 
 export async function handleStartApplication(
   args: StartApplicationArgs,
 ): Promise<Result<StartApplicationResult, ToolError>> {
+  const date = todayIsoDate(new Date());
+  if (args.jobId === undefined) {
+    if (args.company === undefined || args.role === undefined || args.jobDescription === undefined) {
+      return err({
+        type: 'invalid_input',
+        message: 'jobId or company, role, and jobDescription are required',
+      });
+    }
+    const jobId = `direct:${slugify(args.company)}:${slugify(args.role)}:${date}:${directJobIdentity(args)}`;
+    const result = await coreStartApplication({
+      jobId,
+      company: args.company,
+      role: args.role,
+      date,
+      jobDescription: args.jobDescription,
+      ...(args.url !== undefined ? { url: args.url } : {}),
+      ...(args.location !== undefined ? { location: args.location } : {}),
+      ...(args.basedOnResumeName !== undefined
+        ? { basedOnResumeName: args.basedOnResumeName }
+        : {}),
+    });
+    if (!result.ok) return err(toToolError(result.error));
+    return ok({
+      jobId,
+      path: result.value.dir,
+      created: result.value.created,
+      ...(args.basedOnResumeName !== undefined
+        ? { basedOnResumeName: args.basedOnResumeName }
+        : {}),
+      ...(result.value.jobDescriptionPath !== undefined
+        ? { jobDescriptionPath: result.value.jobDescriptionPath }
+        : {}),
+    });
+  }
+
   const job = await findJobInLatestDigest(args.jobId);
   if (!job.ok) return err(job.error);
-  const date = todayIsoDate(new Date());
   const result = await coreStartApplication({
     jobId: args.jobId,
     company: job.value.company,
     role: job.value.title,
     date,
+    url: job.value.url,
+    location: job.value.location,
     ...(args.basedOnResumeName !== undefined
       ? { basedOnResumeName: args.basedOnResumeName }
       : {}),
@@ -236,11 +190,12 @@ export async function handleStartApplication(
   return ok(
     args.basedOnResumeName !== undefined
       ? {
+          jobId: args.jobId,
           path: result.value.dir,
           created: result.value.created,
           basedOnResumeName: args.basedOnResumeName,
         }
-      : { path: result.value.dir, created: result.value.created },
+      : { jobId: args.jobId, path: result.value.dir, created: result.value.created },
   );
 }
 
@@ -255,8 +210,21 @@ export async function handleWriteApplicationOutput(
   if (!result.ok) return err(toToolError(result.error));
   return ok(
     result.value.version !== undefined
-      ? { path: result.value.path, version: result.value.version }
-      : { path: result.value.path },
+      ? {
+          path: result.value.path,
+          applicationDir: result.value.applicationDir,
+          fileName: result.value.fileName,
+          kind: result.value.kind,
+          latestPath: result.value.latestPath,
+          version: result.value.version,
+        }
+      : {
+          path: result.value.path,
+          applicationDir: result.value.applicationDir,
+          fileName: result.value.fileName,
+          kind: result.value.kind,
+          latestPath: result.value.latestPath,
+        },
   );
 }
 
@@ -268,7 +236,7 @@ export async function handleListApplicationVersions(
   const versions = result.value.map((v) => ({
     version: v.version,
     path: v.path,
-    writtenAt: '',
+    writtenAt: v.writtenAt,
   }));
   return ok({ versions });
 }
@@ -284,10 +252,11 @@ export async function handleListRecentApplications(): Promise<
     company: a.company,
     role: a.role,
     startedAt: a.createdAt,
+    ...(a.url !== undefined ? { url: a.url } : {}),
+    ...(a.location !== undefined ? { location: a.location } : {}),
     ...(a.basedOnResumeName !== undefined
       ? { basedOnResumeName: a.basedOnResumeName }
       : {}),
   }));
   return ok({ applications });
 }
-

@@ -7,7 +7,7 @@ export function createConfigTools(deps: CoreDeps): readonly ToolHandler[] {
     buildHandler({
       name: 'init_config',
       description:
-        'First-run helper. Creates ~/.config/jobhelp/config.json. With interactive=true, walks the user through fields. Either works.',
+        'First-run helper. With interactive=true, returns wizard prompts for ~/.config/jobhelp/config.json. After apply_config_answers, use register_resume to create an active selectable resume.',
       inputSchema: {
         type: 'object',
         properties: { interactive: { type: 'boolean' } },
@@ -19,7 +19,7 @@ export function createConfigTools(deps: CoreDeps): readonly ToolHandler[] {
     buildHandler({
       name: 'apply_config_answers',
       description:
-        'Persist the answers gathered during init_config to ~/.config/jobhelp/config.json. Call this after collecting all profile/sources/rules/output answers from the user. Idempotent — overwrites existing config.',
+        'Persist the answers gathered during init_config to ~/.config/jobhelp/config.json. Call this after collecting all profile/sources/rules/output answers from the user, then register the resume path/content. Idempotent — overwrites existing config.',
       inputSchema: {
         type: 'object',
         properties: {

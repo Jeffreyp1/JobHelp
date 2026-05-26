@@ -10,7 +10,7 @@ export function createJobTools(deps: CoreDeps): readonly ToolHandler[] {
     buildHandler({
       name: 'find_matching_jobs',
       description:
-        'Discover and rank jobs against the active or named resume. queries is the inline list of search strings, instructions is free-text guidance. maxAgeDays and recencyEnabled are per-call overrides that win over the persistent config for this call only.',
+        'Discover and rank jobs against the active or named resume. count controls how many top-ranked jobs are returned and persisted. queries is accepted as optional caller context but does not filter sources. instructions is free-text guidance. maxAgeDays and recencyEnabled are per-call overrides that win over the persistent config for this call only.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -18,7 +18,7 @@ export function createJobTools(deps: CoreDeps): readonly ToolHandler[] {
           useAllResumes: { type: 'boolean' },
           queries: { type: 'array', items: { type: 'string' } },
           instructions: { type: 'string' },
-          count: { type: 'number' },
+          count: { type: 'integer', minimum: 1 },
           maxAgeDays: {
             type: ['number', 'null'],
             description:
@@ -29,7 +29,6 @@ export function createJobTools(deps: CoreDeps): readonly ToolHandler[] {
             description: 'Per-call override for recency decay (true/false to toggle for this call only).',
           },
         },
-        required: ['queries'],
         additionalProperties: false,
       },
       parse: parseFindMatchingJobs,

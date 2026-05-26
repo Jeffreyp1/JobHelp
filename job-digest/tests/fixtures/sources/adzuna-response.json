@@ -1,0 +1,56 @@
+{
+  "count": 2,
+  "mean": 125000,
+  "results": [
+    {
+      "id": "4567890123",
+      "title": "Software Engineer I (Remote)",
+      "description": "We are hiring a Software Engineer I to join our backend team. You will work with TypeScript, Go, and Postgres. This is a fully remote role. Equal Opportunity Employer: we celebrate diversity and do not discriminate on the basis of race, religion, color, national origin, gender, sexual orientation, age, marital status, veteran status, or disability status.",
+      "redirect_url": "https://www.adzuna.com/land/ad/4567890123",
+      "company": {
+        "display_name": "Acme Cloud"
+      },
+      "location": {
+        "display_name": "Remote, US",
+        "area": [
+          "US",
+          "Remote"
+        ]
+      },
+      "salary_min": 120000,
+      "salary_max": 160000,
+      "salary_is_predicted": "0",
+      "created": "2026-05-12T14:32:00Z",
+      "category": {
+        "label": "IT Jobs",
+        "tag": "it-jobs"
+      },
+      "contract_type": "permanent"
+    },
+    {
+      "id": "9876543210",
+      "title": "Backend Engineer",
+      "description": "Hybrid role in Austin, TX. You will design distributed systems. WFH 2 days/week. Comprehensive benefits including medical, dental, vision, and 401k matching. EEO statement: all qualified applicants will receive consideration without regard to race, color, religion, sex, national origin, disability, or veteran status.",
+      "redirect_url": "https://www.adzuna.com/land/ad/9876543210",
+      "company": {
+        "display_name": "Globex"
+      },
+      "location": {
+        "display_name": "Austin, TX",
+        "area": [
+          "US",
+          "California",
+          "Fairview"
+        ]
+      },
+      "salary_min": 140000,
+      "salary_max": 180000,
+      "created": "2026-05-13T09:15:00Z",
+      "category": {
+        "label": "IT Jobs",
+        "tag": "it-jobs"
+      },
+      "contract_type": "permanent"
+    }
+  ]
+}

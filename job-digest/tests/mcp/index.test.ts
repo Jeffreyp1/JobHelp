@@ -89,7 +89,7 @@ describe('buildServer', () => {
       resourceDeps: stubResourceDeps(),
     });
     expect(handle.server).toBeDefined();
-    expect(handle.tools.length).toBe(18);
+    expect(handle.tools.length).toBe(20);
     expect(handle.resources.length).toBe(9);
     expect(handle.prompts.length).toBe(3);
   });
