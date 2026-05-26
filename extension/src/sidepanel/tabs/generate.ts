@@ -23,6 +23,7 @@ import {
   lookupBullet,
   renderResumeEditor,
   type ResumeReviseEventDetail,
+  type ResumeReviseScope,
   type ResumeSaveResult,
 } from '../components/resumeEditor.js';
 import { estimateCost } from '../../lib/costCalculator.js';
@@ -48,7 +49,6 @@ import type {
   VerifyClHooksResponse,
   MultiVersionRequest,
   MultiVersionResponse,
-  ReviseTargetScope,
 } from '../../types/api-contract.js';
 import { renderCritiqueResult } from '../features/critique.js';
 import { runScopedRevise } from '../features/autoRevise.js';
@@ -768,14 +768,19 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     resumeSlot.replaceChildren(editor);
     editor.addEventListener('resume:revise', (ev) => {
       const detail = (ev as CustomEvent<ResumeReviseEventDetail>).detail;
-      const target = ev.target instanceof HTMLElement ? ev.target : editor;
-      // whole-resume has no per-element anchor; the composer renders below the editor wrapper
-      const anchorEl =
-        detail.scope.kind === 'bullet'
-          ? target.closest<HTMLElement>('[data-bullet-id]') ?? target
-          : detail.scope.kind === 'section'
-          ? target.closest<HTMLElement>('[data-section-name]') ?? target
-          : target;
+      let anchorEl: HTMLElement = editor;
+      if (detail.scope.kind === 'bullet') {
+        anchorEl =
+          editor.querySelector<HTMLElement>(`[data-bullet-id="${detail.scope.bulletId}"]`) ?? editor;
+      } else if (detail.scope.kind === 'section') {
+        const { sectionName } = detail.scope;
+        anchorEl =
+          Array.from(editor.querySelectorAll<HTMLElement>('[data-section-name]')).find(
+            (el) => el.dataset.sectionName === sectionName,
+          ) ?? editor;
+      } else if (detail.scope.kind === 'selection') {
+        anchorEl = editor.querySelector<HTMLElement>('.resume-editor__codemirror') ?? editor;
+      }
       void runAutoReviseScoped(detail.scope, anchorEl);
     });
     // Auto-scroll the panel to the new preview so the user sees it landed.
@@ -976,7 +981,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
   }
 
   async function runAutoReviseScoped(
-    scope: ReviseTargetScope,
+    scope: ResumeReviseScope,
     anchorEl: HTMLElement,
   ): Promise<void> {
     if (scope.kind === 'whole-resume') {
@@ -984,8 +989,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       await runWholeResumeRevise(md, anchorEl);
       return;
     }
-    if (scope.kind !== 'bullet' && scope.kind !== 'section') return;
-    const scopeKind: 'bullet' | 'section' = scope.kind;
+    if (scope.kind !== 'bullet' && scope.kind !== 'section' && scope.kind !== 'selection') return;
+    const scopeKind: 'bullet' | 'section' | 'selection' = scope.kind;
 
     const scopedHook = hooks.onAutoReviseScoped;
     if (!scopedHook) return;
@@ -1006,7 +1011,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
         let bulletText: string | undefined;
         let sectionPath: string;
         if (scopeKind === 'bullet') {
-          const bulletId = anchorEl.dataset.bulletId ?? '';
+          const bulletId = scope.kind === 'bullet' ? scope.bulletId : '';
           const looked = bulletId ? lookupBullet(md, bulletId) : null;
           if (!looked) {
             composerHost.replaceChildren();
@@ -1019,6 +1024,8 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
           }
           bulletText = looked.text;
           sectionPath = looked.sectionName;
+        } else if (scope.kind === 'selection') {
+          sectionPath = scope.sectionName;
         } else {
           sectionPath = scope.kind === 'section' ? scope.sectionName : '';
         }
@@ -1029,7 +1036,9 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
           slot: composerHost,
           scope: scopeKind,
           currentMarkdown: md,
+          getCurrentMarkdown: () => (currentMarkdownGetter ? currentMarkdownGetter() : md),
           bulletText,
+          selection: scope.kind === 'selection' ? scope : undefined,
           sectionPath,
           instruction,
           model: state.autoReviseModel,

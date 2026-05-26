@@ -23,6 +23,8 @@
     "test": "tests"
   },
   "dependencies": {
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.0",
     "assertion-error": "^2.0.1",
     "cac": "^6.7.14",
     "chai": "^5.3.3",

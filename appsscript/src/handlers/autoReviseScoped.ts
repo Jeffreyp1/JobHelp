@@ -19,7 +19,9 @@ function validationError(message: string): ApiErrorResponse {
   return { ok: false, error: { type: "validation", message, retryable: false } };
 }
 
-const VALID_SCOPES = ["bullet", "section"] as const;
+const VALID_SCOPES = ["bullet", "section", "selection"] as const;
+
+class ScopedValidationError extends Error {}
 
 export function validateAutoReviseScoped(
   raw: Record<string, unknown>,
@@ -47,12 +49,15 @@ export function validateAutoReviseScoped(
 
 function buildCreatorPrompt(req: AutoReviseScopedRequest, priorIssues: string[]): { system: string; user: string } {
   const isBullet = req.scope === "bullet";
+  const isSelection = req.scope === "selection";
   const system = [
     "You are a precision resume editor.",
     "",
     isBullet
       ? "Rewrite ONE bullet to satisfy the instruction. Return ONLY the new bullet text as a single line, with NO leading '- ', NO markdown headers, NO commentary, NO code fences."
-      : "Rewrite the bullets in this section to satisfy the instruction. Return ONLY a JSON array of strings — each string is one bullet's text with NO leading '- ', NO markdown headers, NO commentary, NO code fences.",
+      : isSelection
+        ? "Rewrite ONLY the selected Markdown excerpt to satisfy the instruction. Return ONLY replacement Markdown for that selected range, with NO commentary and NO code fences."
+        : "Rewrite the bullets in this section to satisfy the instruction. Return ONLY a JSON array of strings — each string is one bullet's text with NO leading '- ', NO markdown headers, NO commentary, NO code fences.",
     "",
     "Hard rules:",
     "- Do NOT fabricate metrics, dates, companies, titles, or claims that are not supported by the original.",
@@ -69,7 +74,7 @@ function buildCreatorPrompt(req: AutoReviseScopedRequest, priorIssues: string[])
   const user = [
     `Section: ${neutraliseFences(req.sectionPath)}`,
     "",
-    isBullet ? "Original bullet:" : "Original section content:",
+    isBullet ? "Original bullet:" : isSelection ? "Selected markdown:" : "Original section content:",
     "```",
     neutraliseFences(req.excerpt),
     "```",
@@ -110,6 +115,7 @@ function stripFences(text: string): string {
 function parseCreatorReply(scope: AutoReviseScopedRequest["scope"], text: string): string | string[] {
   const t = stripFences(text).trim();
   if (scope === "bullet") return t.replace(/^\s*-\s+/, "");
+  if (scope === "selection") return t;
   let parsed: unknown;
   try {
     parsed = JSON.parse(t);
@@ -121,6 +127,25 @@ function parseCreatorReply(scope: AutoReviseScopedRequest["scope"], text: string
     throw new Error("section scope: creator JSON must be an array of strings");
   }
   return (parsed as string[]).map((s) => s.replace(/^\s*-\s+/, ""));
+}
+
+function isMarkerOnly(s: string): boolean {
+  return /^[-*+]$/.test(s.trim());
+}
+
+function assertUsableProposal(scope: AutoReviseScopedRequest["scope"], proposal: string | string[]): void {
+  if (scope === "bullet" || scope === "selection") {
+    if (typeof proposal !== "string" || proposal.trim().length === 0 || isMarkerOnly(proposal)) {
+      throw new ScopedValidationError(scope === "bullet" ? "creator returned empty bullet output" : "creator returned empty selection output");
+    }
+    return;
+  }
+  if (!Array.isArray(proposal) || proposal.length === 0) {
+    throw new ScopedValidationError("creator returned empty section output");
+  }
+  if (proposal.some((s) => s.trim().length === 0 || isMarkerOnly(s))) {
+    throw new ScopedValidationError("creator returned an empty section bullet");
+  }
 }
 
 function parseCheckerReply(text: string): AutoReviseScopedCheckerResult {
@@ -171,6 +196,7 @@ export function handleAutoReviseScoped(
       totalUsage = sumUsage(totalUsage, creator.usage);
       modelUsed = creator.model;
       proposal = parseCreatorReply(req.scope, creator.text);
+      assertUsableProposal(req.scope, proposal);
 
       if (!req.useChecker) {
         checker = null;
@@ -196,9 +222,20 @@ export function handleAutoReviseScoped(
       log("error", "autoReviseScoped Claude API error", { errorType: err.errorType, retryable: err.retryable });
       return { ok: false, error: { type: err.errorType, message: err.message, retryable: err.retryable } };
     }
+    if (err instanceof ScopedValidationError) {
+      log("warn", "autoReviseScoped validation failure", { error: err.message });
+      return validationError(err.message);
+    }
     const msg = err instanceof Error ? err.message : String(err);
     log("error", "autoReviseScoped failure", { error: msg });
     return { ok: false, error: { type: "server", message: msg, retryable: true } };
+  }
+
+  if (checker !== null && !checker.ok) {
+    const issues = checker.issues.length > 0 ? checker.issues.join("; ") : "checker rejected rewrite";
+    const cost = calculateCost(totalUsage, modelUsed);
+    log("warn", "autoReviseScoped checker rejected final proposal", { issues: checker.issues, cost: cost.totalUsd });
+    return validationError(`checker rejected final proposal: ${issues}`);
   }
 
   const cost = calculateCost(totalUsage, modelUsed);

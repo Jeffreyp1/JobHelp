@@ -1,5 +1,5 @@
-import esbuild, { type BuildOptions } from 'esbuild';
-import { mkdirSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
+import esbuild, { type BuildOptions, type Plugin } from 'esbuild';
+import { mkdirSync, writeFileSync, existsSync, copyFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -63,6 +63,24 @@ window.__jobhelpScrape = () =>
 
 writeFileSync(scraperShimPath, scraperShimCode);
 
+function sanitizeGeneratedJs(filePath: string): void {
+  if (!filePath.endsWith('.js')) return;
+  const source = readFileSync(filePath, 'utf8');
+  const sanitized = source.replace(/[ \t]+$/gm, '');
+  if (sanitized !== source) writeFileSync(filePath, sanitized);
+}
+
+const sanitizeGeneratedJsPlugin: Plugin = {
+  name: 'sanitize-generated-js',
+  setup(build) {
+    build.onEnd((result) => {
+      if (result.errors.length > 0) return;
+      const outfile = build.initialOptions.outfile;
+      if (outfile) sanitizeGeneratedJs(outfile);
+    });
+  },
+};
+
 const sharedOptions: BuildOptions = {
   bundle: true,
   format: 'esm',
@@ -72,6 +90,7 @@ const sharedOptions: BuildOptions = {
   minify: false,
   sourcemap: true,
   logLevel: 'info',
+  plugins: [sanitizeGeneratedJsPlugin],
 };
 
 interface LabeledBuild extends BuildOptions {

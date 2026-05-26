@@ -443,9 +443,10 @@ export type AutoReviseResponse = ApiResult<AutoReviseResult>;
  * guaranteed by construction rather than by post-hoc trust in the model.
  */
 export interface AutoReviseScopedRequest {
-  scope: "bullet" | "section";
+  scope: "bullet" | "section" | "selection";
   /** ONLY the in-scope text. One bullet line for `bullet`; the section's
-   *  heading line + its bullets (joined by '\n') for `section`. */
+   *  heading line + its bullets (joined by '\n') for `section`; the exact
+   *  highlighted markdown range for `selection`. */
   excerpt: string;
   /** Section heading text (e.g. "Experience", "Skills"). Provided as context
    *  for the creator; the LLM is instructed NOT to modify it. */
@@ -467,7 +468,8 @@ export interface AutoReviseScopedCheckerResult {
 export interface AutoReviseScopedSuccess {
   /** For `scope:"bullet"` — a single replacement line (no leading "- ").
    *  For `scope:"section"` — an array of bullet lines (no leading "- "); the
-   *  section heading itself is preserved verbatim by the client. */
+   *  section heading itself is preserved verbatim by the client.
+   *  For `scope:"selection"` — replacement markdown for the selected range. */
   replaceWith: string | string[];
   /** Null when useChecker was false; otherwise the checker's verdict. */
   checker: AutoReviseScopedCheckerResult | null;
