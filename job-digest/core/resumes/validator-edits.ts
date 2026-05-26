@@ -1,4 +1,4 @@
-import { validateByteEqualityOutsideEdits } from './validator-byte-equality.js';
+import { validateByteEqualityOutsideEdits as validateByteEqualityOutsideEditsInternal } from './validator-byte-equality.js';
 
 export type ValidationSeverity = 'supported' | 'fair-rephrase' | 'exaggerated' | 'made-up';
 
@@ -78,7 +78,7 @@ export function applyValidatorResumeEdits(input: ApplyValidatorEditsInput): Appl
     return blocked(input.prevContent, 'apply', checkedFlagIds, [], [message]);
   }
 
-  const byteCheck = validateByteEqualityOutsideEdits(
+  const byteCheck = validateByteEqualityOutsideEditsInternal(
     input.prevContent,
     applied.content,
     input.edits,
@@ -165,6 +165,16 @@ export function applyEdits(prev: string, critique: Critique, edits: ValidatorEdi
   }
 
   return { content: lines.join('\n'), appliedFlagIds: applied, editedLineIndices };
+}
+
+export function validateByteEqualityOutsideEdits(
+  prev: string,
+  next: string,
+  _critique: Critique,
+  edits: ValidatorEdits,
+  editedLineIndices: readonly number[],
+): ValidationResult {
+  return validateByteEqualityOutsideEditsInternal(prev, next, edits, editedLineIndices);
 }
 
 function blocked(
