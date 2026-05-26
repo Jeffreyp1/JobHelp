@@ -430,6 +430,10 @@ main {
   margin-bottom: var(--space-2);
 }
 
+.resume-editor__codemirror[hidden] {
+  display: none;
+}
+
 .resume-editor__codemirror .cm-editor {
   background: var(--bg);
   color: var(--text);
@@ -502,6 +506,7 @@ main {
 .resume-editor__preview h2 { font-size: 14px; margin: 6px 0; }
 .resume-editor__preview h3 { font-size: 13px; margin: 6px 0; }
 .resume-editor__preview ul, .resume-editor__preview ol { padding-left: 18px; }
+.resume-bullet__text { cursor: text; }
 .resume-editor__preview code {
   background: var(--code-bg);
   padding: 1px 4px;
@@ -518,6 +523,9 @@ main {
 .resume-editor__actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
   margin-top: var(--space-3);
 }
 
