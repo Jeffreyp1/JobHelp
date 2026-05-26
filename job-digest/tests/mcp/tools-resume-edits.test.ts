@@ -92,7 +92,7 @@ describe('apply_validator_resume_edits', () => {
           },
         ],
       },
-      edits: { mode: 'edits', edits: [{ flagId: 7, replaceWith: 'Built API health checks.' }] },
+      edits: { mode: 'edits', edits: [{ flagId: 7, replaceWith: '- Built API health checks.' }] },
     });
 
     expect(res.isError).toBeUndefined();
@@ -105,7 +105,7 @@ describe('apply_validator_resume_edits', () => {
       };
     };
     expect(body.value.verdict).toBe('PASS');
-    expect(body.value.content).toContain('- Built API health checks.');
+    expect(body.value.content).toBe('# R\n\n## Experience\n- Built APIs.\n- Built API health checks.\n');
     expect(body.value.trust).toEqual({
       verdict: 'PASS',
       stage: 'complete',
