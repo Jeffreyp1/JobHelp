@@ -15,6 +15,9 @@ describe('createPrompts', () => {
     const prompt = getPrompt('tailor_resumes');
     const text = prompt.get({ input: 'top 25 jobs' }).messages[0]?.content.text ?? '';
     expect(text).toContain('0..N');
+    expect(text).toContain('prepare_batch_applications');
+    expect(text).toContain('top 25');
+    expect(text).toContain('One job id: call prepare_batch_applications({ jobIds: [id] }) before tailoring');
     expect(text).toContain('tailor_resume');
     expect(text).toContain('validate_resume');
     expect(text).toContain('maximum of 3 rounds');
@@ -25,6 +28,7 @@ describe('createPrompts', () => {
     expect(text).toContain('get_resume_outline');
     expect(text).toContain('apply_scoped_resume_edits');
     expect(text).toContain('write_application_output');
+    expect(text).toContain('per-job status');
   });
 
   it('tailor_resumes names apply_validator_resume_edits payload fields', () => {
