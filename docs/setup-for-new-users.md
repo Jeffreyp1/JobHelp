@@ -104,7 +104,7 @@ This is where v0.2.1 differs from earlier versions. Instead of pasting eight val
    ```jsonc
    {
      "anthropicApiKey": "sk-ant-<paste your key>",
-     "appsScriptUrl":   "https://script.google.com/macros/s/<your deploy id>/exec",
+     "appsScriptUrl":   "<your Apps Script /exec URL>",
      "folders": {
        "source":  "<source-materials folder id>",
        "rules":   "<rules folder id>",
@@ -128,7 +128,7 @@ This is where v0.2.1 differs from earlier versions. Instead of pasting eight val
    | Field | Format | Notes |
    |---|---|---|
    | `anthropicApiKey` | `sk-ant-...` | Same key you put in Apps Script Properties in Step 2. |
-   | `appsScriptUrl` | `https://script.google.com/macros/s/.../exec` | Must end in `/exec`. |
+   | `appsScriptUrl` | `<your Apps Script /exec URL>` | Must end in `/exec`. |
    | `folders.source` / `.rules` / `.output` | Drive folder IDs | The bare ID, not the full URL. |
    | `sheetId` | Drive file ID | From `/spreadsheets/d/<ID>/edit`. |
    | `templateDocxId` | Drive file ID or `""` | Used only by the DOCX-template filler; safe to leave blank. |
