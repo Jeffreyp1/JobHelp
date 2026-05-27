@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { loadConfig } from '../../core/lib/config.js';
 import { isErr, isOk } from '../../core/types/result.js';
 
@@ -128,6 +128,26 @@ describe('loadConfig — round-trip for newly-added source adapters', () => {
       expect(result.value.sources.remoteok).toBeDefined();
     } finally {
       rmSync(p, { force: true });
+    }
+  });
+
+  it('loads editable company-sources.json next to config.json', async () => {
+    const p = writeTempConfig({});
+    const dir = dirname(p);
+    try {
+      writeFileSync(
+        join(dir, 'company-sources.json'),
+        JSON.stringify({
+          greenhouse: { tokens: ['user-kept-greenhouse'] },
+          lever: { slugs: ['user-kept-lever'] },
+        }),
+      );
+      const result = await loadConfig(p);
+      if (!isOk(result)) throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
+      expect(result.value.sources.greenhouse?.tokens).toEqual(['user-kept-greenhouse']);
+      expect(result.value.sources.lever?.slugs).toEqual(['user-kept-lever']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 

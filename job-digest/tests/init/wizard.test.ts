@@ -44,6 +44,16 @@ describe('initConfig', () => {
       expect(keys).toContain('profile.roleFamily');
     });
 
+    it('uses profession-neutral profile wording', () => {
+      const result = initConfig({ interactive: true });
+      if (!isOk(result)) throw new Error('expected ok');
+      const questions = result.value.prompts.map((p) => p.question.toLowerCase()).join('\n');
+      expect(questions).not.toMatch(/core technical skills/);
+      expect(questions).not.toMatch(/typescript|backend|fullstack|ai-engineer|software engineer/);
+      expect(questions).toMatch(/skills, certifications, tools, specialties, or keywords/);
+      expect(questions).toMatch(/roles, job titles, fields, or work settings/);
+    });
+
     it('includes output.dir prompt with default', () => {
       const result = initConfig({ interactive: true });
       if (!isOk(result)) throw new Error('expected ok');
@@ -84,21 +94,25 @@ describe('initConfig', () => {
       }
     });
 
-    it('adzuna queries prompt has a schema-valid default', () => {
+    it('adzuna queries prompt has a neutral blank default', () => {
       const result = initConfig({ interactive: true });
       if (!isOk(result)) throw new Error('expected ok');
       const p = result.value.prompts.find((pr) => pr.key === 'sources.adzuna.queries');
       expect(p?.type).toBe('array');
-      expect(p?.default).toEqual(['software engineer']);
+      expect(p?.default).toEqual([]);
     });
 
-    it('greenhouse and lever prompts are marked optional', () => {
+    it('includes one company-source file prompt instead of per-source company lists', () => {
       const result = initConfig({ interactive: true });
       if (!isOk(result)) throw new Error('expected ok');
-      const p1 = result.value.prompts.find((p) => p.key === 'sources.greenhouse.tokens');
-      const p2 = result.value.prompts.find((p) => p.key === 'sources.lever.slugs');
-      expect(p1?.optional).toBe(true);
-      expect(p2?.optional).toBe(true);
+      expect(result.value.prompts.find((p) => p.key === 'sources.greenhouse.tokens')).toBeUndefined();
+      expect(result.value.prompts.find((p) => p.key === 'sources.lever.slugs')).toBeUndefined();
+      const companySources = result.value.prompts.find((p) => p.key === 'sources.companySources');
+      expect(companySources?.type).toBe('boolean');
+      expect(companySources?.default).toBe(true);
+      expect(companySources?.question).toMatch(/company-sources\.json/);
+      expect(companySources?.question).toMatch(/remove/);
+      expect(companySources?.question).toMatch(/all verified/);
     });
 
     it('does NOT include any anthropic prompt', () => {

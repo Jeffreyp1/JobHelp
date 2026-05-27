@@ -48,12 +48,12 @@ const INTERACTIVE_PROMPTS: readonly WizardPrompt[] = [
   },
   {
     key: 'profile.skills',
-    question: 'List your core technical skills, comma-separated (e.g. typescript, go, python)',
+    question: 'List your skills, certifications, tools, specialties, or keywords, comma-separated',
     type: 'array',
   },
   {
     key: 'profile.salaryFloor',
-    question: 'What is your minimum acceptable salary in USD? (e.g. 100000)',
+    question: 'Minimum salary filter in USD. Enter 0 to keep jobs even when pay is lower or missing.',
     type: 'number',
   },
   {
@@ -63,7 +63,7 @@ const INTERACTIVE_PROMPTS: readonly WizardPrompt[] = [
   },
   {
     key: 'profile.roleFamily',
-    question: 'What role families interest you, comma-separated? (e.g. backend, fullstack, ai-engineer)',
+    question: 'What roles, job titles, fields, or work settings interest you? Enter your own comma-separated terms.',
     type: 'array',
   },
   {
@@ -74,13 +74,13 @@ const INTERACTIVE_PROMPTS: readonly WizardPrompt[] = [
   },
   {
     key: 'rules.mode',
-    question: 'Rules mode — how to combine bundled + user rules? One of: defaults_only, additive, replace',
+    question: 'Tailoring rules mode: defaults_only uses bundled resume-writing rules, additive adds your own rule files, replace uses only your own rule files. One of: defaults_only, additive, replace',
     type: 'string',
     default: DEFAULT_RULES_MODE,
   },
   {
     key: 'rules.userRulesDir',
-    question: 'Directory for your custom rule files (markdown files here override/extend bundled rules)',
+    question: 'Optional directory for your own resume-writing rule files. Leave the default if you do not have custom rules yet.',
     type: 'string',
     default: `~/${DEFAULT_USER_RULES_DIR_HOME_RELATIVE}`,
   },
@@ -105,22 +105,17 @@ const INTERACTIVE_PROMPTS: readonly WizardPrompt[] = [
   },
   {
     key: 'sources.adzuna.queries',
-    question: 'Adzuna search queries, comma-separated',
+    question: 'Adzuna search queries, comma-separated. Leave blank to derive searches from your role/title answers.',
     type: 'array',
     optional: true,
     default: DEFAULT_ADZUNA_QUERIES,
   },
   {
-    key: 'sources.greenhouse.tokens',
-    question: 'Greenhouse company board tokens, comma-separated (e.g. doordash, stripe, openai) — leave blank to skip',
-    type: 'array',
-    optional: true,
-  },
-  {
-    key: 'sources.lever.slugs',
-    question: 'Lever company slugs, comma-separated (e.g. plaid, anthropic, mercury) — leave blank to skip',
-    type: 'array',
-    optional: true,
+    key: 'sources.companySources',
+    question:
+      'Company-board sources: apply_config_answers creates company-sources.json with all verified companies. Review it before searching and remove companies or sources you do not want; continuing means all verified entries may be searched.',
+    type: 'boolean',
+    default: true,
   },
 ];
 

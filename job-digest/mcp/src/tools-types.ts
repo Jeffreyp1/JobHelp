@@ -38,6 +38,8 @@ export interface ApplyConfigAnswersArgs {
 
 export interface ApplyConfigAnswersResult {
   readonly path: string;
+  readonly companySourcesPath?: string;
+  readonly companySourcesCreated?: boolean;
 }
 
 export interface RegisterResumeArgs {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { applyConfigAnswers } from '../../core/init/applyAnswers.js';
@@ -32,6 +32,42 @@ describe('applyConfigAnswers', () => {
       if (!isOk(result)) throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
       expect(result.value.path).toBe(configPath);
       expect(existsSync(configPath)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('creates editable company-sources.json next to the config with verified company boards', async () => {
+    const dir = makeTmpDir();
+    try {
+      const configPath = join(dir, 'config.json');
+      const result = await applyConfigAnswers({ answers: MINIMAL_ANSWERS, outputPath: configPath });
+      if (!isOk(result)) throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
+      expect(result.value.companySourcesPath).toBe(join(dir, 'company-sources.json'));
+      const written = JSON.parse(readFileSync(result.value.companySourcesPath, 'utf8')) as {
+        greenhouse?: { tokens?: string[] };
+        ashby?: { tokens?: string[] };
+        lever?: { slugs?: string[] };
+        workable?: { tokens?: string[] };
+      };
+      expect(written.greenhouse?.tokens?.length).toBeGreaterThan(1000);
+      expect(written.ashby?.tokens?.length).toBeGreaterThan(1000);
+      expect(written.workable?.tokens?.length).toBeGreaterThan(1000);
+      expect(written.lever?.slugs?.length).toBeGreaterThan(50);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not overwrite an existing company-sources.json that the user edited', async () => {
+    const dir = makeTmpDir();
+    try {
+      const configPath = join(dir, 'config.json');
+      const companySourcesPath = join(dir, 'company-sources.json');
+      writeFileSync(companySourcesPath, '{\n  "greenhouse": { "tokens": ["user-kept"] }\n}\n');
+      const result = await applyConfigAnswers({ answers: MINIMAL_ANSWERS, outputPath: configPath });
+      if (!isOk(result)) throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
+      expect(readFileSync(companySourcesPath, 'utf8')).toBe('{\n  "greenhouse": { "tokens": ["user-kept"] }\n}\n');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -118,7 +154,7 @@ describe('applyConfigAnswers', () => {
     }
   });
 
-  it('writes schema-valid adzuna config when credentials use wizard defaults', async () => {
+  it('derives adzuna queries from role answers when credentials use wizard defaults', async () => {
     const dir = makeTmpDir();
     try {
       const configPath = join(dir, 'config.json');
@@ -132,7 +168,7 @@ describe('applyConfigAnswers', () => {
       if (!isOk(applied)) throw new Error(`expected ok; got ${JSON.stringify(applied.error)}`);
       const loaded = await loadConfig(configPath);
       if (!isOk(loaded)) throw new Error(`expected valid config; got ${JSON.stringify(loaded.error)}`);
-      expect(loaded.value.sources.adzuna?.queries).toEqual(['software engineer']);
+      expect(loaded.value.sources.adzuna?.queries).toEqual(['backend']);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
