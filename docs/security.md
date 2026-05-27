@@ -51,8 +51,8 @@ read.)
 
 ### 1.3 Apps Script web app URL
 
-The `/exec` URL of the deployed Apps Script (e.g.
-`https://script.google.com/macros/s/AKfycb…/exec`) is a capability — anyone
+The `/exec` URL of the deployed Apps Script (for example,
+`<your Apps Script /exec URL>`) is a capability — anyone
 who knows it can call the deployed endpoints. JobHelp deploys with
 **Execute as: Me + Who has access: Anyone with the link** so the URL itself
 is the only authorization. Treat it as a secret.
