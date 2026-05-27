@@ -61,6 +61,10 @@ function renderBullet(b: ParsedBullet, ctx: BulletRenderCtx): HTMLLIElement {
   );
 
   span.addEventListener('click', () => {
+    if (span.dataset.suppressNextEdit === 'true') {
+      delete span.dataset.suppressNextEdit;
+      return;
+    }
     if (hasSelectionInside(span)) return;
     const ta = document.createElement('textarea');
     ta.className = 'resume-bullet__editor';
