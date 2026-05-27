@@ -97,3 +97,4 @@ prompts/shared/_validate.test.ts
 !job-digest/tests/**
 !tests/sidepanel/
 !tests/sidepanel/resumeEditor-selection.test.ts
+!tests/sidepanel/generate-whole-resume-revise-safety.test.ts
