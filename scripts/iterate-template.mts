@@ -62,7 +62,7 @@ writeFileSync('/tmp/iter-sample.md', SAMPLE_MD);
 const bundlePath = '/tmp/iter-filler.mjs';
 execSync(
   `npx esbuild --bundle --format=esm --platform=node ` +
-  `--outfile=${bundlePath} ${join(ROOT, 'extension/src/lib/templateFiller.ts')}`,
+  `--outfile=${bundlePath} ${join(ROOT, 'extension-app/extension/src/lib/templateFiller.ts')}`,
   { stdio: 'pipe' },
 );
 

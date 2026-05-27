@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "test:job-digest:mcp": "npm --prefix job-digest test -- --run tests/mcp",
+    "test:jobhelp-mcp:mcp": "npm --prefix jobhelp-mcp test -- --run tests/mcp",
     "test:watch": "vitest"
   },
   "devDependencies": {
@@ -20,8 +20,7 @@
   "description": "",
   "main": "index.js",
   "directories": {
-    "doc": "docs",
-    "test": "tests"
+    "doc": "docs"
   },
   "dependencies": {
     "@codemirror/state": "^6.6.0",

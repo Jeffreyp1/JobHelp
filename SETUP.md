@@ -42,19 +42,16 @@ Create them:
 JobHelp uses your own Google Apps Script project as its backend. It reads/writes Drive, calls the Anthropic API, and logs to your tracking sheet — all under your Google account identity.
 
 1. Go to [script.google.com](https://script.google.com) → **New project**. Rename to `JobHelp Backend`.
-2. Copy the compiled backend code into the editor. You need one file per module. In the editor, click **+** → **Script file** to add each:
-   - `Code.gs` — the HTTP router (`doPost`)
-   - `claude.gs` — Claude API caller
-   - `drive.gs` — Drive read/write operations
-   - `sheet.gs` — tracking sheet row appender
-   - `prompt.gs` — system prompt composer
-   - `tokens.gs` — token estimator
-   - `cost.gs` — cost tracker
-   - `seed.gs` — first-run rule file seeder
+2. Build the backend bundle locally:
 
-   Paste the contents of each corresponding compiled file from `appsscript/src/` (after building with `node appsscript/scripts/build.mts`).
+   ```bash
+   cd /path/to/JobHelp
+   node extension-app/appsscript/scripts/build.mts
+   ```
 
-   > **Note:** This step is the most manual part of setup. A future release will automate deployment via `clasp push`. For now, copy-paste each file.
+   Paste the contents of `extension-app/appsscript/dist/Code.gs` into the default `Code.gs` file in Apps Script.
+
+   > **Note:** This step is the most manual part of setup. A future release will automate deployment via `clasp push`. For now, copy-paste the generated `Code.gs`.
 
 3. In **Project Settings** (gear icon) → **Script Properties**, add:
    - Key: `ANTHROPIC_API_KEY`
@@ -75,10 +72,10 @@ JobHelp uses your own Google Apps Script project as its backend. It reads/writes
    ```bash
    cd /path/to/JobHelp
    npm install
-   node extension/scripts/build.mts
+   node extension-app/extension/scripts/build.mts
    ```
 2. Open **chrome://extensions** in Chrome → toggle **Developer mode** (top right)
-3. Click **Load unpacked** → select the `extension/public/` folder
+3. Click **Load unpacked** → select the `extension-app/extension/public/` folder
 4. The JobHelp icon appears in your toolbar; pin it if you like
 
 ## Step 5: First-run configuration
@@ -101,7 +98,7 @@ JobHelp uses your own Google Apps Script project as its backend. It reads/writes
 
 1. Open your source-materials folder in Drive (use the **"Open source folder"** button in Settings)
 2. Create a new Google Doc or upload a `.md` file named `source-materials.md`
-3. Use the template at `tests/fixtures/source-materials/sample-source-materials.md` in this repo as a starting point
+3. Use the template at `extension-app/tests/fixtures/source-materials/sample-source-materials.md` in this repo as a starting point
 4. Fill in your actual work history, skills, projects, and achievements — the more detail, the better the tailoring
 
 > **Tip:** You can split your content across multiple `.md` files (e.g., `experience.md`, `projects.md`, `skills.md`). JobHelp reads all `.md` files in the folder.

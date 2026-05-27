@@ -29,8 +29,8 @@ If you have already used a v0.2.0-or-earlier install, see the migration note in 
 This step is unchanged in v0.2.1. The Apps Script project reads/writes your Drive, calls Claude, and appends rows to your tracking sheet — all under your Google identity. Follow Step 3 of the legacy guide:
 
 - See [SETUP.md, Step 3 ("Deploy the Apps Script backend")](../SETUP.md#step-3-deploy-the-apps-script-backend) for the click-by-click flow.
-- Build the bundle first: `node appsscript/scripts/build.mts` produces eight `.gs` files in `appsscript/dist/`.
-- Copy each compiled file into a new Apps Script project, deploy as a **Web app** (execute as **Me**, access **Only myself**), and copy the resulting `/exec` URL somewhere — you will paste it into your config file in Step 3 below.
+- Build the bundle first: `node extension-app/appsscript/scripts/build.mts` produces `extension-app/appsscript/dist/Code.gs`.
+- Paste the generated `Code.gs` into a new Apps Script project, deploy as a **Web app** (execute as **Me**, access **Only myself**), and copy the resulting `/exec` URL somewhere — you will paste it into your config file in Step 3 below.
 
 ## Step 2: Set the Anthropic API key in Apps Script Properties
 
@@ -62,7 +62,7 @@ What goes in each:
 
 | Folder | Holds | Created by |
 |---|---|---|
-| `source-materials/` | `.md` files describing your work history, skills, accomplishments. JobHelp concatenates every `.md` in this folder. Start from [`tests/fixtures/source-materials/`](../tests/fixtures/source-materials/) if you have none. | You |
+| `source-materials/` | `.md` files describing your work history, skills, accomplishments. JobHelp concatenates every `.md` in this folder. Start from [`extension-app/tests/fixtures/source-materials/`](../extension-app/tests/fixtures/source-materials/) if you have none. | You |
 | `rules/` | The 12 generation-rule markdown files (`01-priority-hierarchy.md` … `12-template-reproduction.md`). The extension's **Seed rule files** button populates this folder on first run. | JobHelp |
 | `output/` | One auto-created sub-folder per job application, each containing the generated `resume.md`, the Google Doc, and any cover letter or critique. | JobHelp |
 
@@ -81,7 +81,7 @@ The extension is not yet on the Chrome Web Store, so install it via developer mo
 git clone https://github.com/<your-fork>/JobHelp.git
 cd JobHelp
 npm install
-node extension/scripts/build.mts
+node extension-app/extension/scripts/build.mts
 ```
 
 Then:
@@ -89,7 +89,7 @@ Then:
 1. Open `chrome://extensions` in Chrome.
 2. Toggle **Developer mode** (top right).
 3. Click **Load unpacked**.
-4. Select the built directory: `extension/public/`.
+4. Select the built directory: `extension-app/extension/public/`.
 5. Pin the JobHelp icon to the toolbar (puzzle-piece menu → pin icon next to JobHelp).
 
 ## Step 5: Side panel + Onboarding wizard
