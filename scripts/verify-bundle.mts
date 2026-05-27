@@ -40,6 +40,7 @@ const VALID_ACTIONS: string[] = [
   'benchmark_role',
   'critique',
   'auto_revise',
+  'auto_revise_scoped',
   'cover_letter',
   'verify_cl_hooks',
   'multi_version',
@@ -317,7 +318,7 @@ async function main(): Promise<void> {
     return 'doPost entry present';
   });
 
-  await check('appsscript: Code.gs contains all 15 VALID_ACTIONS', async () => {
+  await check('appsscript: Code.gs contains all 16 VALID_ACTIONS', async () => {
     if (codeGsText == null) codeGsText = await readFile(PATHS.codeGs, 'utf8');
     const missing: string[] = [];
     for (const action of VALID_ACTIONS) {

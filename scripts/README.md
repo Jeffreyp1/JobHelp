@@ -81,7 +81,8 @@ network errors, non-JSON responses, and missing `APPS_SCRIPT_URL`).
 
 `ping`, `generate`, `finalize`, `list_files`, `write_file`, `seed_defaults`,
 `download_template`, `upload_filled_docx`, `research_company`, `benchmark_role`,
-`critique`, `auto_revise`, `cover_letter`, `verify_cl_hooks`, `multi_version`.
+`critique`, `auto_revise`, `auto_revise_scoped`, `cover_letter`,
+`verify_cl_hooks`, `multi_version`.
 
 Run `node scripts/test-handler.mts --help` for the full list with examples.
 
@@ -143,10 +144,11 @@ node scripts/verify-bundle.mts --no-build   # skip the build step
 - First non-comment token is valid Apps Script JS (no leftover `import type`,
   `interface`, or top-level `export` keyword)
 - Contains the literal `function doPost` (web-app entry point)
-- Contains every one of the 15 `VALID_ACTIONS` strings (`ping`, `generate`,
+- Contains every one of the 16 `VALID_ACTIONS` strings (`ping`, `generate`,
   `finalize`, `list_files`, `write_file`, `seed_defaults`, `download_template`,
   `upload_filled_docx`, `research_company`, `benchmark_role`, `critique`,
-  `auto_revise`, `cover_letter`, `verify_cl_hooks`, `multi_version`)
+  `auto_revise`, `auto_revise_scoped`, `cover_letter`, `verify_cl_hooks`,
+  `multi_version`)
 
 Exit code is `0` on all-pass, `1` on any failure. Each check prints its
 wallclock duration; output respects `NO_COLOR`.
