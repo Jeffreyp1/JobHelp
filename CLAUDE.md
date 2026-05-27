@@ -9,7 +9,7 @@ A personal-use job-application tool. Chrome extension (Manifest V3, side panel, 
 ## Repo layout
 
 ```
-appsscript/src/
+extension-app/appsscript/src/
   Code.ts                 doPost router + all action handlers' dispatch
   handlers/               one file per action (research, benchmark, critique, autoRevise,
                           coverLetter, verifyHooks, multiVersion, createDriveFile, ...)
@@ -20,10 +20,10 @@ appsscript/src/
   cost.ts                 pricing table + cost calc
   lib/structuredLog.ts    leveled logger with secret redaction (USE THIS, not console.*)
   types/                  api-contract.ts (the wire shape), drive-ops.ts, claude-api.ts, job-insights.ts
-appsscript/tests/         vitest; mocks GAS globals
-appsscript/scripts/build.mts   bundles -> appsscript/dist/Code.gs
+extension-app/appsscript/tests/         vitest; mocks GAS globals
+extension-app/appsscript/scripts/build.mts   bundles -> extension-app/appsscript/dist/Code.gs
 
-extension/src/
+extension-app/extension/src/
   sidepanel/tabs/         generate.ts (orchestration), settings.ts, files.ts
   sidepanel/features/     one UI module per v2 feature + their renderers
   sidepanel/components/   toggleRow, resumeEditor (Edit/Preview), costEstimator, jobInsights, ...
@@ -34,23 +34,25 @@ extension/src/
                           structuredLog, templateFiller, costCalculator, storage, scraper
   types/                  api-contract.ts (SOURCE OF TRUTH; mirrored to the appsscript copy),
                           storage-schema.ts, jobhelp-config.ts, message-bus.ts
-extension/tests/          vitest; jsdom env; chrome mock helpers
-extension/scripts/build.mts    bundles -> extension/public/{sidepanel/index.js, background.js, scraper.bundle.js}
+extension-app/extension/tests/          vitest; jsdom env; chrome mock helpers
+extension-app/extension/scripts/build.mts    bundles -> extension-app/extension/public/{sidepanel/index.js, background.js, scraper.bundle.js}
 
-prompts/shared/           15 rule files; 6 are load-bearing (flagged in frontmatter + H1)
+extension-app/prompts/shared/           15 rule files; 6 are load-bearing (flagged in frontmatter + H1)
 docs/                     CHANGELOG.md, v2-features.md, security.md, setup-for-new-users.md,
                           superpowers/plans/*, superpowers/reviews/* (audits), research/*
 scripts/                  test-handler.mts (CLI to POST any action), verify-bundle.mts,
-                          smoke-test.mts, iterate-template.mts, build-skills-dict.mts
-tests/contracts/, tests/smoke/   black-box wire-shape tests + post-build smoke
-vitest.config.ts          include globs: extension/tests/**, appsscript/tests/**, tests/**, prompts/**
+                          smoke-test.mts, iterate-template.mts
+extension-app/tests/contracts/, extension-app/tests/smoke/   black-box wire-shape tests + post-build smoke
+vitest.config.ts          include globs: extension-app/extension/tests/**,
+                          extension-app/appsscript/tests/**, extension-app/tests/**,
+                          extension-app/prompts/**, jobhelp-mcp/tests/**
 ```
 
 ## Commands
 
-- Tests: `npx vitest run` (run from the repo root — running from inside `extension/` or `appsscript/` picks up a different cwd and surfaces spurious failures).
+- Tests: `npx vitest run` (run from the repo root — running from inside `extension-app/extension/` or `extension-app/appsscript/` picks up a different cwd and surfaces spurious failures).
 - Type check: `npx tsc --noEmit` (must be clean; run from repo root).
-- Build extension: `node extension/scripts/build.mts`. Build Apps Script: `node appsscript/scripts/build.mts`.
+- Build extension: `node extension-app/extension/scripts/build.mts`. Build Apps Script: `node extension-app/appsscript/scripts/build.mts`.
 - Post-build sanity: `node scripts/verify-bundle.mts` (builds both + 12 checks: bundle sizes, manifest schema, version match against CHANGELOG, all action strings present in `Code.gs`).
 - Hit a deployed backend: `APPS_SCRIPT_URL=... node scripts/test-handler.mts ping` (or any action).
 
@@ -65,7 +67,7 @@ A change isn't done until `npx vitest run` is fully green AND `npx tsc --noEmit`
 - File length ceiling: **300 lines per source file** (excluding pure data files, fixtures, and snapshot tests). When a file exceeds 300 lines, split it before adding more. Preferred splits, in order: (a) extract a sibling module by cohesive responsibility (e.g., one handler file → handler + helpers + types); (b) move pure functions into `lib/`; (c) pull large type definitions into `types/`; (d) split tests by surface (`handler.test.ts` → `handler.success.test.ts` + `handler.errors.test.ts`). Re-export the original public surface from the original path so existing imports stay intact. The 300-line cap is for readability and reliable LLM-context editing — a 600-line file gets edited worse than two 300-line files.
 - Logging: use `log(level, msg, ctx)` from `lib/structuredLog.ts` (both packages have one). Pass structured context objects (`{ company, role, cost, error }`) — don't string-interpolate; the logger redacts API keys and truncates >2 KB automatically. Levels: `info` = milestones, `debug` = chatter, `warn` = recoverable degradation, `error` = a broken flow. Don't double-log (don't `console.error` then return a typed error too — replace, don't add).
 - Error policy in handlers: never throw across the HTTP boundary. Return `ApiResult<T>` = `{ ok: true, ... } | { ok: false, error: { type, message, retryable } }`. `error.type` is the union in `api-contract.ts`; `retryable` is true only for `rate_limit` and `server`. Forward `err.errorType` verbatim from a `ClaudeApiError` — do not collapse `rate_limit` into `server`.
-- `api-contract.ts` exists in two copies: `extension/src/types/api-contract.ts` is the SOURCE OF TRUTH; `appsscript/src/types/api-contract.ts` is a manual mirror. If you change one, change the other byte-identically (except the file-header comment, which legitimately differs). JSDoc-only changes are fine; type-signature changes ripple — be deliberate.
+- `api-contract.ts` exists in two copies: `extension-app/extension/src/types/api-contract.ts` is the SOURCE OF TRUTH; `extension-app/appsscript/src/types/api-contract.ts` is a manual mirror. If you change one, change the other byte-identically (except the file-header comment, which legitimately differs). JSDoc-only changes are fine; type-signature changes ripple — be deliberate.
 - Apps Script V8 runtime: NO `Promise.all`, no `async`/`await` in the request path (it's synchronous), no Node APIs. The `Code.gs` bundle is paste-deployed by the user — anything you add must be esbuild-inlinable (same module system as everything else). `ContentService`, `DriveApp`, `DocumentApp`, `SpreadsheetApp`, `UrlFetchApp`, `CacheService`, `ScriptApp`, `Utilities` are GAS globals — guard for `typeof X === 'undefined'` in code that also runs under vitest.
 - Cache keys that include user-supplied strings must be collision-safe — encode tuples (`JSON.stringify([company, role])`), don't `${company}:${role}`.
 - `git`: only commit when the user asks. Never `--no-verify`, never force-push to main, never amend a published commit, never skip hooks. No "Co-Authored-By" trailers unless asked. New commits, not amends.
@@ -100,6 +102,6 @@ Report format every agent uses on completion (keep it tight):
 
 - `generate.ts` imports `getRuntimeConfig` from `sidepanel/index.ts` (a circular import) — it's safe because `getRuntimeConfig` is only called inside event handlers, esbuild bundles both into one file, and importing `index.ts` under vitest is inert (`init()` early-returns when `#tab-content` is absent).
 - The background service worker still reads the legacy `chrome.storage` keys; the side panel mirror-writes them from the loaded Drive config. Don't "clean that up" by deleting the legacy keys — it's load-bearing during the migration window.
-- `prompts/shared/_validate.test.ts` is now in the vitest include glob — if you change the rule files (count, load-bearing flags, total tokens), update its assertions.
+- `extension-app/prompts/shared/_validate.test.ts` is now in the vitest include glob — if you change the rule files (count, load-bearing flags, total tokens), update its assertions.
 - The 14/15 rule files: rule 13 (output-shape) uses ASCII hyphens in role-header location markers (not em-dashes) because rule 05 caps em-dashes at 2/doc. Don't reintroduce em-dashes there.
 - Auto-revise (rule 14) is byte-identity-disciplined: instructions are validated non-whitespace, the fence-stripper does NOT `.trim()` the response (trailing newlines matter), and `computeDiff` LF-normalizes both sides before comparing. Don't undo any of that.

@@ -30,7 +30,7 @@ Details, API shapes, and caveats: [docs/v2-features.md](docs/v2-features.md). Re
 git clone https://github.com/<your-fork>/JobHelp.git
 cd JobHelp
 npm install
-node extension/scripts/build.mts
+node extension-app/extension/scripts/build.mts
 ```
 
 Then load the unpacked extension in Chrome:
@@ -40,25 +40,25 @@ Then load the unpacked extension in Chrome:
 #   chrome://extensions
 # Toggle "Developer mode" (top right), click "Load unpacked",
 # and select the built output directory:
-open -R extension/public
+open -R extension-app/extension/public
 ```
 
 The JobHelp icon appears in the toolbar; click it to open the side panel.
 
 ## Deploy the Apps Script backend
 
-The backend reads/writes your Drive, calls Claude, and logs to your tracking sheet. Build the bundle, then paste each file into a new Apps Script project.
+The backend reads/writes your Drive, calls Claude, and logs to your tracking sheet. Build the single-file bundle, then paste it into a new Apps Script project.
 
 ```bash
-node appsscript/scripts/build.mts
-ls appsscript/dist/
-# Code.gs  claude.gs  drive.gs  sheet.gs  prompt.gs  tokens.gs  cost.gs  seed.gs
+node extension-app/appsscript/scripts/build.mts
+ls extension-app/appsscript/dist/
+# Code.gs
 ```
 
 In [script.google.com](https://script.google.com):
 
 1. **New project** → rename to `JobHelp Backend`.
-2. Add one script file per `.gs` above (click **+** → **Script file**) and paste the contents.
+2. Paste the contents of `extension-app/appsscript/dist/Code.gs` into the default `Code.gs` file.
 3. **Project Settings** → **Script Properties** → add `ANTHROPIC_API_KEY` = your `sk-ant-…` key.
 4. **Deploy** → **New deployment** → type **Web app**, execute as **Me**, access **Only myself**.
 5. Copy the `/exec` URL — you'll paste it into the extension's Settings tab.
@@ -91,7 +91,7 @@ For step-by-step screenshots and troubleshooting, see [SETUP.md](SETUP.md).
 
 ## Call the backend API directly
 
-The extension talks to Apps Script over HTTP. Every request shape is defined in [`extension/src/types/api-contract.ts`](extension/src/types/api-contract.ts) and mirrored in `appsscript/src/types/`.
+The extension talks to Apps Script over HTTP. Every request shape is defined in [`extension-app/extension/src/types/api-contract.ts`](extension-app/extension/src/types/api-contract.ts) and mirrored in `extension-app/appsscript/src/types/`.
 
 Generate a resume programmatically:
 
@@ -99,7 +99,7 @@ Generate a resume programmatically:
 import type {
   GenerateRequest,
   GenerateResponse,
-} from "./extension/src/types/api-contract.js";
+} from "./extension-app/extension/src/types/api-contract.js";
 
 const APPS_SCRIPT_URL = "<your Apps Script /exec URL>";
 
@@ -135,7 +135,7 @@ console.log(data.docUrl, data.cost.totalUsd, data.keywordCoverage.rate);
 Every response is an `ApiResult<T>` discriminated union. Always branch on `ok` first.
 
 ```typescript
-import type { ApiError, GenerateResponse } from "./extension/src/types/api-contract.js";
+import type { ApiError, GenerateResponse } from "./extension-app/extension/src/types/api-contract.js";
 
 function describe(err: ApiError): string {
   switch (err.type) {
@@ -176,7 +176,7 @@ await generateResume({ ...request, model: MODELS.balanced });
 After generation, the user-edited markdown is converted via Google Docs' native export:
 
 ```typescript
-import type { FinalizeRequest, FinalizeResponse } from "./extension/src/types/api-contract.js";
+import type { FinalizeRequest, FinalizeResponse } from "./extension-app/extension/src/types/api-contract.js";
 
 const finalize: FinalizeRequest = {
   action: "finalize",
@@ -197,10 +197,10 @@ if (data.ok) {
 
 ## Customize the generation rules
 
-The markdown files in `prompts/shared/` are the single source of truth for generation behavior. They live in your Drive `rules/` folder after seeding — edit them there.
+The markdown files in `extension-app/prompts/shared/` are the single source of truth for generation behavior. They live in your Drive `rules/` folder after seeding — edit them there.
 
 ```bash
-ls prompts/shared/
+ls extension-app/prompts/shared/
 # 01-priority-hierarchy.md   06-bullet-construction.md  11-self-scan-checklist.md
 # 02-anti-fabrication.md     07-reframing-strategies.md 12-template-reproduction.md
 # 03-banned-words.md         08-bridge-language.md      13-output-shape.md
@@ -239,11 +239,11 @@ Place `.md` files in your source folder. JobHelp reads every `.md` in the folder
 - AWS (ECS, RDS, SQS)
 ```
 
-A starter template lives at [`tests/fixtures/source-materials/sample-source-materials.md`](tests/fixtures/source-materials).
+A starter template lives at [`extension-app/tests/fixtures/source-materials/sample-source-materials.md`](extension-app/tests/fixtures/source-materials).
 
 ## Add support for a new job site
 
-Scrapers live in `extension/src/scraper.ts`. Each is a function that takes the page DOM and returns a partial `ScraperOutput`. Register it in the dispatcher.
+Scrapers live in `extension-app/extension/src/scraper.ts`. Each is a function that takes the page DOM and returns a partial `ScraperOutput`. Register it in the dispatcher.
 
 ```typescript
 import type { ScraperOutput } from "./types/scraper-output.js";
@@ -263,21 +263,21 @@ if (location.hostname.endsWith("myats.example.com")) {
 }
 ```
 
-Add a fixture at `tests/fixtures/<site>.html` and a test that pins the expected output.
+Add a fixture at `extension-app/tests/fixtures/<site>.html` and a test that pins the expected output.
 
 ## Code layout
 
 ```text
-appsscript/src/
+extension-app/appsscript/src/
   Code.ts                 Web-app entry; routes ApiAction → handlers
   claude.ts               Anthropic Messages API client (forwards optional tools[])
   drive.ts                Drive helpers (readSourceFiles, createFileInFolder, createGoogleDoc, ...)
   message-builder.ts      Composes the canonical user-message shape; shared by generate + multi-version
   handlers/               One file per v2 action — research, benchmark, critique, autoRevise,
                           coverLetter, verifyHooks, multiVersion
-  types/                  api-contract.ts (mirrored from extension/src/types/), claude-api.ts, ...
+  types/                  api-contract.ts (mirrored from extension-app/extension/src/types/), claude-api.ts, ...
 
-extension/src/
+extension-app/extension/src/
   background.ts           Service worker — owns generate / finalize / list_files / write_file /
                           seed_defaults / download_template / upload_filled_docx
   sidepanel/
@@ -296,7 +296,7 @@ extension/src/
 
 ```bash
 npm test                                              # full suite (~138 tests, ~3s)
-npx vitest run extension/tests/onboarding.test.ts     # one file
+npx vitest run extension-app/extension/tests/onboarding.test.ts     # one file
 npx vitest run -t "scraper"                           # by name
 npx vitest                                            # watch mode
 ```

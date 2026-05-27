@@ -2,7 +2,7 @@
 
 Developer utilities for working on JobHelp from the command line. Each script
 is a Node 18+ ESM module with **zero external dependencies** beyond what the
-repo already pulls in for the extension/Apps Script builds.
+repo already pulls in for the extension and Apps Script builds.
 
 | Script | Purpose |
 | --- | --- |
@@ -101,7 +101,7 @@ Run `node scripts/test-handler.mts --help` for the full list with examples.
 ## `iterate-template.mts`
 
 Renders a hard-coded sample resume Markdown through the docxtemplater pipeline
-in `extension/src/lib/templateFiller.ts`, converts the resulting `.docx` to PDF
+in `extension-app/extension/src/lib/templateFiller.ts`, converts the resulting `.docx` to PDF
 via `soffice`, and rasterises a preview PNG via `pdftoppm`. Useful for
 iterating on the template visually.
 
@@ -128,7 +128,7 @@ node scripts/verify-bundle.mts --no-build   # skip the build step
 
 ### What it checks
 
-**Extension** (`extension/public/`):
+**Extension** (`extension-app/extension/public/`):
 
 - `sidepanel/index.js` exists, non-empty, under **2 MB**
 - `background.js` exists, non-empty, under **500 KB**
@@ -138,7 +138,7 @@ node scripts/verify-bundle.mts --no-build   # skip the build step
   matches the latest `## [x.y.z]` heading in `CHANGELOG.md`. **This is the
   catch for "I bumped the changelog but forgot the manifest" (or vice versa).**
 
-**Apps Script** (`appsscript/dist/Code.gs`):
+**Apps Script** (`extension-app/appsscript/dist/Code.gs`):
 
 - File exists, non-empty, under **200 KB**
 - First non-comment token is valid Apps Script JS (no leftover `import type`,
@@ -182,5 +182,5 @@ A summary block at the end prints per-phase elapsed time and total wallclock.
 Designed to run in CI (where `APPS_SCRIPT_URL` is typically absent) or
 locally as a pre-commit check.
 
-The matching vitest suite in [`tests/smoke/smoke.test.ts`](../tests/smoke/smoke.test.ts)
+The matching vitest suite in [`extension-app/tests/smoke/smoke.test.ts`](../extension-app/tests/smoke/smoke.test.ts)
 runs both scripts via `child_process.spawnSync` and asserts exit code `0`.

@@ -5,15 +5,15 @@ export default defineConfig({
     // Default to node; UI tests opt into jsdom via /** @vitest-environment jsdom */
     environment: 'node',
     environmentMatchGlobs: [
-      ['extension/tests/sidepanel/**', 'jsdom'],
-      ['extension/tests/lib/presetManager.test.ts', 'jsdom'],
+      ['extension-app/extension/tests/sidepanel/**', 'jsdom'],
+      ['extension-app/extension/tests/lib/presetManager.test.ts', 'jsdom'],
     ],
     include: [
-      'extension/tests/**/*.test.ts',
-      'appsscript/tests/**/*.test.ts',
-      'job-digest/tests/**/*.test.ts',
-      'tests/**/*.test.ts',
-      'prompts/**/*.test.ts',
+      'extension-app/extension/tests/**/*.test.ts',
+      'extension-app/appsscript/tests/**/*.test.ts',
+      'jobhelp-mcp/tests/**/*.test.ts',
+      'extension-app/tests/**/*.test.ts',
+      'extension-app/prompts/**/*.test.ts',
     ],
   },
 });

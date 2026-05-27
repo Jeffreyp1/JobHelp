@@ -3,7 +3,7 @@ export {
   applyValidatorResumeEdits,
   validateByteEqualityOutsideEdits,
   validateEditCoverage,
-} from '../../job-digest/core/resumes/validator-edits.js';
+} from '../../jobhelp-mcp/core/resumes/validator-edits.js';
 export type {
   ApplyValidatorEditsInput,
   ApplyValidatorEditsResult,
@@ -13,4 +13,4 @@ export type {
   ValidationSeverity as Severity,
   ValidatorEdit as Edit,
   ValidatorEdits as Edits,
-} from '../../job-digest/core/resumes/validator-edits.js';
+} from '../../jobhelp-mcp/core/resumes/validator-edits.js';

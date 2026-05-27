@@ -16,7 +16,7 @@ In parallel, the revise-instruction UI was `globalThis.prompt()` — the browser
 
 ### Server (Apps Script)
 
-New action `auto_revise_scoped` ([`appsscript/src/handlers/autoReviseScoped.ts`](../appsscript/src/handlers/autoReviseScoped.ts)) takes ONLY the in-scope text — one bullet line for `scope: "bullet"`, or one section's heading + bullets for `scope: "section"`. The model never sees content outside the excerpt, so byte equality of out-of-scope text is guaranteed by construction.
+New action `auto_revise_scoped` ([`extension-app/appsscript/src/handlers/autoReviseScoped.ts`](../extension-app/appsscript/src/handlers/autoReviseScoped.ts)) takes ONLY the in-scope text — one bullet line for `scope: "bullet"`, or one section's heading + bullets for `scope: "section"`. The model never sees content outside the excerpt, so byte equality of out-of-scope text is guaranteed by construction.
 
 A two-agent flow runs inside the handler:
 - **Creator**: rewrites the excerpt per the instruction. Output shape is tight (single line for bullet, JSON array of strings for section). Banned-word / structural rules injected.
@@ -26,35 +26,35 @@ A two-agent flow runs inside the handler:
 
 ### Client (extension)
 
-A new pure library [`extension/src/lib/anchor-replace.ts`](../extension/src/lib/anchor-replace.ts) handles the line replacement locally. Functions:
+A new pure library [`extension-app/extension/src/lib/anchor-replace.ts`](../extension-app/extension/src/lib/anchor-replace.ts) handles the line replacement locally. Functions:
 - `findAnchorLine(lines, draftText, sectionName)` — locates a unique bullet within its section's heading scope. Throws on missing or non-unique.
 - `applyBulletEdit(prev, draftText, sectionName, replaceWith)` — replaces the targeted line; preserves the leading `- ` marker; rejects multi-line replacements.
 - `applySectionEdit(prev, sectionName, replaceBullets)` — replaces the bullet block under a `## Heading` wholesale.
 - `validateByteEqualityOutsideEdits(prev, next, editedLineIndices, replacements)` — LCS-aligned diff walk with a per-replacement multiset budget. Defense-in-depth check that no line outside the edit site changed.
 
-The orchestration lives in `runScopedRevise` in [`extension/src/sidepanel/features/autoRevise.ts`](../extension/src/sidepanel/features/autoRevise.ts): call the scoped API → apply the edit locally → run the byte-equality check → render an inline before/after diff with Accept/Reject. Checker findings (when present) surface as warning chips above Accept; the user can still accept.
+The orchestration lives in `runScopedRevise` in [`extension-app/extension/src/sidepanel/features/autoRevise.ts`](../extension-app/extension/src/sidepanel/features/autoRevise.ts): call the scoped API → apply the edit locally → run the byte-equality check → render an inline before/after diff with Accept/Reject. Checker findings (when present) surface as warning chips above Accept; the user can still accept.
 
 ### UI
 
-The Edit/Preview tabs in the resume editor merged into a single click-to-edit view ([`resumeEditor.ts`](../extension/src/sidepanel/components/resumeEditor.ts), now split into [`.parser.ts`](../extension/src/sidepanel/components/resumeEditor.parser.ts) and [`.render.ts`](../extension/src/sidepanel/components/resumeEditor.render.ts) for the 300-line cap). Clicking a bullet's text swaps it for an inline textarea; blur or Enter commits, Esc reverts. A collapsed `<details>` at the bottom exposes raw markdown for paste-in / large rewrites.
+The Edit/Preview tabs in the resume editor merged into a single click-to-edit view ([`resumeEditor.ts`](../extension-app/extension/src/sidepanel/components/resumeEditor.ts), now split into [`.parser.ts`](../extension-app/extension/src/sidepanel/components/resumeEditor.parser.ts) and [`.render.ts`](../extension-app/extension/src/sidepanel/components/resumeEditor.render.ts) for the 300-line cap). Clicking a bullet's text swaps it for an inline textarea; blur or Enter commits, Esc reverts. A collapsed `<details>` at the bottom exposes raw markdown for paste-in / large rewrites.
 
-The `Revise` buttons next to bullets and `## ...` section headings now open an inline composer ([`reviseComposer.ts`](../extension/src/sidepanel/components/reviseComposer.ts)) directly beneath the targeted element — replacing `globalThis.prompt()`. The composer is keyboard-driven (Enter to submit, Esc to cancel, Submit disabled while empty) and accessibility-labelled. The `revise role` button was dropped entirely; a user wanting to rewrite an entire role-block uses the parent `Revise section` instead.
+The `Revise` buttons next to bullets and `## ...` section headings now open an inline composer ([`reviseComposer.ts`](../extension-app/extension/src/sidepanel/components/reviseComposer.ts)) directly beneath the targeted element — replacing `globalThis.prompt()`. The composer is keyboard-driven (Enter to submit, Esc to cancel, Submit disabled while empty) and accessibility-labelled. The `revise role` button was dropped entirely; a user wanting to rewrite an entire role-block uses the parent `Revise section` instead.
 
 ## Tests
 
-- `extension/tests/lib/anchor-replace.test.ts` — 13 cases covering anchor location, replacement, and the multiset-budget byte-equality check.
-- `appsscript/tests/handlers/autoReviseScoped.test.ts` — 8 cases including the creator-fail-then-retry flow.
-- `extension/tests/sidepanel/components/reviseComposer.test.ts` — 7 cases for keyboard, accessibility, disabled-button.
-- `extension/tests/sidepanel/resumeEditor.test.ts` — 25 cases for click-to-edit, raw-markdown details, `setEditorMarkdown` event.
-- `extension/tests/sidepanel/features/autoRevise.test.ts` — 6 cases including the disconnected-slot race guard.
+- `extension-app/extension/tests/lib/anchor-replace.test.ts` — 13 cases covering anchor location, replacement, and the multiset-budget byte-equality check.
+- `extension-app/appsscript/tests/handlers/autoReviseScoped.test.ts` — 8 cases including the creator-fail-then-retry flow.
+- `extension-app/extension/tests/sidepanel/components/reviseComposer.test.ts` — 7 cases for keyboard, accessibility, disabled-button.
+- `extension-app/extension/tests/sidepanel/resumeEditor.test.ts` — 25 cases for click-to-edit, raw-markdown details, `setEditorMarkdown` event.
+- `extension-app/extension/tests/sidepanel/features/autoRevise.test.ts` — 6 cases including the disconnected-slot race guard.
 
 Full suite: 940 passing across 58 files.
 
 ## Deployment
 
-The `appsscript/dist/Code.gs` bundle is paste-deployed (it is gitignored on purpose — users copy its contents into their Apps Script web-app project and Save). The new `auto_revise_scoped` action is routed by `Code.ts`; after pulling this branch, run `node appsscript/scripts/build.mts` and paste the new `Code.gs` into the deployed script before exercising the feature.
+The `extension-app/appsscript/dist/Code.gs` bundle is paste-deployed (it is gitignored on purpose — users copy its contents into their Apps Script web-app project and Save). The new `auto_revise_scoped` action is routed by `Code.ts`; after pulling this branch, run `node extension-app/appsscript/scripts/build.mts` and paste the new `Code.gs` into the deployed script before exercising the feature.
 
-The extension bundles (`extension/public/sidepanel/index.js`, `extension/public/background.js`) are tracked in git and rebuilt as part of this branch.
+The extension bundles (`extension-app/extension/public/sidepanel/index.js`, `extension-app/extension/public/background.js`) are tracked in git and rebuilt as part of this branch.
 
 ## What is intentionally NOT in this rewrite
 

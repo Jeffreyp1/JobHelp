@@ -11,6 +11,13 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node", "chrome"]
   },
-  "include": ["extension/src/**/*", "extension/tests/**/*", "appsscript/src/**/*", "appsscript/tests/**/*", "tests/**/*"],
+  "include": [
+    "extension-app/extension/src/**/*",
+    "extension-app/extension/tests/**/*",
+    "extension-app/appsscript/src/**/*",
+    "extension-app/appsscript/tests/**/*",
+    "extension-app/tests/**/*",
+    "extension-app/prompts/**/*.test.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }
