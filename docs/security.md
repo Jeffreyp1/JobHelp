@@ -142,7 +142,7 @@ right defense.
 ### 2.6 Browser extension permission leaks (likelihood: low)
 
 JobHelp requests `<all_urls>` host permissions (see
-`extension/public/manifest.json`) so it can talk to `script.google.com`,
+`extension-app/extension/public/manifest.json`) so it can talk to `script.google.com`,
 `api.anthropic.com`, and any job-board URL the user is viewing. A future
 permission downgrade (to a narrower allowlist) would shrink the attack
 surface. This is tracked but not blocking.
@@ -224,7 +224,7 @@ generates their own API key, and creates their own `jobhelp-config.json`.
 
 ## 4. Optional passphrase encryption (configCrypto.ts)
 
-This milestone adds `extension/src/lib/configCrypto.ts`, which provides
+This milestone adds `extension-app/extension/src/lib/configCrypto.ts`, which provides
 AES-GCM 256-bit encryption keyed by a PBKDF2-derived AES key. The intent is
 to give users who are worried about the Drive ACL misconfiguration scenario
 (§2.1) or the shoulder-surfer scenario (§2.4) a defense-in-depth option.
