@@ -1,9 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { bootstrap } from '../../mcp/src/wiring.js';
 import { buildServer } from '../../mcp/src/index.js';
+import { createDepsResolver } from '../../mcp/src/wiring-cache.js';
 import { findResource, findTool, parseToolBody, writeMinimalConfig } from './_wiring-fixtures.js';
 
 describe('mcp/wiring lazy re-bootstrap — config written after boot', () => {
@@ -103,5 +104,23 @@ describe('mcp/wiring lazy re-bootstrap — config written after boot', () => {
         }),
       ]),
     );
+  });
+
+  it('reloads config when company-sources.json changes without touching config.json', async () => {
+    const configPath = writeMinimalConfig(tmp);
+    const resolver = createDepsResolver();
+
+    const before = await resolver();
+    if (before.kind !== 'ready') throw new Error('expected ready config');
+    expect(before.config.sources.ashby).toBeUndefined();
+
+    writeFileSync(
+      join(dirname(configPath), 'company-sources.json'),
+      JSON.stringify({ ashby: { tokens: ['verified-ashby'] } }),
+    );
+
+    const after = await resolver();
+    if (after.kind !== 'ready') throw new Error('expected ready config');
+    expect(after.config.sources.ashby?.tokens).toEqual(['verified-ashby']);
   });
 });

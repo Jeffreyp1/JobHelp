@@ -35,6 +35,7 @@ import {
   validateRecency,
   validateSourceTrust,
 } from './config-ranking.js';
+import { loadCompanySourcesForConfig } from '../init/companySources.js';
 import { err, ok, type Result } from '../types/result.js';
 
 export type { RulesMode, RulesConfig };
@@ -369,6 +370,17 @@ function validate(raw: unknown): JobDigestConfig {
   };
 }
 
+function mergeCompanySources(config: JobDigestConfig, sources: SourcesConfig | undefined): JobDigestConfig {
+  if (sources === undefined) return config;
+  return {
+    ...config,
+    sources: {
+      ...config.sources,
+      ...sources,
+    },
+  };
+}
+
 function getStringCode(e: unknown): string | undefined {
   if (typeof e !== 'object' || e === null) return undefined;
   const c = Reflect.get(e, 'code');
@@ -406,7 +418,8 @@ export async function loadConfig(
 
   try {
     const config = validate(interpolated);
-    return ok(config);
+    const companySources = await loadCompanySourcesForConfig(resolved);
+    return ok(mergeCompanySources(config, companySources));
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'unknown validation error';
     return err({ type: 'validation', path: resolved, message });
