@@ -14,6 +14,7 @@
   "type": "module",
   "private": false,
   "files": [
+    "company-lists/",
     "mcp/dist/",
     "prompts-bundle/",
     "README.md",

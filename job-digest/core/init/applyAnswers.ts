@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { ok, err, type Result } from '../types/result.js';
+import { writeDefaultCompanySourcesIfMissing } from './companySources.js';
 
 export interface ApplyError {
   readonly type: 'write_error';
@@ -16,11 +17,13 @@ export interface ApplyOptions {
 
 export interface ApplyResult {
   readonly path: string;
+  readonly companySourcesPath: string;
+  readonly companySourcesCreated: boolean;
 }
 
 export const DEFAULT_RULES_MODE = 'additive' as const;
 export const DEFAULT_USER_RULES_DIR_HOME_RELATIVE = 'jobhelp/rules' as const;
-export const DEFAULT_ADZUNA_QUERIES = ['software engineer'] as const;
+export const DEFAULT_ADZUNA_QUERIES: readonly string[] = [] as const;
 
 type RulesMode = 'defaults_only' | 'additive' | 'replace';
 
@@ -59,9 +62,7 @@ function buildConfig(answers: Record<string, unknown>): Record<string, unknown> 
       appId: adzunaAppId,
       appKey: adzunaAppKey,
       country: adzunaCountry,
-      queries: isStringArray(adzunaQueries) && adzunaQueries.length > 0
-        ? adzunaQueries
-        : [...DEFAULT_ADZUNA_QUERIES],
+      queries: adzunaSearchQueries(answers),
     };
   }
 
@@ -103,6 +104,16 @@ function buildConfig(answers: Record<string, unknown>): Record<string, unknown> 
   };
 }
 
+function adzunaSearchQueries(answers: Record<string, unknown>): string[] {
+  const adzunaQueries = answers['sources.adzuna.queries'];
+  if (isStringArray(adzunaQueries) && adzunaQueries.length > 0) return adzunaQueries;
+  const roleFamily = answers['profile.roleFamily'];
+  if (isStringArray(roleFamily) && roleFamily.length > 0) return roleFamily;
+  const skills = answers['profile.skills'];
+  if (isStringArray(skills) && skills.length > 0) return skills.slice(0, 5);
+  return [...DEFAULT_ADZUNA_QUERIES];
+}
+
 export async function applyConfigAnswers(
   options: ApplyOptions,
 ): Promise<Result<ApplyResult, ApplyError>> {
@@ -112,7 +123,12 @@ export async function applyConfigAnswers(
   try {
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
-    return ok({ path: outputPath });
+    const companySources = await writeDefaultCompanySourcesIfMissing(outputPath);
+    return ok({
+      path: outputPath,
+      companySourcesPath: companySources.path,
+      companySourcesCreated: companySources.created,
+    });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'unknown write error';
     return err({ type: 'write_error', message, path: outputPath });

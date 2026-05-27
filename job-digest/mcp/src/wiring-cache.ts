@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises';
 import type { JobDigestConfig } from '../../core/types/config.js';
 import { loadConfig, type ConfigError } from '../../core/lib/config.js';
 import { createRegistry, type Registry } from '../../core/resumes/registry.js';
+import { defaultCompanySourcesPath } from '../../core/init/companySources.js';
 import type { CoreDeps } from './tools-types.js';
 import type { ResourceDeps } from './resources.js';
 import { getConfigPath, getResumesDir } from './wiring-helpers.js';
@@ -19,7 +20,8 @@ export type DepsResolution =
     };
 
 interface CachedReady {
-  readonly mtimeMs: number | null;
+  readonly configMtimeMs: number | null;
+  readonly companySourcesMtimeMs: number | null;
   readonly resolution: Extract<DepsResolution, { kind: 'ready' }>;
 }
 
@@ -40,8 +42,14 @@ export function createDepsResolver(): () => Promise<DepsResolution> {
   const state: DepsResolverState = { cached: null };
   return async (): Promise<DepsResolution> => {
     const configPath = getConfigPath();
-    const mtimeMs = await getMtimeMs(configPath);
-    if (state.cached !== null && state.cached.mtimeMs === mtimeMs && mtimeMs !== null) {
+    const configMtimeMs = await getMtimeMs(configPath);
+    const companySourcesMtimeMs = await getMtimeMs(defaultCompanySourcesPath(configPath));
+    if (
+      state.cached !== null &&
+      state.cached.configMtimeMs === configMtimeMs &&
+      state.cached.companySourcesMtimeMs === companySourcesMtimeMs &&
+      configMtimeMs !== null
+    ) {
       return state.cached.resolution;
     }
     const loaded = await loadConfig(configPath);
@@ -59,7 +67,7 @@ export function createDepsResolver(): () => Promise<DepsResolution> {
       config: loaded.value,
       registry,
     };
-    state.cached = { mtimeMs, resolution };
+    state.cached = { configMtimeMs, companySourcesMtimeMs, resolution };
     return resolution;
   };
 }

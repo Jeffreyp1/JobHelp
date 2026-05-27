@@ -57,7 +57,11 @@ export async function handleApplyConfigAnswers(
       : { answers: args.answers },
   );
   if (!result.ok) return err(toToolError(result.error));
-  return ok({ path: result.value.path });
+  return ok({
+    path: result.value.path,
+    companySourcesPath: result.value.companySourcesPath,
+    companySourcesCreated: result.value.companySourcesCreated,
+  });
 }
 
 export async function handleRegisterResume(
