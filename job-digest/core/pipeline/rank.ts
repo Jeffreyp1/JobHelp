@@ -78,7 +78,7 @@ export function computeRecencyMultiplier(
   if (ageDays <= 0) return 1.0;
   const m = Math.pow(2, -ageDays / halfLife);
   if (!Number.isFinite(m)) return 1.0;
-  return Math.min(1, Math.max(0, m));
+  return Math.min(1, Math.max(0.5, m));
 }
 
 export function computeSourceTrustMultiplier(
@@ -186,7 +186,10 @@ export async function rank(
     const bm25f = scoreBM25F(pc.corpus, i, pc.queryTerms, pc.params);
     bm25Scores.set(job.id, bm25f);
     const productScore = bm25f * recencyBoost * sourceTrust;
-    const breakdown: ScoreBreakdown = { keywordOverlap, recencyBoost, bm25f, sourceTrust };
+    const breakdown: ScoreBreakdown =
+      sourceTrustCfg.enabled === false
+        ? { keywordOverlap, recencyBoost, bm25f }
+        : { keywordOverlap, recencyBoost, bm25f, sourceTrust };
     return { job, productScore, breakdown };
   });
 

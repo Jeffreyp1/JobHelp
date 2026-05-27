@@ -31,6 +31,7 @@ export type ApiAction =
   | "benchmark_role"
   | "critique"
   | "auto_revise"
+  | "auto_revise_scoped"
   | "cover_letter"
   | "verify_cl_hooks"
   | "multi_version"
@@ -435,6 +436,47 @@ export interface AutoReviseResult {
   cost: CostBreakdown;
 }
 export type AutoReviseResponse = ApiResult<AutoReviseResult>;
+
+/**
+ * Scoped auto-revise (action: "auto_revise_scoped"). The model never sees
+ * content outside the excerpt — byte equality of out-of-scope text is
+ * guaranteed by construction rather than by post-hoc trust in the model.
+ */
+export interface AutoReviseScopedRequest {
+  scope: "bullet" | "section" | "selection";
+  /** ONLY the in-scope text. One bullet line for `bullet`; the section's
+   *  heading line + its bullets (joined by '\n') for `section`; the exact
+   *  highlighted markdown range for `selection`. */
+  excerpt: string;
+  /** Section heading text (e.g. "Experience", "Skills"). Provided as context
+   *  for the creator; the LLM is instructed NOT to modify it. */
+  sectionPath: string;
+  /** User-supplied revision instruction. Whitespace-trimmed; rejected if empty. */
+  instruction: string;
+  model: string;
+  /** When true, runs a second checker agent over the proposal. */
+  useChecker: boolean;
+}
+
+export interface AutoReviseScopedCheckerResult {
+  ok: boolean;
+  /** Empty when ok:true. Otherwise short human-readable issues, e.g.
+   *  "introduces a number that's not in the original bullet". */
+  issues: string[];
+}
+
+export interface AutoReviseScopedSuccess {
+  /** For `scope:"bullet"` — a single replacement line (no leading "- ").
+   *  For `scope:"section"` — an array of bullet lines (no leading "- "); the
+   *  section heading itself is preserved verbatim by the client.
+   *  For `scope:"selection"` — replacement markdown for the selected range. */
+  replaceWith: string | string[];
+  /** Null when useChecker was false; otherwise the checker's verdict. */
+  checker: AutoReviseScopedCheckerResult | null;
+  cost: CostBreakdown;
+}
+
+export type AutoReviseScopedResponse = ApiResult<AutoReviseScopedSuccess>;
 
 // ─── E3: cover_letter ───
 /** Voice preset for the generated cover letter. Defaults to "neutral" when omitted. */

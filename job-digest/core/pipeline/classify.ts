@@ -46,7 +46,7 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
   { pattern: /marketing|brand|content strategist|seo manager/i, family: 'marketing' },
   // 'finance' must precede 'solutions-architect' so "Accounting Technical Solutions Lead" wins.
   {
-    pattern: /\baccounting\b|financial\s+analyst|financial\s+planning|finance.{0,15}analyt|\bfinance\s+(?:systems|technical|technology)?\s*(?:lead|engineer|analyst|associate)\b/i,
+    pattern: /\baccounting\b|financial\s+analyst|financial\s+planning|\bfinance\s+(?:systems|technical|technology)?\s*(?:lead|engineer|analyst|associate)\b/i,
     family: 'finance',
   },
   // 'support' must precede 'backend' so "Support Engineer" lands here, not in backend's systems-engineer match.
@@ -61,6 +61,7 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
     family: 'ml',
   },
   { pattern: /data engineer|analytics engineer|data analyst/i, family: 'data' },
+  { pattern: /\banalytics?\s+analyst\b|\banalyst\b/i, family: 'analyst' },
   {
     pattern: /security engineer|application security|appsec|offensive security|red team/i,
     family: 'security',
@@ -76,7 +77,7 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
   // don't fall into backend's systems-engineer match. The (solutions?|services) alternation keeps the
   // immediate (architect|engineer|lead) constraint so "Customer Service Representative" never matches.
   {
-    pattern: /\b(?:solutions?\s+(?:architect|engineer|lead)|services\s+(?:architect|lead))\b/i,
+    pattern: /\b(?:solutions\s+(?:architect|engineer|lead)|services\s+(?:architect|lead))\b/i,
     family: 'solutions-architect',
   },
   {

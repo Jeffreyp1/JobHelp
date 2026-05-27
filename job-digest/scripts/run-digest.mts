@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { runDigest } from '../core/digest/generate.js';
-import { aiFilter, buildAIFilterPrompt, type AIJudgment, type Judger, type Tier } from '../core/pipeline/ai-filter.js';
+import { aiFilter, type AIJudgment, type Judger, type Tier } from '../core/pipeline/ai-filter.js';
 import type { JobDigestConfig, ProfileConfig, RankedJob } from '../core/types/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -84,22 +84,6 @@ const config: JobDigestConfig = {
   output: { dir: '/tmp/jobhelp-demo' },
 };
 
-async function claudeSdkJudger(jobs: readonly RankedJob[], profile: ProfileConfig): Promise<readonly AIJudgment[]> {
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
-  const client = new Anthropic();
-  const prompt = buildAIFilterPrompt(jobs, profile);
-  const res = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: prompt }],
-  });
-  const text = res.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n');
-  return parseJudgmentLines(text);
-}
-
 function parseJudgmentLines(text: string): readonly AIJudgment[] {
   const out: AIJudgment[] = [];
   for (const line of text.split('\n')) {
@@ -129,10 +113,7 @@ function pickJudger(): { judger: Judger | null; mode: string } {
   if (preload !== undefined && preload.length > 0 && existsSync(preload)) {
     return { judger: preloadedJudger(preload), mode: `preloaded:${preload}` };
   }
-  if (process.env['ANTHROPIC_API_KEY']) {
-    return { judger: claudeSdkJudger, mode: 'claude-sdk:haiku-4-5' };
-  }
-  return { judger: null, mode: 'disabled (set ANTHROPIC_API_KEY or AI_JUDGMENT_FILE)' };
+  return { judger: null, mode: 'disabled (set AI_JUDGMENT_FILE)' };
 }
 
 const t0 = Date.now();

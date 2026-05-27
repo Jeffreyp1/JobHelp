@@ -318,6 +318,14 @@ var ApiClient = class {
   async autoRevise(req) {
     return this.post({ action: "auto_revise", ...req });
   }
+  /**
+   * Scoped auto-revise: the model only sees the in-scope excerpt (one bullet
+   * or one section's bullets), guaranteeing byte equality of out-of-scope text
+   * by construction. Optional checker agent verifies the proposed replacement.
+   */
+  async autoReviseScoped(req) {
+    return this.post({ action: "auto_revise_scoped", ...req });
+  }
   // ─── feature owner: E3 ───────────────────────────────────────────────────
   /**
    * Generate a HOOK/EVIDENCE/CLOSING cover letter (250-300 words) from the

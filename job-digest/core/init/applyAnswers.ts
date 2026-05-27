@@ -20,6 +20,7 @@ export interface ApplyResult {
 
 export const DEFAULT_RULES_MODE = 'additive' as const;
 export const DEFAULT_USER_RULES_DIR_HOME_RELATIVE = 'jobhelp/rules' as const;
+export const DEFAULT_ADZUNA_QUERIES = ['software engineer'] as const;
 
 type RulesMode = 'defaults_only' | 'additive' | 'replace';
 
@@ -28,6 +29,7 @@ interface SourcesBlock {
     appId: string;
     appKey: string;
     country: string;
+    queries: string[];
   };
   greenhouse?: { tokens: string[] };
   lever?: { slugs: string[] };
@@ -47,12 +49,20 @@ function buildConfig(answers: Record<string, unknown>): Record<string, unknown> 
   const adzunaAppId = answers['sources.adzuna.appId'];
   const adzunaAppKey = answers['sources.adzuna.appKey'];
   const adzunaCountry = answers['sources.adzuna.country'];
+  const adzunaQueries = answers['sources.adzuna.queries'];
   if (
     typeof adzunaAppId === 'string' && adzunaAppId.length > 0 &&
     typeof adzunaAppKey === 'string' && adzunaAppKey.length > 0 &&
     typeof adzunaCountry === 'string' && adzunaCountry.length > 0
   ) {
-    sources.adzuna = { appId: adzunaAppId, appKey: adzunaAppKey, country: adzunaCountry };
+    sources.adzuna = {
+      appId: adzunaAppId,
+      appKey: adzunaAppKey,
+      country: adzunaCountry,
+      queries: isStringArray(adzunaQueries) && adzunaQueries.length > 0
+        ? adzunaQueries
+        : [...DEFAULT_ADZUNA_QUERIES],
+    };
   }
 
   const ghTokens = answers['sources.greenhouse.tokens'];

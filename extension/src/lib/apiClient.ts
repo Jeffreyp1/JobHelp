@@ -34,6 +34,8 @@ import type {
   CritiqueResponse,
   AutoReviseRequest,
   AutoReviseResponse,
+  AutoReviseScopedRequest,
+  AutoReviseScopedResponse,
   CoverLetterRequest,
   CoverLetterResponse,
   VerifyClHooksRequest,
@@ -258,6 +260,17 @@ export class ApiClient {
     req: Omit<AutoReviseRequest, 'action'>,
   ): Promise<AutoReviseResponse> {
     return this.post<AutoReviseResponse>({ action: 'auto_revise', ...req });
+  }
+
+  /**
+   * Scoped auto-revise: the model only sees the in-scope excerpt (one bullet
+   * or one section's bullets), guaranteeing byte equality of out-of-scope text
+   * by construction. Optional checker agent verifies the proposed replacement.
+   */
+  async autoReviseScoped(
+    req: AutoReviseScopedRequest,
+  ): Promise<AutoReviseScopedResponse> {
+    return this.post<AutoReviseScopedResponse>({ action: 'auto_revise_scoped', ...req });
   }
 
   // ─── feature owner: E3 ───────────────────────────────────────────────────

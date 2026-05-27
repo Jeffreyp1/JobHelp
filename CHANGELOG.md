@@ -4,6 +4,12 @@ All notable changes to JobHelp are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Auto-revise rewrite (scoped):** Replaced the broken bullet/section revise flow. The model now only sees the in-scope excerpt (one bullet or one section's bullets), so byte equality of out-of-scope text is guaranteed by construction rather than by post-hoc validation. A new `auto_revise_scoped` action runs a two-agent creator+checker prompt with one retry on checker failure; checker findings surface as warning chips in the UI. The browser-native `prompt()` dialog is replaced with an inline composer that opens beneath the targeted bullet or section heading. Edit/Preview tabs in the resume editor were merged into a single click-to-edit view; a collapsed `<details>` exposes raw markdown for power edits. `whole-resume` revise keeps the existing full-document handler.
+
 ## [0.3.0] - 2026-05-12
 
 Job pipeline — Phase 1 of the auto-apply architecture (see [docs/research/auto-apply-architecture.md](docs/research/auto-apply-architecture.md)): discover relevant postings, rank them against your resume, track them in a sheet, one-click "tailor resume" reusing the existing engine. No auto-submit — per the research that's the part with no API / ToS violations / LinkedIn perma-bans; the flow is discover → tailor → you click apply & submit.

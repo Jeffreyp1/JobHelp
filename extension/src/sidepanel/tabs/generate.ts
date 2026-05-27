@@ -20,8 +20,10 @@ import { renderJobInsightsCard } from '../components/jobInsights.js';
 import { renderToggleRow } from '../components/toggleRow.js';
 import { renderCostEstimator } from '../components/costEstimator.js';
 import {
+  lookupBullet,
   renderResumeEditor,
   type ResumeReviseEventDetail,
+  type ResumeReviseScope,
   type ResumeSaveResult,
 } from '../components/resumeEditor.js';
 import { estimateCost } from '../../lib/costCalculator.js';
@@ -47,11 +49,17 @@ import type {
   VerifyClHooksResponse,
   MultiVersionRequest,
   MultiVersionResponse,
-  ReviseTargetScope,
 } from '../../types/api-contract.js';
 import { renderCritiqueResult } from '../features/critique.js';
-import { renderRevisionDiff } from '../features/autoRevise.js';
+import { runScopedRevise } from '../features/autoRevise.js';
+import { renderReviseComposer } from '../components/reviseComposer.js';
+import { setEditorMarkdown } from '../components/resumeEditor.js';
+import type {
+  AutoReviseScopedRequest,
+  AutoReviseScopedResponse,
+} from '../../types/api-contract.js';
 import { getRuntimeConfig } from '../index.js';
+import { log } from '../../lib/structuredLog.js';
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-4-6';
@@ -140,6 +148,7 @@ export interface GenerateTabHooks {
   onBenchmarkRole?: (req: Omit<BenchmarkRoleRequest, 'action'>) => Promise<BenchmarkRoleResponse>;
   onCritique?: (req: Omit<CritiqueRequest, 'action'>) => Promise<CritiqueResponse>;
   onAutoRevise?: (req: Omit<AutoReviseRequest, 'action'>) => Promise<AutoReviseResponse>;
+  onAutoReviseScoped?: (req: AutoReviseScopedRequest) => Promise<AutoReviseScopedResponse>;
   onCoverLetter?: (req: Omit<CoverLetterRequest, 'action'>) => Promise<CoverLetterResponse>;
   onVerifyClHooks?: (req: Omit<VerifyClHooksRequest, 'action'>) => Promise<VerifyClHooksResponse>;
   onMultiVersion?: (req: Omit<MultiVersionRequest, 'action'>) => Promise<MultiVersionResponse>;
@@ -192,6 +201,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
   // Reference to the resume editor's textarea so finalize can read the
   // current (potentially user-edited) markdown.
   let currentMarkdownGetter: (() => string) | null = null;
+  let editorEl: HTMLElement | null = null;
 
   // ─── 1. Job Insights card ─────────────────────────────────────────
   const insightsContainer = document.createElement('div');
@@ -311,11 +321,6 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       onModelChange: (m) => { state.autoReviseModel = m; void persistTogglesState(); renderCostBlock(); },
     }),
   );
-  const reviseDiffSlot = document.createElement('div');
-  reviseDiffSlot.setAttribute('data-revise-diff', '');
-  reviseDiffSlot.className = 'feature-result feature-result--revise';
-  togglesBlock.appendChild(reviseDiffSlot);
-
   // Multi-version (count + model)
   togglesBlock.appendChild(
     renderToggleRow({
@@ -619,7 +624,6 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     // Clear all preview/result slots before starting.
     resumeSlot.replaceChildren();
     critiqueResultSlot.replaceChildren();
-    reviseDiffSlot.replaceChildren();
     clResultSlot.replaceChildren();
     verifyResultSlot.replaceChildren();
     finalizeStatusEl.textContent = '';
@@ -758,13 +762,26 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       initialMarkdown: md,
       onSave: (latest) => hooks.onSaveResume(latest),
     });
-    // Wire up the markdown getter so finalize reads the current textarea value.
-    const textarea = editor.querySelector<HTMLTextAreaElement>('.resume-editor__textarea');
-    currentMarkdownGetter = textarea ? () => textarea.value : () => md;
+    editorEl = editor;
+    const rawTa = editor.querySelector<HTMLTextAreaElement>('.resume-editor__raw-textarea');
+    currentMarkdownGetter = rawTa ? () => rawTa.value : () => md;
     resumeSlot.replaceChildren(editor);
     editor.addEventListener('resume:revise', (ev) => {
       const detail = (ev as CustomEvent<ResumeReviseEventDetail>).detail;
-      void runAutoReviseScoped(detail.scope, detail.currentMarkdown);
+      let anchorEl: HTMLElement = editor;
+      if (detail.scope.kind === 'bullet') {
+        anchorEl =
+          editor.querySelector<HTMLElement>(`[data-bullet-id="${detail.scope.bulletId}"]`) ?? editor;
+      } else if (detail.scope.kind === 'section') {
+        const { sectionName } = detail.scope;
+        anchorEl =
+          Array.from(editor.querySelectorAll<HTMLElement>('[data-section-name]')).find(
+            (el) => el.dataset.sectionName === sectionName,
+          ) ?? editor;
+      } else if (detail.scope.kind === 'selection') {
+        anchorEl = editor.querySelector<HTMLElement>('.resume-editor__codemirror') ?? editor;
+      }
+      void runAutoReviseScoped(detail.scope, anchorEl);
     });
     // Auto-scroll the panel to the new preview so the user sees it landed.
     requestAnimationFrame(() => {
@@ -838,9 +855,6 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     if (state.coverLetterEnabled && hooks.onCoverLetter && jobFolderId) {
       tasks.push(runCoverLetter(resumeMd, jobFolderId));
     }
-    // Auto-revise is now triggered by the resume editor's own "Revise…"
-    // buttons (which dispatch a 'resume:revise' CustomEvent). No redundant
-    // whole-resume button needed here.
 
     await Promise.allSettled(tasks);
   }
@@ -967,39 +981,133 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
   }
 
   async function runAutoReviseScoped(
-    scope: ReviseTargetScope,
-    currentMd: string,
+    scope: ResumeReviseScope,
+    anchorEl: HTMLElement,
   ): Promise<void> {
-    if (!hooks.onAutoRevise) return;
-    const instruction = typeof globalThis !== 'undefined' && globalThis.prompt
-      ? globalThis.prompt('Revision instruction (e.g. "tighten verbs, add metrics"):')
-      : null;
-    if (!instruction || !instruction.trim()) return;
-
-    const md = currentMarkdownGetter ? currentMarkdownGetter() : currentMd;
-
-    reviseDiffSlot.textContent = 'Revising…';
-    try {
-      const result = await hooks.onAutoRevise({
-        currentMarkdown: md,
-        targetScope: scope,
-        instruction: instruction.trim(),
-        model: state.autoReviseModel,
-      });
-      renderRevisionDiff(root, result, {
-        onReviseRequest: () => { /* one-shot */ },
-        onRevisionAccepted: (revisedMd: string) => {
-          showResume(revisedMd);
-          reviseDiffSlot.replaceChildren();
-        },
-        onRevisionRejected: () => {
-          reviseDiffSlot.replaceChildren();
-        },
-      });
-    } catch (e) {
-      console.error('[generate] auto-revise threw:', e);
-      reviseDiffSlot.textContent = `Auto-revise failed: ${(e as Error).message}`;
+    if (scope.kind === 'whole-resume') {
+      const md = currentMarkdownGetter ? currentMarkdownGetter() : '';
+      await runWholeResumeRevise(md, anchorEl);
+      return;
     }
+    if (scope.kind !== 'bullet' && scope.kind !== 'section' && scope.kind !== 'selection') return;
+    const scopeKind: 'bullet' | 'section' | 'selection' = scope.kind;
+
+    const scopedHook = hooks.onAutoReviseScoped;
+    if (!scopedHook) return;
+
+    const composerHost = document.createElement('div');
+    composerHost.className = 'revise-composer-host';
+    const existing = anchorEl.nextElementSibling;
+    if (existing?.classList.contains('revise-composer-host')) existing.remove();
+    anchorEl.insertAdjacentElement('afterend', composerHost);
+
+    const closeComposer = (): void => composerHost.remove();
+
+    const composer = renderReviseComposer({
+      scope: scopeKind,
+      onCancel: closeComposer,
+      onSubmit: (instruction) => {
+        const md = currentMarkdownGetter ? currentMarkdownGetter() : '';
+        let bulletText: string | undefined;
+        let sectionPath: string;
+        if (scopeKind === 'bullet') {
+          const bulletId = scope.kind === 'bullet' ? scope.bulletId : '';
+          const looked = bulletId ? lookupBullet(md, bulletId) : null;
+          if (!looked) {
+            composerHost.replaceChildren();
+            const err = document.createElement('div');
+            err.className = 'revise-error';
+            err.textContent =
+              'Could not locate the bullet in your resume. Try clicking Revise again after editing.';
+            composerHost.appendChild(err);
+            return;
+          }
+          bulletText = looked.text;
+          sectionPath = looked.sectionName;
+        } else if (scope.kind === 'selection') {
+          sectionPath = scope.sectionName;
+        } else {
+          sectionPath = scope.kind === 'section' ? scope.sectionName : '';
+        }
+
+        composerHost.replaceChildren();
+        void runScopedRevise({
+          api: { autoReviseScoped: scopedHook },
+          slot: composerHost,
+          scope: scopeKind,
+          currentMarkdown: md,
+          getCurrentMarkdown: () => (currentMarkdownGetter ? currentMarkdownGetter() : md),
+          bulletText,
+          selection: scope.kind === 'selection' ? scope : undefined,
+          sectionPath,
+          instruction,
+          model: state.autoReviseModel,
+          useChecker: true,
+          onAccept: (nextMd) => {
+            if (editorEl) setEditorMarkdown(editorEl, nextMd);
+            closeComposer();
+          },
+          onReject: closeComposer,
+        });
+      },
+    });
+    composerHost.appendChild(composer);
+  }
+
+  async function runWholeResumeRevise(md: string, anchorEl: HTMLElement): Promise<void> {
+    const wholeHook = hooks.onAutoRevise;
+    if (!wholeHook) return;
+
+    const composerHost = document.createElement('div');
+    composerHost.className = 'revise-composer-host';
+    const existing = anchorEl.nextElementSibling;
+    if (existing?.classList.contains('revise-composer-host')) existing.remove();
+    anchorEl.insertAdjacentElement('afterend', composerHost);
+
+    const closeComposer = (): void => composerHost.remove();
+
+    const composer = renderReviseComposer({
+      scope: 'whole-resume',
+      onCancel: closeComposer,
+      onSubmit: async (instruction) => {
+        composerHost.replaceChildren();
+        const loading = document.createElement('div');
+        loading.className = 'revise-loading';
+        loading.textContent = 'Revising whole resume…';
+        composerHost.appendChild(loading);
+        try {
+          const resp = await wholeHook({
+            currentMarkdown: md,
+            targetScope: { kind: 'whole-resume' },
+            instruction,
+            model: state.autoReviseModel,
+          });
+          if (!composerHost.isConnected) {
+            log('debug', 'whole-resume revise discarded: composer closed', { scope: 'whole-resume' });
+            return;
+          }
+          if (!resp.ok) {
+            const err = document.createElement('div');
+            err.className = 'revise-error';
+            err.textContent = `Revise failed: ${resp.error.message}`;
+            composerHost.replaceChildren(err);
+            return;
+          }
+          if (editorEl) setEditorMarkdown(editorEl, resp.revisedMarkdown);
+          closeComposer();
+        } catch (e) {
+          if (!composerHost.isConnected) {
+            log('debug', 'whole-resume revise discarded: composer closed', { scope: 'whole-resume' });
+            return;
+          }
+          const err = document.createElement('div');
+          err.className = 'revise-error';
+          err.textContent = `Revise failed: ${e instanceof Error ? e.message : String(e)}`;
+          composerHost.replaceChildren(err);
+        }
+      },
+    });
+    composerHost.appendChild(composer);
   }
 
   function renderMultiVersionResult(result: MultiVersionResponse): void {
