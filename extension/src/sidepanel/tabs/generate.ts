@@ -985,8 +985,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     anchorEl: HTMLElement,
   ): Promise<void> {
     if (scope.kind === 'whole-resume') {
-      const md = currentMarkdownGetter ? currentMarkdownGetter() : '';
-      await runWholeResumeRevise(md, anchorEl);
+      await runWholeResumeRevise(anchorEl);
       return;
     }
     if (scope.kind !== 'bullet' && scope.kind !== 'section' && scope.kind !== 'selection') return;
@@ -1054,7 +1053,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
     composerHost.appendChild(composer);
   }
 
-  async function runWholeResumeRevise(md: string, anchorEl: HTMLElement): Promise<void> {
+  async function runWholeResumeRevise(anchorEl: HTMLElement): Promise<void> {
     const wholeHook = hooks.onAutoRevise;
     if (!wholeHook) return;
 
@@ -1070,6 +1069,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
       scope: 'whole-resume',
       onCancel: closeComposer,
       onSubmit: async (instruction) => {
+        const submittedMarkdown = currentMarkdownGetter ? currentMarkdownGetter() : '';
         composerHost.replaceChildren();
         const loading = document.createElement('div');
         loading.className = 'revise-loading';
@@ -1077,7 +1077,7 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
         composerHost.appendChild(loading);
         try {
           const resp = await wholeHook({
-            currentMarkdown: md,
+            currentMarkdown: submittedMarkdown,
             targetScope: { kind: 'whole-resume' },
             instruction,
             model: state.autoReviseModel,
@@ -1093,8 +1093,52 @@ export function renderGenerateTab(hooks: GenerateTabHooks): GenerateTabControlle
             composerHost.replaceChildren(err);
             return;
           }
-          if (editorEl) setEditorMarkdown(editorEl, resp.revisedMarkdown);
-          closeComposer();
+          const diffBlock = document.createElement('div');
+          diffBlock.className = 'revise-diff';
+
+          const row = document.createElement('div');
+          row.className = 'revise-diff__row revise-diff__row--whole-resume';
+          const before = document.createElement('pre');
+          before.className = 'revise-diff__before';
+          before.textContent = submittedMarkdown;
+          const after = document.createElement('pre');
+          after.className = 'revise-diff__after';
+          after.textContent = resp.revisedMarkdown;
+          row.appendChild(before);
+          row.appendChild(after);
+          diffBlock.appendChild(row);
+
+          const actions = document.createElement('div');
+          actions.className = 'revise-actions';
+          const accept = document.createElement('button');
+          accept.type = 'button';
+          accept.className = 'btn btn-primary';
+          accept.setAttribute('data-action', 'accept');
+          accept.textContent = 'Accept';
+          const reject = document.createElement('button');
+          reject.type = 'button';
+          reject.className = 'btn btn-secondary';
+          reject.setAttribute('data-action', 'reject');
+          reject.textContent = 'Reject';
+          actions.appendChild(accept);
+          actions.appendChild(reject);
+          diffBlock.appendChild(actions);
+
+          accept.addEventListener('click', () => {
+            const latestMarkdown = currentMarkdownGetter ? currentMarkdownGetter() : submittedMarkdown;
+            if (latestMarkdown !== submittedMarkdown) {
+              const err = document.createElement('div');
+              err.className = 'revise-error';
+              err.textContent =
+                'Resume changed since this revision was requested. Review the latest resume and retry.';
+              composerHost.replaceChildren(err);
+              return;
+            }
+            if (editorEl) setEditorMarkdown(editorEl, resp.revisedMarkdown);
+            closeComposer();
+          });
+          reject.addEventListener('click', closeComposer);
+          composerHost.replaceChildren(diffBlock);
         } catch (e) {
           if (!composerHost.isConnected) {
             log('debug', 'whole-resume revise discarded: composer closed', { scope: 'whole-resume' });
