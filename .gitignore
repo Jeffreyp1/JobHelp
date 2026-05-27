@@ -17,6 +17,7 @@ dist/
 jobhelp-config.json
 
 # Local/private AI workflow artifacts
+.local/
 .codex/
 .agents/
 job-digest/scripts/companies-all.json
@@ -34,6 +35,10 @@ job-digest/scripts/companies-report.md
 .superpowers/
 
 # Personal job-search artifacts (NEVER commit — these contain real resume, scraped JDs, etc.)
+applications/
+digests/
+resumes/
+state.json
 resume-dump/
 out/
 job-descriptions/
@@ -87,7 +92,7 @@ tests/fixtures/_validate.test.ts
 
 # Superpowers planning/spec docs — maintained locally only
 docs/superpowers/plans/
-docs/superpowers/specs/2026-05-17-resume-tailor-validator-design.md
+docs/superpowers/specs/
 prompts/shared/_validate.test.ts
 **/*.test.ts
 **/*.test.mts

@@ -101,7 +101,7 @@ import type {
   GenerateResponse,
 } from "./extension/src/types/api-contract.js";
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/…/exec";
+const APPS_SCRIPT_URL = "<your Apps Script /exec URL>";
 
 const request: GenerateRequest = {
   action: "generate",
