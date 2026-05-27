@@ -20,11 +20,15 @@ export interface StartApplicationInput {
   readonly role: string;
   readonly date: string;
   readonly basedOnResumeName?: string;
+  readonly jobDescription?: string;
+  readonly url?: string;
+  readonly location?: string;
 }
 
 export interface StartApplicationResult {
   readonly dir: string;
   readonly created: boolean;
+  readonly jobDescriptionPath?: string;
 }
 
 export interface WriteApplicationOutputInput {
@@ -35,6 +39,10 @@ export interface WriteApplicationOutputInput {
 
 export interface WriteApplicationOutputResult {
   readonly path: string;
+  readonly applicationDir: string;
+  readonly fileName: string;
+  readonly kind: ApplicationKind;
+  readonly latestPath: string;
   readonly version?: number;
 }
 
@@ -42,6 +50,7 @@ export interface ApplicationVersion {
   readonly version: number;
   readonly path: string;
   readonly fileName: string;
+  readonly writtenAt: string;
 }
 
 export interface RecentApplication {
@@ -50,6 +59,8 @@ export interface RecentApplication {
   readonly role: string;
   readonly date: string;
   readonly dir: string;
+  readonly url?: string;
+  readonly location?: string;
   readonly basedOnResumeName?: string;
   readonly createdAt: string;
   readonly updatedAt: string;

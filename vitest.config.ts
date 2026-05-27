@@ -11,6 +11,7 @@ export default defineConfig({
     include: [
       'extension/tests/**/*.test.ts',
       'appsscript/tests/**/*.test.ts',
+      'job-digest/tests/**/*.test.ts',
       'tests/**/*.test.ts',
       'prompts/**/*.test.ts',
     ],

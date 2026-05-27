@@ -415,6 +415,50 @@ main {
   font-weight: 600;
 }
 
+.resume-editor__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.resume-editor__codemirror {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.resume-editor__codemirror[hidden] {
+  display: none;
+}
+
+.resume-editor__codemirror .cm-editor {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 260px;
+  font-size: 12px;
+}
+
+.resume-editor__codemirror .cm-editor.cm-focused {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.resume-editor__codemirror .cm-scroller {
+  font-family: var(--font-mono);
+  max-height: 360px;
+}
+
+.resume-editor__codemirror .cm-content {
+  padding: var(--space-2);
+}
+
+.resume-editor__codemirror .cm-line {
+  line-height: 1.5;
+}
+
 .resume-editor__split {
   display: grid;
   grid-template-columns: 1fr;
@@ -462,6 +506,7 @@ main {
 .resume-editor__preview h2 { font-size: 14px; margin: 6px 0; }
 .resume-editor__preview h3 { font-size: 13px; margin: 6px 0; }
 .resume-editor__preview ul, .resume-editor__preview ol { padding-left: 18px; }
+.resume-bullet__text { cursor: text; }
 .resume-editor__preview code {
   background: var(--code-bg);
   padding: 1px 4px;
@@ -478,6 +523,9 @@ main {
 .resume-editor__actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
   margin-top: var(--space-3);
 }
 

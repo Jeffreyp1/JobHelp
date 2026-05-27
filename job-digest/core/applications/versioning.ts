@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   APPLICATION_KINDS,
@@ -62,11 +62,14 @@ export async function listVersions(
   kind: ApplicationKind,
 ): Promise<ApplicationVersion[]> {
   if (!VERSIONED_KINDS.has(kind)) {
+    const path = join(dir, fileNameForKind(kind, 1));
+    const writtenAt = await readWrittenAt(path);
     return [
       {
         version: 1,
-        path: join(dir, fileNameForKind(kind, 1)),
+        path,
         fileName: fileNameForKind(kind, 1),
+        writtenAt,
       },
     ];
   }
@@ -79,8 +82,19 @@ export async function listVersions(
     if (numText === undefined) continue;
     const n = Number.parseInt(numText, 10);
     if (Number.isNaN(n)) continue;
-    versions.push({ version: n, path: join(dir, file), fileName: file });
+    const path = join(dir, file);
+    versions.push({ version: n, path, fileName: file, writtenAt: await readWrittenAt(path) });
   }
   versions.sort((a, b) => a.version - b.version);
   return versions;
+}
+
+async function readWrittenAt(path: string): Promise<string> {
+  try {
+    const info = await stat(path);
+    return info.mtime.toISOString();
+  } catch (e: unknown) {
+    if (getStringCode(e) === 'ENOENT') return '';
+    throw e;
+  }
 }

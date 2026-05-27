@@ -22,7 +22,7 @@ export const DEFAULT_MAX_AGE: MaxAgeConfig = {
 };
 
 export const DEFAULT_SOURCE_TRUST: SourceTrustConfig = {
-  enabled: true,
+  enabled: false,
   weights: {
     greenhouse: 1.0,
     lever: 1.0,
