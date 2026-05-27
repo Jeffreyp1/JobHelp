@@ -234,7 +234,15 @@ export function renderResumeEditor(props: ResumeEditorProps): HTMLElement {
   preview.addEventListener('mouseup', () => {
     const bullet = selectedBulletIn(preview);
     const bulletId = bullet?.dataset.bulletId;
-    if (bulletId) emitRevise({ kind: 'bullet', bulletId });
+    if (!bulletId) return;
+    const text = bullet.querySelector<HTMLElement>('.resume-bullet__text');
+    if (text) {
+      text.dataset.suppressNextEdit = 'true';
+      window.setTimeout(() => {
+        delete text.dataset.suppressNextEdit;
+      }, 0);
+    }
+    emitRevise({ kind: 'bullet', bulletId });
   });
 
   wrap.addEventListener('click', (ev) => {
