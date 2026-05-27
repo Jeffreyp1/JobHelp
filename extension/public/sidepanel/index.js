@@ -28425,6 +28425,10 @@ function renderBullet(b, ctx) {
     makeReviseButton("Revise", "revise-bullet", { "data-bullet-id": b.bulletId })
   );
   span.addEventListener("click", () => {
+    if (span.dataset.suppressNextEdit === "true") {
+      delete span.dataset.suppressNextEdit;
+      return;
+    }
     if (hasSelectionInside(span)) return;
     const ta = document.createElement("textarea");
     ta.className = "resume-bullet__editor";
@@ -28702,7 +28706,15 @@ function renderResumeEditor(props) {
   preview.addEventListener("mouseup", () => {
     const bullet = selectedBulletIn(preview);
     const bulletId = bullet?.dataset.bulletId;
-    if (bulletId) emitRevise({ kind: "bullet", bulletId });
+    if (!bulletId) return;
+    const text = bullet.querySelector(".resume-bullet__text");
+    if (text) {
+      text.dataset.suppressNextEdit = "true";
+      window.setTimeout(() => {
+        delete text.dataset.suppressNextEdit;
+      }, 0);
+    }
+    emitRevise({ kind: "bullet", bulletId });
   });
   wrap.addEventListener("click", (ev) => {
     const target = ev.target;

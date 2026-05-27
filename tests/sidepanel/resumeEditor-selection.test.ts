@@ -68,6 +68,30 @@ describe('resume editor rendered preview selection', () => {
     document.body.removeChild(editor);
   });
 
+  it('does not turn a highlighted bullet into the direct text editor', () => {
+    const editor = editorWith();
+    document.body.appendChild(editor);
+    const events: ResumeReviseEventDetail[] = [];
+    editor.addEventListener('resume:revise', (ev) => {
+      events.push((ev as CustomEvent<ResumeReviseEventDetail>).detail);
+    });
+
+    const bullet = editor.querySelector<HTMLLIElement>('li[data-bullet-id]')!;
+    const text = bullet.querySelector<HTMLElement>('.resume-bullet__text')!;
+    const strong = bullet.querySelector<HTMLElement>('strong')!;
+    selectNodeContents(strong);
+    strong.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    window.getSelection()?.removeAllRanges();
+    text.click();
+
+    expect(events[0]?.scope).toEqual({
+      kind: 'bullet',
+      bulletId: bullet.dataset.bulletId,
+    });
+    expect(editor.querySelector('.resume-bullet__editor')).toBeNull();
+    document.body.removeChild(editor);
+  });
+
   it('does not emit a revise event for an ambiguous cross-bullet highlight', () => {
     const editor = editorWith();
     document.body.appendChild(editor);
