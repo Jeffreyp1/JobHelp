@@ -80,16 +80,16 @@ Edit `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global):
 
 ## First-run setup
 
-On first use, call `init_config` — the AI walks you through each field (Adzuna keys, Greenhouse board tokens, Lever slugs, profile location/salary/skills) and writes `~/.config/jobhelp/config.json`. Or hand-edit that file directly; either works.
+On first use, call `init_config`. It returns wizard prompts for the AI to ask you about profile, source, rules, and output settings. After collecting those answers, call `apply_config_answers` to persist `~/.config/jobhelp/config.json`. Or hand-edit that file directly; either works.
 
-Any tool call other than `init_config` returns a typed error if the config file is missing, with instructions to run `init_config`.
+Configuration-dependent tool calls return a typed error if the config file is missing, with instructions to run `init_config`.
 
 ## Tools
 
 | Tool | What it does |
 |------|-------------|
-| `init_config` | First-run setup: walks through config fields, writes `~/.config/jobhelp/config.json` |
-| `apply_config_answers` | Write answers collected from `init_config` into the config file |
+| `init_config` | First-run helper: returns wizard prompts for `~/.config/jobhelp/config.json` |
+| `apply_config_answers` | Persist answers collected from `init_config` into the config file |
 | `register_resume` | Store a resume under a friendly name (e.g. `backend`, `ml-engineer`); markdown only, any number of resumes |
 | `set_active_resume` | Switch the active resume; with no name, lists registered resumes |
 | `find_matching_jobs` | Discover jobs from all enabled sources, score against the active resume, return ranked digest |
@@ -159,7 +159,7 @@ All output lives under `~/jobhelp/`:
   state.json       registry index + application history
 ```
 
-Config: `~/.config/jobhelp/config.json` (override via `JOBHELP_CONFIG` env var).
+Config: `~/.config/jobhelp/config.json` (override via `JOBHELP_CONFIG_PATH` env var).
 Logs: `~/.config/jobhelp/log.jsonl`.
 
 ## License

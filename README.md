@@ -13,7 +13,8 @@ The two products share the same repo and rule philosophy, but they are intention
 | --- | --- |
 | Tailor a resume from the job page currently open in Chrome | Extension app |
 | Generate a Google Doc, DOCX, PDF, cover letter, critique, and tracking-sheet row | Extension app |
-| Discover and rank jobs from configured job sources | JobHelp MCP |
+| Run the Chrome side-panel Jobs digest for extension-supported sources | Extension app |
+| Discover and rank jobs from the full configured source-adapter catalog | JobHelp MCP |
 | Work inside Claude Code, Claude Desktop, Cursor, or another local MCP client | JobHelp MCP |
 | Batch-tailor resumes with validation and application folders | JobHelp MCP |
 
@@ -92,6 +93,8 @@ The extension app is the browser-first workflow:
 5. Generate a tailored resume through your Apps Script backend.
 6. Save, finalize to DOCX/PDF, generate optional cover letters or critiques, and log the application to Google Sheets.
 
+The extension also includes a Jobs tab for a smaller discovery/digest workflow that can prefill Generate from ranked jobs. Its source support is narrower than the JobHelp MCP adapter catalog.
+
 Read the full product guide: [extension-app/README.md](extension-app/README.md).
 Read Chrome-extension internals: [extension-app/extension/README.md](extension-app/extension/README.md).
 Set up from scratch: [docs/setup-for-new-users.md](docs/setup-for-new-users.md).
@@ -128,8 +131,8 @@ npm --prefix jobhelp-mcp run build
 Focused commands:
 
 ```bash
-npx vitest run extension-app/extension/tests/scraper.test.ts
-npx vitest run extension-app/appsscript/tests/handlers/autoRevise.test.ts
+npx vitest run extension-app/tests/sidepanel/resumeEditor-selection.test.ts
+npx vitest run extension-app/tests/contracts/verify-bundle-actions.test.ts
 npm --prefix jobhelp-mcp test -- --run tests/sources/validate.test.ts
 ```
 
@@ -181,4 +184,4 @@ The most load-bearing files are anti-fabrication, bullet construction, bridge la
 
 ## License
 
-MIT for `jobhelp-mcp`. The root repo is personal-use software unless a package-level license says otherwise.
+MIT. See [LICENSE](LICENSE). The software is provided as-is, without warranty or liability for misuse.
