@@ -1,23 +1,3 @@
-/**
- * @file handlers/benchmark.ts
- *
- * Feature: Benchmark Role (action: "benchmark_role")
- * Owner agent: E1 — Research + LinkedIn Benchmarking
- * Plan section: Phase 1 › Group E1
- *
- * Rule files to load (from extension-app/prompts/shared/):
- *   - 01-priority-hierarchy.md  (output truthfulness gate)
- *   - 02-anti-fabrication.md    (no hallucinated role patterns)
- *
- * Patterns:
- *   - CacheService key = "benchmark:<company>:<role>", TTL 86400s.
- *   - Same Claude/error/JSON-parse handling shape as research.ts.
- *   - Result includes patterns (a coherent paragraph or bulleted list
- *     describing what successful candidates look like).
- *
- * Tests: extension-app/appsscript/tests/handlers/benchmark.test.ts
- */
-
 import type { Deps } from '../Code.js';
 import type {
   BenchmarkRoleRequest,
@@ -30,20 +10,12 @@ import { ClaudeApiError } from '../types/claude-api.js';
 import { calculateCost } from '../cost.js';
 import { log } from '../lib/structuredLog.js';
 
-// ---------------------------------------------------------------------------
-// Apps Script CacheService ambient declaration
-// ---------------------------------------------------------------------------
-
 declare const CacheService: {
   getScriptCache(): {
     get(key: string): string | null;
     put(key: string, value: string, ttlSeconds?: number): void;
   };
 };
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 
 const CACHE_TTL_SECONDS = 86400;
 
@@ -60,18 +32,10 @@ const SYSTEM_PROMPT =
   'NEVER fabricate. If unsure, say "unclear" in patterns. ' +
   'Return JSON only — no preamble, no markdown fences.';
 
-// ---------------------------------------------------------------------------
-// Validate
-// ---------------------------------------------------------------------------
-
 function validationError(message: string): ApiErrorResponse {
   return { ok: false, error: { type: 'validation', message, retryable: false } };
 }
 
-/**
- * Validate a raw request body for the "benchmark_role" action.
- * Returns null if valid, or an ApiErrorResponse if invalid.
- */
 export function validateBenchmarkRole(
   raw: Record<string, unknown>,
 ): ApiErrorResponse | null {
@@ -92,10 +56,6 @@ export function validateBenchmarkRole(
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Handler
-// ---------------------------------------------------------------------------
-
 interface CachedBenchmarkPayload {
   patterns: string;
   keywords: string[];
@@ -103,10 +63,6 @@ interface CachedBenchmarkPayload {
   cost: BenchmarkRoleResult['cost'];
 }
 
-/**
- * Handle a "benchmark_role" request.
- * Always returns ApiResult<BenchmarkRoleResult>; never throws.
- */
 export function handleBenchmarkRole(
   deps: Deps,
   req: BenchmarkRoleRequest,
@@ -114,7 +70,6 @@ export function handleBenchmarkRole(
   const forceRefresh = req.forceRefresh === true;
   log('info', 'benchmark start', { company: req.company, role: req.role, forceRefresh });
 
-  // Defensive validation
   const validationErr = validateBenchmarkRole(
     req as unknown as Record<string, unknown>,
   );
@@ -123,10 +78,8 @@ export function handleBenchmarkRole(
     return validationErr;
   }
 
-  // JSON-encoded tuple to avoid colon-collision (see research.ts).
   const cacheKey = `benchmark:${JSON.stringify([req.company, req.role])}`;
 
-  // 1) Cache check unless forceRefresh
   if (!forceRefresh) {
     const cached = readCache(cacheKey);
     if (cached) {
@@ -145,7 +98,6 @@ export function handleBenchmarkRole(
     log('debug', 'benchmark forceRefresh — skipping cache lookup', { company: req.company, role: req.role });
   }
 
-  // 2) Build Claude request
   const userMessage =
     `What do successful candidates for the role "${req.role}" at "${req.company}" look like? ` +
     `Search LinkedIn-style profiles and job postings to find typical experience, ` +
@@ -161,7 +113,6 @@ export function handleBenchmarkRole(
     tools: [{ type: 'web_search_20250305', name: 'web_search' }],
   };
 
-  // 3) Call Claude
   let response;
   try {
     response = deps.claude.call(claudeReq);
@@ -190,7 +141,6 @@ export function handleBenchmarkRole(
     };
   }
 
-  // 4) Parse JSON
   let parsed: { patterns: unknown; keywords: unknown; sources: unknown };
   try {
     parsed = JSON.parse(stripJsonFences(response.text)) as typeof parsed;
@@ -210,7 +160,6 @@ export function handleBenchmarkRole(
     };
   }
 
-  // 5) Shape-check
   const shapeError = validateClaudePayload(parsed);
   if (shapeError) {
     log('error', 'benchmark Claude payload shape error', { error: shapeError });
@@ -228,10 +177,8 @@ export function handleBenchmarkRole(
   const keywords = parsed.keywords as string[];
   const sources = parsed.sources as { title: string; url: string }[];
 
-  // 6) Cost
   const cost = calculateCost(response.usage, response.model);
 
-  // 7) Write to cache
   const cachePayload: CachedBenchmarkPayload = { patterns, keywords, sources, cost };
   writeCache(cacheKey, cachePayload);
 
@@ -252,10 +199,6 @@ export function handleBenchmarkRole(
     cost,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 function readCache(key: string): CachedBenchmarkPayload | null {
   try {
