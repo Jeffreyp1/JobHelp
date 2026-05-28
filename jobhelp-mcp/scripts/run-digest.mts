@@ -6,19 +6,20 @@ import { aiFilter, type AIJudgment, type Judger, type Tier } from '../core/pipel
 import type { JobDigestConfig, ProfileConfig, RankedJob } from '../core/types/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const companyListsDir = join(__dirname, '..', 'company-lists');
 function loadSlugs(file: string, fallback: readonly string[]): readonly string[] {
-  const p = join(__dirname, file);
+  const p = join(companyListsDir, file);
   return existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')) as readonly string[]) : fallback;
 }
-const greenhouseTokens = loadSlugs('greenhouse-tokens.json', ['stripe', 'vercel']);
-const ashbyTokens = loadSlugs('ashby-slugs.json', ['ramp']);
-const leverSlugs = loadSlugs('lever-slugs.json', ['plaid']);
-const smartrecruitersTokens = loadSlugs('smartrecruiters-slugs.json', ['visa']);
-const recruiteeTokens = loadSlugs('recruitee-slugs.json', ['bunq']);
-const teamtailorTokens = loadSlugs('teamtailor-slugs.json', ['polestar']);
-const breezyTokens = loadSlugs('breezy-slugs.json', []);
-const pinpointTokens = loadSlugs('pinpoint-slugs.json', ['workwithus']);
-const personioTokens = loadSlugs('personio-slugs.json', ['personio']);
+const greenhouseTokens = loadSlugs('greenhouse.json', ['stripe', 'vercel']);
+const ashbyTokens = loadSlugs('ashby.json', ['ramp']);
+const leverSlugs = loadSlugs('lever.json', ['plaid']);
+const smartrecruitersTokens = loadSlugs('smartrecruiters.json', ['visa']);
+const recruiteeTokens = loadSlugs('recruitee.json', ['bunq']);
+const teamtailorTokens = loadSlugs('teamtailor.json', ['polestar']);
+const breezyTokens = loadSlugs('breezy.json', []);
+const pinpointTokens = loadSlugs('pinpoint.json', ['workwithus']);
+const personioTokens = loadSlugs('personio.json', ['personio']);
 
 // Adzuna auto-activates when ADZUNA_APP_ID + ADZUNA_APP_KEY are set; omitted otherwise.
 const adzunaAppId = process.env['ADZUNA_APP_ID'];

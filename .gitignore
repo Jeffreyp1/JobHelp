@@ -22,6 +22,9 @@ jobhelp-config.json
 .agents/
 jobhelp-mcp/scripts/companies-all.json
 jobhelp-mcp/scripts/companies-report.md
+jobhelp-mcp/scripts/*-report.md
+jobhelp-mcp/scripts/*-slugs.json
+jobhelp-mcp/scripts/*-tokens.json
 
 # Local user-specific Claude / extension config (contains permissioned commands list,
 # may contain personal paths — not appropriate for a shared repo)
@@ -35,15 +38,15 @@ jobhelp-mcp/scripts/companies-report.md
 .superpowers/
 
 # Personal job-search artifacts (NEVER commit — these contain real resume, scraped JDs, etc.)
-applications/
-digests/
-resumes/
-state.json
-resume-dump/
-out/
-job-descriptions/
-experiments/
-docs/research/
+/applications/
+/digests/
+/resumes/
+/state.json
+/resume-dump/
+/out/
+/job-descriptions/
+/experiments/
+/docs/research/
 
 # Scratch dirs used by sub-agents as Write-tool sandbox workaround
 .scratch-*/
