@@ -40,23 +40,8 @@ import type { ClaudeRequest } from '../types/claude-api.js';
 import { ClaudeApiError } from '../types/claude-api.js';
 import { calculateCost } from '../cost.js';
 import { log } from '../lib/structuredLog.js';
-
-// ---------------------------------------------------------------------------
-// Apps Script CacheService ambient declaration (for tests + production)
-// ---------------------------------------------------------------------------
-
-declare const CacheService: {
-  getScriptCache(): {
-    get(key: string): string | null;
-    put(key: string, value: string, ttlSeconds?: number): void;
-  };
-};
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const CACHE_TTL_SECONDS = 86400; // 24 hours
+import { readCache, writeCache, type CachedResearchPayload } from './research-cache.js';
+import { stripJsonFences, validateClaudePayload } from './research-parser.js';
 
 const SYSTEM_PROMPT =
   'You are a company research assistant. Given a company name and (optionally) a target role, ' +
@@ -101,17 +86,6 @@ export function validateResearchCompany(
     }
   }
   return null;
-}
-
-// ---------------------------------------------------------------------------
-// Handler
-// ---------------------------------------------------------------------------
-
-interface CachedResearchPayload {
-  summary: string;
-  keywords: string[];
-  sources: { title: string; url: string }[];
-  cost: ResearchCompanyResult['cost'];
 }
 
 /**
@@ -269,67 +243,4 @@ export function handleResearchCompany(
     cached: false,
     cost,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-function readCache(key: string): CachedResearchPayload | null {
-  try {
-    if (typeof CacheService === 'undefined') return null;
-    const raw = CacheService.getScriptCache().get(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as CachedResearchPayload;
-  } catch (err) {
-    // Cache failures must not fail the request — log and proceed
-    const message = err instanceof Error ? err.message : String(err);
-    log('warn', 'research cache read failed', { key, error: message });
-    return null;
-  }
-}
-
-function writeCache(key: string, payload: CachedResearchPayload): void {
-  try {
-    if (typeof CacheService === 'undefined') return;
-    CacheService.getScriptCache().put(key, JSON.stringify(payload), CACHE_TTL_SECONDS);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    log('warn', 'research cache write failed', { key, error: message });
-  }
-}
-
-/** Strip optional ```json fences if Claude wrapped the JSON. */
-function stripJsonFences(text: string): string {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced ? fenced[1].trim() : trimmed;
-}
-
-/** Returns null if shape OK, else a string describing what's wrong. */
-function validateClaudePayload(p: {
-  summary: unknown;
-  keywords: unknown;
-  sources: unknown;
-}): string | null {
-  if (typeof p.summary !== 'string' || p.summary.length === 0) {
-    return 'summary must be a non-empty string';
-  }
-  if (!Array.isArray(p.keywords) || !p.keywords.every((k) => typeof k === 'string')) {
-    return 'keywords must be an array of strings';
-  }
-  if (!Array.isArray(p.sources)) {
-    return 'sources must be an array';
-  }
-  for (const s of p.sources) {
-    if (
-      typeof s !== 'object' ||
-      s === null ||
-      typeof (s as { title?: unknown }).title !== 'string' ||
-      typeof (s as { url?: unknown }).url !== 'string'
-    ) {
-      return 'each source must have string title + url';
-    }
-  }
-  return null;
 }
