@@ -39,6 +39,7 @@ const VALID_ACTIONS: string[] = [
   'seed_defaults',
   'download_template',
   'upload_filled_docx',
+  'create_drive_file',
   'research_company',
   'benchmark_role',
   'critique',
@@ -47,6 +48,9 @@ const VALID_ACTIONS: string[] = [
   'cover_letter',
   'verify_cl_hooks',
   'multi_version',
+  'extract_profile',
+  'discover_and_rank',
+  'update_job_status',
   'ping',
 ];
 
@@ -321,7 +325,7 @@ async function main(): Promise<void> {
     return 'doPost entry present';
   });
 
-  await check('appsscript: Code.gs contains all 16 VALID_ACTIONS', async () => {
+  await check('appsscript: Code.gs contains all VALID_ACTIONS', async () => {
     if (codeGsText == null) codeGsText = await readFile(PATHS.codeGs, 'utf8');
     const missing: string[] = [];
     for (const action of VALID_ACTIONS) {
