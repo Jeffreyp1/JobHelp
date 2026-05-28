@@ -31089,7 +31089,13 @@ function validateConfig(parsed) {
     output: requireString(foldersRaw, "output", "folders.output")
   };
   const sheetId = requireString(parsed, "sheetId", "sheetId");
-  const templateDocxId = requireString(parsed, "templateDocxId", "templateDocxId");
+  const templateDocxId = parsed["templateDocxId"];
+  if (typeof templateDocxId !== "string") {
+    throw new ConfigValidationError(
+      `Config field "templateDocxId" must be a string (got ${describeType(templateDocxId)}).`,
+      "templateDocxId"
+    );
+  }
   const defaultsRaw = requireObject(parsed, "defaults", "defaults");
   const defaults = {
     model: requireString(defaultsRaw, "model", "defaults.model"),

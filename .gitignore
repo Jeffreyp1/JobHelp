@@ -85,7 +85,7 @@ jobhelp-mcp/dist/
 extension-app/appsscript/tests/
 extension-app/extension/tests/
 jobhelp-mcp/tests/
-extension-app/tests/contracts/
+extension-app/tests/contracts/*
 extension-app/tests/smoke/
 extension-app/tests/local/
 extension-app/tests/fixtures/_validate.test.ts
@@ -103,3 +103,6 @@ extension-app/prompts/shared/_validate.test.ts
 !extension-app/tests/sidepanel/
 !extension-app/tests/sidepanel/resumeEditor-selection.test.ts
 !extension-app/tests/sidepanel/generate-whole-resume-revise-safety.test.ts
+!extension-app/tests/contracts/
+!extension-app/tests/contracts/configLoader.test.ts
+!extension-app/tests/contracts/verify-bundle-actions.test.ts
