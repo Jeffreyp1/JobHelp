@@ -28,7 +28,8 @@ The build produces three browser bundles under `extension-app/extension/public/`
 | `extension-app/extension/src/sidepanel/components/` | Shared UI components such as the resume editor, cost estimator, job insights card, toggle row, and revise composer. |
 | `extension-app/extension/src/lib/` | Browser-side utilities: API client, config loader/migration, storage wrapper, template filling, DOCX helpers, cost calculation, logging, presets, and cached job digest support. Larger utilities are split into cohesive `*-*.ts` helpers. |
 | `extension-app/extension/src/types/` | Extension-owned TypeScript contracts for backend actions, Chrome message bus payloads, config, storage, scraping, and job discovery. |
-| `extension-app/extension/tests/` | Vitest coverage for background behavior, scraper behavior, lib utilities, side-panel UI, settings, onboarding, and v2 workflows. |
+| `extension-app/extension/tests/` | Local-only Vitest coverage for background behavior, scraper behavior, lib utilities, side-panel UI, settings, onboarding, and v2 workflows when present in this workspace. Publication-tracked extension tests live under `extension-app/tests/`. |
+| `extension-app/tests/` | Publication-tracked cross-package fixtures, contract tests, and focused side-panel safety tests. |
 | `extension-app/extension/public/` | Built extension output loaded by Chrome. Do not edit generated JS bundles by hand. |
 
 ## Runtime Flow
@@ -52,7 +53,7 @@ The side panel renders four tabs:
 |---|---|
 | Generate | Primary tailoring workflow: scrape intake, metadata edits, job description textarea, model and feature toggles, cost estimate, generate button, resume editor, save, finalize, and template conversion. |
 | Files | Lists source and rules files from Drive through the backend. |
-| Jobs | Optional job discovery and ranking workflow. It can extract a profile from source materials, run a digest, cache the latest digest locally, prefill Generate from a ranked job, and update tracking status. |
+| Jobs | Optional job discovery and ranking workflow. It can extract a profile from source materials, run a digest for the extension-supported sources, cache the latest digest locally, prefill Generate from a ranked job, and update tracking status. This is narrower than the MCP source-adapter catalog. |
 | Settings | Links a Drive-hosted config file, reloads config, opens config in Drive, runs onboarding, migrates legacy local settings when available, and shows a redacted diagnostic readout. |
 
 `extension-app/extension/src/sidepanel/index.ts` owns tab construction, navigation, runtime config adoption, and the hooks passed into each tab.
@@ -84,7 +85,7 @@ The scraper returns `ScraperOutput`, including raw job description text, company
 
 ## Config Model
 
-The v2.1 setup model uses a single Drive-hosted `jobhelp-config.json` file as the source of truth. On a fresh install, the extension stores only the config file ID in `chrome.storage.local` under `jobhelpConfigFileId`.
+The v2.1 setup model uses a single Drive-hosted `jobhelp-config.json` file as the source of truth. The extension stores the config file ID in `chrome.storage.local` under `jobhelpConfigFileId`, mirrors selected legacy config keys for background-worker paths that still read them, and stores current Jobs-tab discovery/cache keys locally.
 
 The loaded config includes:
 
@@ -96,7 +97,7 @@ The loaded config includes:
 - Default model and toggle preset
 - UI preferences
 
-The side panel loads and validates this config through `extension-app/extension/src/lib/configLoader.ts`, caches it in memory for the session, and mirrors selected values into legacy storage keys. That mirror is intentional during the migration window because parts of the background worker still read the legacy keys.
+The side panel loads and validates this config through `extension-app/extension/src/lib/configLoader.ts`, caches it in memory for the session, and mirrors selected values into legacy storage keys. That mirror is intentional during the migration window because parts of the background worker still read the legacy keys. Jobs-tab source credentials and cached digest/profile state are also local today; they are not part of the Drive config yet.
 
 Do not print config contents in logs or docs. The Settings diagnostic masks the API key and never needs secret values in source control.
 
@@ -130,7 +131,8 @@ node scripts/verify-bundle.mts
 Focused extension commands:
 
 ```bash
-npx vitest run extension-app/extension/tests
+npx vitest run extension-app/tests/sidepanel/resumeEditor-selection.test.ts
+npx vitest run extension-app/tests/contracts/verify-bundle-actions.test.ts
 node extension-app/extension/scripts/build.mts
 node extension-app/extension/scripts/build.mts --watch
 ```
@@ -202,4 +204,4 @@ After a build, a basic local smoke check is:
 7. Finalize to DOCX or PDF.
 8. Confirm the output folder and tracking sheet were updated by the backend.
 
-For broader manual UI coverage, see `extension-app/extension/tests/sidepanel/MANUAL-TEST-CHECKLIST.md`.
+For broader manual UI coverage, use `extension-app/extension/tests/sidepanel/MANUAL-TEST-CHECKLIST.md` when the local-only extension test suite is present.

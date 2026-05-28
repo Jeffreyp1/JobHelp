@@ -25,6 +25,8 @@ Use it when you want to open a job posting, scrape the job description, tailor a
 8. Click Generate.
 9. Review the tailored markdown, then save, finalize, revise, critique, or generate a cover letter as needed.
 
+The Jobs tab can also run an optional discovery digest and prefill Generate from a ranked job. That extension workflow currently supports a narrower set of discovery sources than the JobHelp MCP source adapters.
+
 For the click-by-click setup path, use [../docs/setup-for-new-users.md](../docs/setup-for-new-users.md).
 
 ## Architecture
@@ -88,7 +90,7 @@ flowchart TB
 
 ## Configuration
 
-The source of truth is a Drive file named `jobhelp-config.json`. The extension stores only that config file ID locally. The config includes:
+The source of truth is a Drive file named `jobhelp-config.json`. The config includes:
 
 - Apps Script `/exec` URL
 - Anthropic API key
@@ -97,7 +99,9 @@ The source of truth is a Drive file named `jobhelp-config.json`. The extension s
 - Optional template DOCX file ID
 - Default model and preferences
 
-The side panel loads the file through `configLoader.ts`, validates the schema, keeps a session runtime config, and mirrors selected values into legacy storage keys while older background-worker paths still need them.
+The extension stores the Drive config file ID locally so it can reload the file on each machine. The side panel loads the file through `configLoader.ts`, validates the schema, keeps a session runtime config, and mirrors selected values into legacy storage keys while older background-worker paths still need them.
+
+Current Jobs-tab discovery credentials and digest/profile caches are also stored locally during this migration window; the Drive config remains the source of truth for the core extension setup.
 
 Do not commit real config files, API keys, Apps Script URLs, Drive IDs tied to private data, generated resumes, or tracking sheets.
 
@@ -132,9 +136,9 @@ node scripts/verify-bundle.mts
 Focused checks:
 
 ```bash
-npx vitest run extension-app/extension/tests/scraper.test.ts
-npx vitest run extension-app/extension/tests/lib/apiClient.test.ts
-npx vitest run extension-app/appsscript/tests/handlers/autoRevise.test.ts
+npx vitest run extension-app/tests/sidepanel/resumeEditor-selection.test.ts
+npx vitest run extension-app/tests/contracts/verify-bundle-actions.test.ts
+node scripts/verify-bundle.mts
 ```
 
 ## Local Installation
@@ -163,6 +167,10 @@ Paste `extension-app/appsscript/dist/Code.gs` into a new Apps Script project and
 - Use structured loggers in both packages.
 - Keep generated JS bundles under `extension-app/extension/public/` reproducible from source.
 - Prefer cohesive helper modules over growing handler or UI files past 300 lines.
+
+## License And Publication
+
+MIT under the repo root [LICENSE](../LICENSE). The software is provided as-is, without warranty or liability for misuse.
 
 ## Related Docs
 

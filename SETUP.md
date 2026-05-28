@@ -14,14 +14,14 @@ Estimated time: 20-30 minutes.
 
 1. Go to [console.anthropic.com](https://console.anthropic.com) — sign up or log in
 2. Navigate to **API Keys** → **Create Key**
-3. Copy the key (starts with `sk-ant-`). You'll paste it in Step 5.
+3. Copy the key (starts with `sk-ant-`). You'll add it to Apps Script Properties in Step 3 and to the Drive config in Step 5.
 
 ## Step 2: Set up your Google Drive folders
 
 JobHelp needs four Google resources:
 
 1. **Source materials folder** — where you put `.md` files describing your resume content
-2. **Rule files folder** — JobHelp seeds 12 rule files here on first run; you can edit them
+2. **Rule files folder** — JobHelp seeds 15 rule files here on first run; you can edit them
 3. **Output folder** — where tailored resumes get saved as Google Docs
 4. **Tracking sheet** — where each generation is logged
 
@@ -60,11 +60,11 @@ JobHelp uses your own Google Apps Script project as its backend. It reads/writes
 4. Click **Deploy** → **New deployment**
    - Type: **Web app**
    - Execute as: **Me**
-   - Who has access: **Only myself**
+   - Who has access: **Anyone with the link**
 
 5. Click **Deploy** → authorize any permissions requested
 
-6. Copy the **Web app URL** (ends in `/exec`). You'll paste it in Step 5.
+6. Copy the **Web app URL** (ends in `/exec`). You'll add it to the Drive config in Step 5. The extension calls this URL without OAuth, so treat it as a secret capability URL.
 
 ## Step 4: Install the Chrome extension
 
@@ -81,18 +81,15 @@ JobHelp uses your own Google Apps Script project as its backend. It reads/writes
 ## Step 5: First-run configuration
 
 1. Click the JobHelp icon → the side panel opens on the right
-2. Click the **Settings** tab
-3. Paste the following values into their respective fields:
-   - **Apps Script URL** — the `/exec` URL from Step 3
-   - **Anthropic API key** — starts with `sk-ant-`
-   - **Drive: source folder ID** — from Step 2
-   - **Drive: rules folder ID** — from Step 2
-   - **Drive: output folder ID** — from Step 2
-   - **Tracking sheet ID** — from Step 2
-4. Each field saves automatically on change (no Save button needed)
-5. The status banner at the top of Settings updates as you fill fields. When all folder IDs are set, it shows "Almost ready"
-6. Click **"Seed rule files"** — this calls your Apps Script backend to populate the rules folder with the 12 default rule files from GitHub. It takes 5-15 seconds.
-7. The banner changes to **"Setup complete. JobHelp is ready."**
+2. On a fresh install, the onboarding wizard opens automatically. If it does not, open **Settings** and start onboarding from there.
+3. Create a plain-text file named `jobhelp-config.json` on your computer, using the schema in [docs/setup-for-new-users.md, Step 5](docs/setup-for-new-users.md#step-5-side-panel--onboarding-wizard).
+4. Replace the placeholders with the API key, Apps Script `/exec` URL, folder IDs, tracking sheet ID, and any optional defaults from Steps 1-3, then upload the file to Google Drive. If you already have a Drive-hosted config file, use that existing file instead.
+5. Copy the `jobhelp-config.json` file ID from its Drive URL or sharing link.
+6. Paste that single file ID into the onboarding wizard or Settings, then click **Use this config** or **Reload config**.
+7. Click **"Seed rule files"** — this calls your Apps Script backend to populate the rules folder with the 15 default rule files from GitHub. It takes 5-15 seconds.
+8. The banner changes to **"Setup complete. JobHelp is ready."**
+
+For the full click-by-click v2.1 onboarding flow, see [docs/setup-for-new-users.md](docs/setup-for-new-users.md).
 
 ## Step 6: Add your source materials
 
@@ -127,14 +124,14 @@ JobHelp uses your own Anthropic API key. You pay Anthropic directly; there is no
 
 At 25 applications/day with Haiku 4.5, expect **~$9-12/month**.
 
-Change the default model in Settings → **Default generate model**.
+To change the default model, edit `defaults.model` in the Drive-hosted `jobhelp-config.json`, save it, then click **Reload config** in Settings.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| "Backend unreachable" | Apps Script URL wrong or deployment expired | Check/re-copy the URL in Settings; redeploy if needed |
-| "Auth error" | Anthropic API key invalid or expired | Regenerate at console.anthropic.com → paste new key in Settings |
+| "Backend unreachable" | Apps Script URL wrong or deployment expired | Edit `appsScriptUrl` in `jobhelp-config.json`, click **Reload config** in Settings, and redeploy if needed |
+| "Auth error" | Anthropic API key invalid or expired | Regenerate at console.anthropic.com, update `anthropicApiKey` in `jobhelp-config.json`, update Apps Script Script Properties `ANTHROPIC_API_KEY`, then reload config |
 | Job Insights card stays empty | Job page selectors may have changed, or JS-heavy page | Try **Paste JD** button to paste the description manually; check Console for scrape errors |
 | Generate succeeds but no Doc appears | Drive output folder ID wrong, or Apps Script lacks Drive permission | Verify folder ID; re-authorize Apps Script by running a test deployment |
 | Side panel doesn't open | Chrome version too old (need 120+), or extension failed to load | Check chrome://extensions; reload the extension |
@@ -143,21 +140,25 @@ Change the default model in Settings → **Default generate model**.
 
 ## Editing the rules
 
-JobHelp's generation behavior is controlled by 12 markdown rule files in your Drive `rules/` folder. Open them from **Settings → Open rule files**.
+JobHelp's generation behavior is controlled by 15 markdown rule files in your Drive `rules/` folder. Open them from **Settings → Open rule files**.
 
 The files are plain markdown — edit them directly in Drive. Changes apply on the next generation (after the 10-minute Drive cache expires).
 
-Four files are load-bearing and affect truthfulness guarantees:
+Six files are load-bearing and affect truthfulness guarantees:
 - `02-anti-fabrication.md`
 - `06-bullet-construction.md`
 - `08-bridge-language.md`
 - `11-self-scan-checklist.md`
+- `13-output-shape.md`
+- `14-revision-discipline.md`
 
 To restore defaults after editing: **Settings → Reset rules to defaults**.
 
 ## Multi-machine setup
 
-Sign into your Google account on each Chrome instance and reinstall the extension. Because settings are stored locally (`chrome.storage.local`), you will need to re-enter the field values on each machine. However, all Drive content (source materials, rules, outputs, tracking sheet) is shared via your Google account — no duplication needed.
+The Drive-hosted `jobhelp-config.json` is the source of truth. On each Chrome instance, sign into the same Google account, reinstall the extension, and paste the same Drive config file ID into the onboarding wizard or Settings. The extension then loads the core setup from Drive, so you do not re-enter the API key, Apps Script URL, folder IDs, or tracking sheet ID per machine.
+
+During the v2.1 migration window, `chrome.storage.local` may still contain the config file ID, selected legacy mirror keys used by older background-worker paths, and Jobs-tab discovery credentials or digest/profile caches. Treat those as local cache or migration data; edit the Drive config for the core setup.
 
 ## Uninstall
 
