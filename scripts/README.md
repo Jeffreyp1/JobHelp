@@ -80,9 +80,10 @@ network errors, non-JSON responses, and missing `APPS_SCRIPT_URL`).
 ### Supported actions
 
 `ping`, `generate`, `finalize`, `list_files`, `write_file`, `seed_defaults`,
-`download_template`, `upload_filled_docx`, `research_company`, `benchmark_role`,
-`critique`, `auto_revise`, `auto_revise_scoped`, `cover_letter`,
-`verify_cl_hooks`, `multi_version`.
+`download_template`, `upload_filled_docx`, `create_drive_file`,
+`research_company`, `benchmark_role`, `critique`, `auto_revise`,
+`auto_revise_scoped`, `cover_letter`, `verify_cl_hooks`, `multi_version`,
+`extract_profile`, `discover_and_rank`, `update_job_status`.
 
 Run `node scripts/test-handler.mts --help` for the full list with examples.
 
@@ -144,11 +145,9 @@ node scripts/verify-bundle.mts --no-build   # skip the build step
 - First non-comment token is valid Apps Script JS (no leftover `import type`,
   `interface`, or top-level `export` keyword)
 - Contains the literal `function doPost` (web-app entry point)
-- Contains every one of the 16 `VALID_ACTIONS` strings (`ping`, `generate`,
-  `finalize`, `list_files`, `write_file`, `seed_defaults`, `download_template`,
-  `upload_filled_docx`, `research_company`, `benchmark_role`, `critique`,
-  `auto_revise`, `auto_revise_scoped`, `cover_letter`, `verify_cl_hooks`,
-  `multi_version`)
+- Contains every action in the verifier's `VALID_ACTIONS` mirror of
+  `Code.ts`, including `create_drive_file`, `extract_profile`,
+  `discover_and_rank`, and `update_job_status`
 
 Exit code is `0` on all-pass, `1` on any failure. Each check prints its
 wallclock duration; output respects `NO_COLOR`.
@@ -182,5 +181,5 @@ A summary block at the end prints per-phase elapsed time and total wallclock.
 Designed to run in CI (where `APPS_SCRIPT_URL` is typically absent) or
 locally as a pre-commit check.
 
-The matching vitest suite in [`extension-app/tests/smoke/smoke.test.ts`](../extension-app/tests/smoke/smoke.test.ts)
+When the local-only smoke suite is present, `extension-app/tests/smoke/smoke.test.ts`
 runs both scripts via `child_process.spawnSync` and asserts exit code `0`.

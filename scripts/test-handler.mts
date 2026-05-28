@@ -17,13 +17,18 @@ const ACTIONS: string[] = [
   'seed_defaults',
   'download_template',
   'upload_filled_docx',
+  'create_drive_file',
   'research_company',
   'benchmark_role',
   'critique',
   'auto_revise',
+  'auto_revise_scoped',
   'cover_letter',
   'verify_cl_hooks',
   'multi_version',
+  'extract_profile',
+  'discover_and_rank',
+  'update_job_status',
 ];
 
 const ANSI = {
