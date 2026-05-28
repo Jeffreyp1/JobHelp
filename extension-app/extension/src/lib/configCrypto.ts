@@ -1,53 +1,9 @@
 /**
- * configCrypto.ts
+ * Optional encryption-at-rest helpers for the Drive-hosted
+ * `jobhelp-config.json`.
  *
- * Optional encryption-at-rest helpers for the Drive-hosted `jobhelp-config.json`.
- *
- * Threat model: the v2.1 Drive config file holds the Anthropic API key in plain
- * text. Drive's default ACL is "private to owner", so under normal use the file
- * is unreadable to anyone but the owner. However, an accidental share (folder
- * shared with a co-worker, parent folder set to "anyone with the link"), a
- * shoulder-surfer reading the file in the Drive web UI, or any other ACL
- * misconfiguration would expose the key. See `docs/security.md` for the full
- * threat model.
- *
- * This module provides AES-GCM 256-bit symmetric encryption keyed by a
- * user-supplied passphrase. PBKDF2-SHA256 at 600,000 iterations (OWASP 2023
- * recommendation) derives the AES key from the passphrase. A random 16-byte
- * salt is generated per encryption and stored alongside the ciphertext; a
- * random 12-byte IV is generated per encryption (AES-GCM's recommended size).
- *
- * The output is a `EncryptedBlob` JSON object with everything needed to
- * decrypt (except the passphrase). All binary fields are base64-encoded so
- * the blob is safe to embed inside JSON.
- *
- * Crypto choice rationale:
- *   - AES-GCM: authenticated encryption (AEAD). Tamper-detection comes free —
- *     any single bit flip in ciphertext / IV / salt causes decrypt to throw.
- *     This is critical: without authentication an attacker could flip bits in
- *     the stored ciphertext and we'd silently decrypt to garbage that might
- *     look like a valid API key.
- *   - 256-bit key: maximum AES key size; future-proofs against quantum-era
- *     halving attacks (Grover's algorithm reduces effective key strength).
- *   - PBKDF2: not the strongest KDF (Argon2 is preferred) but the only one
- *     Web Crypto exposes natively. 600k iterations is the OWASP 2023 minimum
- *     for PBKDF2-SHA256. Higher would impact UX (unlock takes ~1s on a modern
- *     laptop already); lower is below the recommended floor.
- *   - 12-byte IV: NIST SP 800-38D recommended size for GCM.
- *   - 16-byte salt: matches NIST recommendation; effectively prevents
- *     rainbow-table attacks even on a globally-known passphrase list.
- *
- * Usage (encrypt):
- *   const blob = await encryptString("sk-ant-…", "my-passphrase");
- *   // store blob inside jobhelp-config.json: { "anthropicApiKey": null,
- *   //                                          "anthropicApiKeyEnc": blob }
- *
- * Usage (decrypt):
- *   const apiKey = await decryptString(blob, "my-passphrase");
- *
- * This module is intentionally NOT wired into configLoader yet — see the
- * integration sketch in `docs/security.md`. Only the helpers + types ship
- * in this milestone.
+ * The encrypted blob is self-contained except for the user passphrase. Binary
+ * fields are base64-encoded so callers can embed the blob directly in JSON.
  */
 
 /** PBKDF2 iteration count. OWASP 2023 minimum for PBKDF2-SHA256. */
