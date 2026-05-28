@@ -1,6 +1,8 @@
-# JobHelp Chrome Extension
+# JobHelp Chrome Extension Internals
 
 The extension is the browser front end for JobHelp. It runs as a Chrome Manifest V3 extension with a side panel UI, an MV3 background service worker, and an injected scraper bundle. The backend remains the Apps Script web app; the extension sends typed action requests to that backend and renders the returned files, costs, edits, and diagnostics.
+
+For the end-to-end extension app product guide, including Apps Script and Drive setup, start with [`../README.md`](../README.md).
 
 ## Architecture
 
@@ -10,7 +12,7 @@ The build produces three browser bundles under `extension-app/extension/public/`
 |---|---|---|
 | `background.js` | `extension-app/extension/src/background.ts` | MV3 service worker. Opens the side panel, watches tab changes and page-load completion, injects the scraper, routes selected panel messages, and calls the backend for background-owned actions. |
 | `sidepanel/index.js` | `extension-app/extension/src/sidepanel/index.ts` | Main UI bundle. Renders Generate, Files, Jobs, and Settings tabs; owns runtime config hydration; calls the backend directly for most side-panel workflows. |
-| `scraper.bundle.js` | `extension-app/extension/scripts/_scraper-shim.ts` generated from `extension-app/extension/src/scraper.ts` | Injected into the active tab by the background worker. Exposes `window.__jobhelpScrape()` and returns a structured scrape result. |
+| `scraper.bundle.js` | `extension-app/extension/scripts/_scraper-shim.ts` generated from `extension-app/extension/src/scraper.ts` and `scraper-*` helpers | Injected into the active tab by the background worker. Exposes `window.__jobhelpScrape()` and returns a structured scrape result. |
 
 `extension-app/extension/public/manifest.json` declares the MV3 extension, side panel, background worker, permissions, and icons. `extension-app/extension/scripts/build.mts` copies static side-panel assets, ensures placeholder icons exist when needed, writes the scraper shim, and bundles the three entries with esbuild.
 
@@ -19,12 +21,12 @@ The build produces three browser bundles under `extension-app/extension/public/`
 | Path | Contents |
 |---|---|
 | `extension-app/extension/src/background.ts` | Service-worker event wiring, scrape injection, generate request routing, settings persistence bridge, and selected async side-panel responses. |
-| `extension-app/extension/src/scraper.ts` | Pure DOM scraper for LinkedIn, Indeed, Greenhouse, Lever, Workday, Ashby, and generic job pages. Also builds structured job insights from page text. |
+| `extension-app/extension/src/scraper.ts` and `scraper-*.ts` | Pure DOM scraper for LinkedIn, Indeed, Greenhouse, Lever, Workday, Ashby, and generic job pages. The entry file selects strategy; sibling modules own site extraction, field parsing, job insights, and DOM helpers. |
 | `extension-app/extension/src/sidepanel/` | Side panel entry point, tabs, UI components, feature renderers, onboarding wizard, HTML, and CSS. |
 | `extension-app/extension/src/sidepanel/tabs/` | Generate, Files, Jobs, and Settings tab implementations. |
 | `extension-app/extension/src/sidepanel/features/` | Optional pipeline feature UI and rendering code for research, benchmark, critique, auto-revise, cover letter, hook verification, and multi-version generation. |
 | `extension-app/extension/src/sidepanel/components/` | Shared UI components such as the resume editor, cost estimator, job insights card, toggle row, and revise composer. |
-| `extension-app/extension/src/lib/` | Browser-side utilities: API client, config loader/migration, storage wrapper, template filling, DOCX helpers, cost calculation, logging, presets, and cached job digest support. |
+| `extension-app/extension/src/lib/` | Browser-side utilities: API client, config loader/migration, storage wrapper, template filling, DOCX helpers, cost calculation, logging, presets, and cached job digest support. Larger utilities are split into cohesive `*-*.ts` helpers. |
 | `extension-app/extension/src/types/` | Extension-owned TypeScript contracts for backend actions, Chrome message bus payloads, config, storage, scraping, and job discovery. |
 | `extension-app/extension/tests/` | Vitest coverage for background behavior, scraper behavior, lib utilities, side-panel UI, settings, onboarding, and v2 workflows. |
 | `extension-app/extension/public/` | Built extension output loaded by Chrome. Do not edit generated JS bundles by hand. |
@@ -68,7 +70,7 @@ The side panel renders four tabs:
 
 ## Scraper
 
-`extension-app/extension/src/scraper.ts` chooses a scrape strategy by hostname and page structure. Supported first-class strategies are:
+`extension-app/extension/src/scraper.ts` chooses a scrape strategy by hostname and page structure, then delegates to focused scraper helper modules. Supported first-class strategies are:
 
 - LinkedIn
 - Indeed

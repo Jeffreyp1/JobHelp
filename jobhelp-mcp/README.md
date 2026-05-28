@@ -1,10 +1,31 @@
 # @jeffreyp1/jobhelp-mcp
 
-A proactive job-discovery MCP server. It fetches job postings from Adzuna, Greenhouse, and Lever, runs a deterministic keyword-overlap + recency ranking pipeline, and exposes the results as MCP tools, resources, and prompts. Current supported clients are Claude Code, Claude Desktop, and Cursor using local stdio MCP. The client AI does all reasoning - ranking judgment, resume tailoring, critique, revision - in its own session using its own subscription.
+A proactive job-discovery MCP server. It fetches job postings from configured sources, runs a deterministic normalization, dedupe, keyword-overlap, recency, and fusion-ranking pipeline, and exposes the results as MCP tools, resources, and prompts. Current supported clients are Claude Code, Claude Desktop, and Cursor using local stdio MCP. The client AI does all reasoning - ranking judgment, resume tailoring, critique, revision - in its own session using its own subscription.
 
 ## Zero-API-key principle
 
 The server makes no LLM calls. It exposes pure data tools (HTTP fetch, regex parsing, file I/O, deterministic scoring) and prompt-context resources (rule files, resume dump, digest history). The intelligence lives in Claude or Cursor. One `npm install`, no Anthropic API key, no signup, no marginal server cost.
+
+## Architecture
+
+```mermaid
+flowchart TB
+  Client["MCP client AI"] --> Server["jobhelp-mcp stdio server"]
+  Server --> Tools["mcp/src/tools-*.ts"]
+  Server --> Resources["mcp/src/resources.ts"]
+  Server --> Prompts["mcp/src/prompts.ts"]
+  Tools --> Core["core/"]
+  Resources --> Core
+  Prompts --> Rules["prompts-bundle/ and user rules"]
+  Core --> Sources["source adapters"]
+  Core --> Pipeline["normalize, dedupe, filter, rank"]
+  Core --> State["~/jobhelp state"]
+  Core --> Config["~/.config/jobhelp/config.json"]
+```
+
+The MCP layer owns protocol shape: tool schemas, prompt/resource registration, argument parsing, and user-facing errors. The core layer owns durable behavior: config loading, source adapters, ranking, resume registry, rules, application folders, and state writes. This split keeps protocol code thin and lets the core be tested without an MCP client.
+
+Built-in source adapters currently include Adzuna, Ashby, Breezy, Greenhouse, JSearch, Lever, Personio, Pinpoint, Recruitee, RemoteOK, Remotive, SmartRecruiters, Teamtailor, USAJobs, We Work Remotely, Workable, and YC Work at a Startup.
 
 ## Support Scope
 
