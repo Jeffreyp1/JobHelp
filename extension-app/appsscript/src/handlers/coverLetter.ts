@@ -24,135 +24,14 @@ import type { Deps } from '../Code.js';
 import type {
   CoverLetterRequest,
   CoverLetterResult,
-  CoverLetterTone,
   ApiResult,
-  ApiErrorResponse,
 } from '../types/api-contract.js';
 import { ClaudeApiError } from '../types/claude-api.js';
 import { calculateCost } from '../cost.js';
 import { log } from '../lib/structuredLog.js';
+import { buildToneDirective } from './coverLetter-prompt.js';
 
-// ---------------------------------------------------------------------------
-// Tone profiles (see extension-app/prompts/shared/15-cl-tones.md)
-// ---------------------------------------------------------------------------
-
-const VALID_TONES: readonly CoverLetterTone[] = [
-  'formal',
-  'casual',
-  'technical',
-  'persuasive',
-  'neutral',
-] as const;
-
-/**
- * Per-tone directive injected into the system prompt. Each block references
- * the matching section of 15-cl-tones.md so the model loads the right
- * profile rather than restating every do/don't here.
- */
-const TONE_DIRECTIVES: Record<Exclude<CoverLetterTone, 'neutral'>, string> = {
-  formal:
-    'Adopt the "formal" voice profile from 15-cl-tones.md. Use full forms (no contractions), ' +
-    'multisyllabic Latinate vocabulary, third-person hints where natural, and measured cadence. ' +
-    'Close with constructions such as "I would value the opportunity to discuss...". ' +
-    'Structure (HOOK/EVIDENCE/CLOSING) and all anti-fabrication rules remain unchanged.',
-  casual:
-    'Adopt the "casual" voice profile from 15-cl-tones.md. Use contractions, first-person ' +
-    'reflection, and varied sentence lengths. Stay professional — casual is not careless. ' +
-    'Close with warm constructions such as "I\'d love to bring this to your team". ' +
-    'Structure (HOOK/EVIDENCE/CLOSING) and all anti-fabrication rules remain unchanged.',
-  technical:
-    'Adopt the "technical" voice profile from 15-cl-tones.md. Lead with metrics, named systems, ' +
-    'and precise engineering verbs (instrumented, refactored, sharded). Assume the reader is ' +
-    'engineering-savvy; subordinate adjectives to data. Avoid padding adjectives like "robust" ' +
-    'or "scalable". Structure (HOOK/EVIDENCE/CLOSING) and all anti-fabrication rules remain unchanged.',
-  persuasive:
-    'Adopt the "persuasive" voice profile from 15-cl-tones.md. Open with a sharper hook, use ' +
-    'vivid verbs, and place a single emotional word per paragraph at most ("compelled", ' +
-    '"thrilled", "drawn to"). Energy is the signal, but do not cross into hype or sloganeering. ' +
-    'Structure (HOOK/EVIDENCE/CLOSING) and all anti-fabrication rules remain unchanged.',
-};
-
-/** Build the tone directive block to append to the system prompt. */
-function buildToneDirective(tone: Exclude<CoverLetterTone, 'neutral'>): string {
-  return [
-    '\n\n=== TONE: ' + tone + ' ===',
-    TONE_DIRECTIVES[tone],
-    '=== END TONE ===',
-  ].join('\n');
-}
-
-// ---------------------------------------------------------------------------
-// Validate
-// ---------------------------------------------------------------------------
-
-/**
- * Validate a raw request body for the "cover_letter" action.
- * Returns null if valid, or an ApiErrorResponse if invalid.
- */
-export function validateCoverLetter(
-  raw: Record<string, unknown>,
-): ApiErrorResponse | null {
-  const requiredStringFields = [
-    'resumeMd',
-    'jd',
-    'jobFolderId',
-    'sourceFolderId',
-    'rulesFolderId',
-    'model',
-  ];
-
-  for (const field of requiredStringFields) {
-    if (!raw[field] || typeof raw[field] !== 'string') {
-      log('warn', 'coverLetter validation failed: missing or invalid field', { field });
-      return {
-        ok: false,
-        error: {
-          type: 'validation',
-          message: `Missing required field: ${field}`,
-          retryable: false,
-        },
-      };
-    }
-  }
-
-  // tone is optional but, if present, must be one of the known presets
-  if (raw['tone'] !== undefined && raw['tone'] !== null) {
-    if (
-      typeof raw['tone'] !== 'string' ||
-      !VALID_TONES.includes(raw['tone'] as CoverLetterTone)
-    ) {
-      log('warn', 'coverLetter validation failed: invalid tone', { tone: String(raw['tone']) });
-      return {
-        ok: false,
-        error: {
-          type: 'validation',
-          message:
-            `Invalid tone: ${String(raw['tone'])}. ` +
-            `Must be one of: ${VALID_TONES.join(', ')}`,
-          retryable: false,
-        },
-      };
-    }
-  }
-
-  // H21 (silent-failure-audit): company / role are optional (string | null)
-  // but were not type-checked — a `company: 123` slips through and later
-  // string-concatenates into the user message. Validate them too.
-  for (const field of ['company', 'role'] as const) {
-    if (raw[field] !== undefined && raw[field] !== null && typeof raw[field] !== 'string') {
-      log('warn', 'coverLetter validation failed: optional field has wrong type', { field });
-      return {
-        ok: false,
-        error: {
-          type: 'validation',
-          message: `Field "${field}", when provided, must be a string or null`,
-          retryable: false,
-        },
-      };
-    }
-  }
-  return null;
-}
+export { validateCoverLetter } from './coverLetter-validation.js';
 
 // ---------------------------------------------------------------------------
 // Helper: word count
