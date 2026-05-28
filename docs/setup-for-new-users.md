@@ -54,7 +54,7 @@ A reasonable layout in your Drive:
 My Drive/
   JobHelp/
     source-materials/      <- your resume facts, achievements, projects
-    rules/                 <- 12 rule .md files (auto-seeded on first run)
+    rules/                 <- 15 rule .md files (auto-seeded on first run)
     output/                <- one sub-folder per generated job application
 ```
 
@@ -143,7 +143,7 @@ This is where v0.2.1 differs from earlier versions. Instead of pasting eight val
 6. Copy the file's Drive ID — from the URL while the file is open, or from the file's right-click menu → **Get link**.
 7. Back in the side panel, paste the file ID into the wizard's single input and click **Use this config**.
 8. The wizard reads the file from Drive, validates the schema, and writes a success banner: **"Config loaded — JobHelp is ready."**
-9. Click **Seed rule files** (offered in the wizard or under the Settings tab) to populate the rules folder with the 12 default `.md` files from this repo. Wait 5-15 seconds for the seed to finish.
+9. Click **Seed rule files** (offered in the wizard or under the Settings tab) to populate the rules folder with the 15 default `.md` files from this repo. Wait 5-15 seconds for the seed to finish.
 
 You are done.
 
