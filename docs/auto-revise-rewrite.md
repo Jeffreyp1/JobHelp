@@ -1,5 +1,7 @@
 # Auto-revise rewrite
 
+Historical branch notes. This historical document records the May 22, 2026 `auto-revise-rewrite` branch and is not current user or operator documentation. For current extension behavior, use [docs/v2-features.md](./v2-features.md).
+
 A rewrite of the extension's per-bullet / per-section revise flow. Branch `auto-revise-rewrite`, 19 commits, May 22 2026.
 
 ## Why

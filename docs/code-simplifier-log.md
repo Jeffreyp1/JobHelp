@@ -2,6 +2,8 @@
 
 Tracks files changed by behavior-preserving simplification passes so they can be revisited after future feature work.
 
+The Verification column records local verification run for that simplification pass unless it explicitly names the full suite or bundle verifier. It is not publication verification.
+
 | Date | File | Area | Change Type | Verification | Revisit Trigger |
 | --- | --- | --- | --- | --- | --- |
 | 2026-05-27 | `jobhelp-mcp/core/sources/validate.ts` | MCP source validation | Split orchestration from pingers/helpers | `npm --prefix jobhelp-mcp test -- --run tests/sources/validate.test.ts`; `npm --prefix jobhelp-mcp run typecheck`; Karen auditor pass | Validation behavior changes or source adapter additions |

@@ -22,7 +22,7 @@ If you have already used a v0.2.0-or-earlier install, see the migration note in 
 | Chrome 120 or newer | The extension uses the Side Panel API |
 | Local clone of this repo | Needed for the developer-mode install and the Apps Script bundle |
 
-> **Security note.** Your Anthropic API key will live in a JSON file in *your* Drive (see Step 3). The extension never sends it to any third-party server. If you would prefer the key encrypted at rest in Drive, see [docs/security.md](./security.md).
+> **Security note.** Your Anthropic API key is stored in two places: `jobhelp-config.json` in *your* Drive for extension validation/display/mirroring, and Apps Script Script Properties for backend Claude calls. Treat both the config file and the Apps Script `/exec` URL as secrets. See [docs/security.md](./security.md).
 
 ## Step 1: Deploy the Apps Script backend
 
@@ -30,7 +30,7 @@ This step is unchanged in v0.2.1. The Apps Script project reads/writes your Driv
 
 - See [SETUP.md, Step 3 ("Deploy the Apps Script backend")](../SETUP.md#step-3-deploy-the-apps-script-backend) for the click-by-click flow.
 - Build the bundle first: `node extension-app/appsscript/scripts/build.mts` produces `extension-app/appsscript/dist/Code.gs`.
-- Paste the generated `Code.gs` into a new Apps Script project, deploy as a **Web app** (execute as **Me**, access **Only myself**), and copy the resulting `/exec` URL somewhere — you will paste it into your config file in Step 3 below.
+- Paste the generated `Code.gs` into a new Apps Script project, deploy as a **Web app** (execute as **Me**, access **Anyone with the link**), and copy the resulting `/exec` URL somewhere safe — you will paste it into your config file in Step 3 below. The extension calls this URL without OAuth, so treat it as a secret capability URL.
 
 ## Step 2: Set the Anthropic API key in Apps Script Properties
 
@@ -63,7 +63,7 @@ What goes in each:
 | Folder | Holds | Created by |
 |---|---|---|
 | `source-materials/` | `.md` files describing your work history, skills, accomplishments. JobHelp concatenates every `.md` in this folder. Start from [`extension-app/tests/fixtures/source-materials/`](../extension-app/tests/fixtures/source-materials/) if you have none. | You |
-| `rules/` | The 12 generation-rule markdown files (`01-priority-hierarchy.md` … `12-template-reproduction.md`). The extension's **Seed rule files** button populates this folder on first run. | JobHelp |
+| `rules/` | The 15 generation-rule markdown files from `extension-app/prompts/shared/`. The extension's **Seed rule files** button populates this folder on first run. | JobHelp |
 | `output/` | One auto-created sub-folder per job application, each containing the generated `resume.md`, the Google Doc, and any cover letter or critique. | JobHelp |
 
 Get each folder's ID from its Drive URL: `https://drive.google.com/drive/folders/<THIS-IS-THE-ID>`. You will paste these three IDs into the config file in [Step 5](#step-5-side-panel--onboarding-wizard).
@@ -98,8 +98,8 @@ This is where v0.2.1 differs from earlier versions. Instead of pasting eight val
 
 1. Click the JobHelp toolbar icon. The side panel opens on the right.
 2. On a fresh install, the **Onboarding wizard** launches automatically.
-3. Click **Create config**. The extension uses the Apps Script backend to create a new `jobhelp-config.json` file in your Drive (root folder) and opens it in a new tab.
-4. The file opens with a pre-filled template. Replace each `<placeholder>` with the values you collected in Steps 1-3:
+3. In a local text editor, create a plain-text file named `jobhelp-config.json`. Do not use a Google Doc with that name; the config must be a JSON file.
+4. Paste this template into the file, then replace each `<placeholder>` with the values you collected in Steps 1-3:
 
    ```jsonc
    {
@@ -128,7 +128,7 @@ This is where v0.2.1 differs from earlier versions. Instead of pasting eight val
    | Field | Format | Notes |
    |---|---|---|
    | `anthropicApiKey` | `sk-ant-...` | Same key you put in Apps Script Properties in Step 2. |
-   | `appsScriptUrl` | `<your Apps Script /exec URL>` | Must end in `/exec`. |
+   | `appsScriptUrl` | `<your Apps Script /exec URL>` | Must end in `/exec`; treat it as a secret capability URL. |
    | `folders.source` / `.rules` / `.output` | Drive folder IDs | The bare ID, not the full URL. |
    | `sheetId` | Drive file ID | From `/spreadsheets/d/<ID>/edit`. |
    | `templateDocxId` | Drive file ID or `""` | Used only by the DOCX-template filler; safe to leave blank. |
@@ -137,13 +137,15 @@ This is where v0.2.1 differs from earlier versions. Instead of pasting eight val
    | `preferences.autoConvertOnGenerate` | boolean | If true, auto-finalize to DOCX/PDF after each generate. |
    | `preferences.showCostInline` | boolean | If true, show per-call USD cost inline in the side panel. |
 
-   All twelve string fields are required and must be non-empty. The loader rejects unknown types with a precise dotted-path error message (e.g. `Config field "folders.source" must be a string`).
+   The config must match the `JobhelpConfig` schema, including required non-empty strings for `anthropicApiKey`, `appsScriptUrl`, `folders.source`, `folders.rules`, `folders.output`, and `sheetId`. The loader rejects unknown types with a precise dotted-path error message (e.g. `Config field "folders.source" must be a string`).
 
-5. Save the file in Drive (Google Drive auto-saves; no action needed for a Drive-native JSON).
+5. Save the file, then upload it to Drive with **New** → **File upload**. If you already have a Drive-hosted `jobhelp-config.json`, use that existing file instead.
 6. Copy the file's Drive ID — from the URL while the file is open, or from the file's right-click menu → **Get link**.
-7. Back in the side panel, paste the file ID into the wizard's single input and click **Use this config**.
+7. Back in the side panel, paste the file ID into the wizard's single input and click **Use this config**. If you later edit or replace the Drive file from Settings, click **Reload config**.
 8. The wizard reads the file from Drive, validates the schema, and writes a success banner: **"Config loaded — JobHelp is ready."**
 9. Click **Seed rule files** (offered in the wizard or under the Settings tab) to populate the rules folder with the 15 default `.md` files from this repo. Wait 5-15 seconds for the seed to finish.
+
+After a valid Apps Script URL has already been loaded into this Chrome profile, Settings may offer **Create config** as a convenience for scaffolding a replacement config file through the backend. Fresh installs should use the manual upload or link an existing Drive file first.
 
 You are done.
 
@@ -171,7 +173,7 @@ If you change a value (rotate the API key, switch models, etc.), edit `jobhelp-c
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `File ID invalid` | Pasted a folder URL or extra whitespace | Use only the bare ID — the long string from `/d/<ID>` or `/folders/<ID>` |
-| `Config field "<x>" must be a string` | A required field is null, missing, or a number | Edit `jobhelp-config.json` in Drive; replace the value with a non-empty string |
+| `Config field "<x>" must be a string` | A string field is null, missing, or a number | Edit `jobhelp-config.json` in Drive; use a non-empty string for required fields. `templateDocxId` may be `""` |
 | `Config file is not valid JSON` | A stray comma, missing quote, or comment in JSON | Standard JSON does not allow `//` comments; remove them or use a JSON linter |
 | `Failed to download jobhelp-config.json` | Apps Script lacks Drive permission, or the file ID is wrong | Re-authorize the Apps Script deployment; verify you copied the file's ID, not its folder's |
 | `Backend unreachable` after pasting file ID | `appsScriptUrl` wrong or deployment expired | Open `jobhelp-config.json` in Drive; verify the URL ends in `/exec`; redeploy if the URL changed |
@@ -193,19 +195,19 @@ If the validation error mentions a field like `defaults.model`, that is the **do
 | Generated resumes / cover letters / critiques | Your Drive `output/` folder |
 | Tracking-sheet rows | Your tracking Google Sheet |
 
-Only the **file ID of `jobhelp-config.json`** lives per-machine. Everything else is in your Drive.
+The Drive config file is the source of truth for the core setup. The extension still stores the config file ID, selected legacy cache keys, and current Jobs-tab discovery/cache keys per-machine during this migration window.
 
 ## Security best practices
 
-The default flow stores your Anthropic API key in cleartext inside the Drive config file. This is acceptable for personal use because the file is in *your* Drive and inherits your Drive sharing model — but you should not share the folder containing `jobhelp-config.json`.
+The default flow stores your Anthropic API key in cleartext inside the Drive config file and in Apps Script Script Properties. This is acceptable for personal use when both remain private to your Google account, but you should not share the folder containing `jobhelp-config.json` or expose the Apps Script `/exec` URL.
 
-For optional encryption-at-rest of the API key field (with a passphrase you enter once per session), see [docs/security.md](./security.md).
+Passphrase encryption for the Drive config is not wired into the end-user setup today; `configCrypto.ts` is only a standalone helper. See [docs/security.md](./security.md).
 
 Other recommendations:
 
 - Keep `jobhelp-config.json` in **My Drive**, not a shared drive.
 - Never check `jobhelp-config.json` into git.
-- Rotate the Anthropic key periodically; updating it in one place (the Drive file) propagates everywhere except the Apps Script Project Properties — update both at the same time.
+- Rotate the Anthropic key periodically; update both the Drive config and Apps Script Script Properties at the same time.
 - If you suspect the file has been exposed, revoke the Anthropic key at [console.anthropic.com](https://console.anthropic.com) immediately.
 
 ## What to do next
