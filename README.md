@@ -1,316 +1,187 @@
 # JobHelp
 
-Chrome extension that tailors your resume to a job description and logs each application to Google Sheets. Frontend runs in Chrome; backend runs as your own Apps Script web app calling the Anthropic API. ~$0.012 per resume (Haiku 4.5 with prompt caching).
+JobHelp is a personal job-application workspace with two related products:
 
-## Quick start
+- **Extension app**: a Chrome side-panel extension plus a Google Apps Script backend for tailoring resumes from job postings, exporting documents, and logging applications to Google Sheets.
+- **JobHelp MCP**: a local Model Context Protocol server for job discovery, ranking, resume context, application artifacts, and AI-assisted tailoring workflows inside MCP-compatible clients.
 
-New to JobHelp? Follow the step-by-step guide: [docs/setup-for-new-users.md](docs/setup-for-new-users.md). It covers the Anthropic key, Apps Script deploy, Drive folder layout, extension install, and the v0.2.1 single-file config flow end-to-end.
+The two products share the same repo and rule philosophy, but they are intentionally separated so each can be built, tested, documented, and shipped on its own.
 
-If you are upgrading from v0.2.0 or earlier, the extension auto-migrates your per-machine settings into a Drive config file on first launch — confirm the file ID in the Onboarding wizard and you are done.
+## Which Product Should I Use?
 
-## v2 features
+| Goal | Use |
+| --- | --- |
+| Tailor a resume from the job page currently open in Chrome | Extension app |
+| Generate a Google Doc, DOCX, PDF, cover letter, critique, and tracking-sheet row | Extension app |
+| Run the Chrome side-panel Jobs digest for extension-supported sources | Extension app |
+| Discover and rank jobs from the full configured source-adapter catalog | JobHelp MCP |
+| Work inside Claude Code, Claude Desktop, Cursor, or another local MCP client | JobHelp MCP |
+| Batch-tailor resumes with validation and application folders | JobHelp MCP |
 
-Seven optional pipeline toggles that run alongside the base `generate` flow — pre-generate context fetchers, post-generate refinement passes, and a multi-version fan-out. Each has its own model selector and runs only when toggled on in the side panel. v0.2.1 ships a single-file config model: paste one Drive file ID instead of eight per-machine values — see [docs/setup-for-new-users.md](docs/setup-for-new-users.md).
+## Architecture
 
-| Toggle | What it does |
-|---|---|
-| Research company | Web-search-backed company facts injected into the generate prompt |
-| LinkedIn role benchmark | Public-profile patterns for the target role, injected into the prompt |
-| Critique pass | 8-dimension scoring + tiered improvements on the generated resume |
-| Auto-revise | Surgical, scope-bounded revision (currently whole-resume in the UI) |
-| Cover letter | 3-paragraph industry cover letter saved to the job folder |
-| Verify CL hooks | Web-search verification of named entities in a cover letter |
-| Multi-version | N variants (2-5) with different framings; replaces standard generate |
+```mermaid
+flowchart LR
+  subgraph Browser["Chrome Extension"]
+    SidePanel["Side panel UI"]
+    Background["MV3 background worker"]
+    Scraper["Injected scraper bundle"]
+  end
 
-Details, API shapes, and caveats: [docs/v2-features.md](docs/v2-features.md). Release history: [CHANGELOG.md](CHANGELOG.md).
+  subgraph Google["Google Workspace"]
+    AppsScript["Apps Script web app"]
+    Drive["Drive folders and config"]
+    Sheet["Tracking sheet"]
+  end
 
-## Install and build the extension
+  subgraph MCP["Local MCP Server"]
+    MCPServer["jobhelp-mcp stdio server"]
+    Sources["Job source adapters"]
+    State["Local jobhelp state"]
+  end
+
+  SidePanel --> Background
+  Background --> Scraper
+  SidePanel --> AppsScript
+  Background --> AppsScript
+  AppsScript --> Drive
+  AppsScript --> Sheet
+  AppsScript --> Anthropic["Anthropic API"]
+  MCPServer --> Sources
+  MCPServer --> State
+  MCPServer --> MCPClient["MCP client AI"]
+```
+
+## Repository Layout
+
+```text
+extension-app/
+  README.md                     Extension app product guide
+  extension/                    Chrome Manifest V3 extension
+  appsscript/                   Apps Script backend source and bundle
+  prompts/shared/               Resume and cover-letter rule files
+  tests/                        Cross-package contract, smoke, and fixture tests
+
+jobhelp-mcp/
+  README.md                     MCP install and usage guide
+  mcp/src/                      MCP tools, resources, prompts, and wiring
+  core/                         Source adapters, ranking, state, resumes, rules
+  prompts-bundle/               Rule bundle shipped with the MCP package
+  tests/                        MCP and core regression tests
+
+docs/
+  setup-for-new-users.md        End-user extension setup
+  v2-features.md                Extension feature actions and caveats
+  security.md                   Secret storage and threat model
+  jobhelp-mcp.md                MCP maintainer notes
+  code-simplifier-log.md        Files touched by simplification passes
+
+scripts/
+  verify-bundle.mts             Repo-level build and bundle sanity check
+  smoke-test.mts                Extension/App Script smoke harness
+  test-handler.mts              CLI for calling a deployed Apps Script action
+```
+
+## Extension App
+
+The extension app is the browser-first workflow:
+
+1. Open a job posting.
+2. Open the JobHelp side panel.
+3. The scraper extracts company, role, job description, and job insights from the page.
+4. Review or edit the extracted fields.
+5. Generate a tailored resume through your Apps Script backend.
+6. Save, finalize to DOCX/PDF, generate optional cover letters or critiques, and log the application to Google Sheets.
+
+The extension also includes a Jobs tab for a smaller discovery/digest workflow that can prefill Generate from ranked jobs. Its source support is narrower than the JobHelp MCP adapter catalog.
+
+Read the full product guide: [extension-app/README.md](extension-app/README.md).
+Read Chrome-extension internals: [extension-app/extension/README.md](extension-app/extension/README.md).
+Set up from scratch: [docs/setup-for-new-users.md](docs/setup-for-new-users.md).
+
+## JobHelp MCP
+
+The MCP server is the local AI-client workflow:
+
+1. Install `@jeffreyp1/jobhelp-mcp` in an MCP-compatible client.
+2. Run `init_config` and `apply_config_answers` to create local config.
+3. Register a resume.
+4. Discover and rank matching jobs.
+5. Start application folders, tailor resumes, validate drafts, and write artifacts.
+
+The MCP server makes no LLM calls. It exposes deterministic data, state, and prompt context; the client AI performs reasoning in its own session.
+
+Read the full MCP guide: [jobhelp-mcp/README.md](jobhelp-mcp/README.md).
+Read MCP maintainer notes: [docs/jobhelp-mcp.md](docs/jobhelp-mcp.md).
+
+## Build And Test
+
+Run commands from the repo root unless a package README says otherwise.
 
 ```bash
-git clone https://github.com/<your-fork>/JobHelp.git
-cd JobHelp
 npm install
-node extension/scripts/build.mts
+npx tsc --noEmit
+npx vitest run
+node extension-app/extension/scripts/build.mts
+node extension-app/appsscript/scripts/build.mts
+node scripts/verify-bundle.mts
+npm --prefix jobhelp-mcp run build
 ```
 
-Then load the unpacked extension in Chrome:
+Focused commands:
 
 ```bash
-# In Chrome, open:
-#   chrome://extensions
-# Toggle "Developer mode" (top right), click "Load unpacked",
-# and select the built output directory:
-open -R extension/public
+npx vitest run extension-app/tests/sidepanel/resumeEditor-selection.test.ts
+npx vitest run extension-app/tests/contracts/verify-bundle-actions.test.ts
+npm --prefix jobhelp-mcp test -- --run tests/sources/validate.test.ts
 ```
 
-The JobHelp icon appears in the toolbar; click it to open the side panel.
+`scripts/verify-bundle.mts` is the best final check before publishing. It builds the extension and Apps Script bundles, runs MCP regression coverage, checks bundle sizes, validates the manifest, verifies version alignment, and confirms every backend action is present in `Code.gs`.
 
-## Deploy the Apps Script backend
+## Data And Security Model
 
-The backend reads/writes your Drive, calls Claude, and logs to your tracking sheet. Build the bundle, then paste each file into a new Apps Script project.
+JobHelp is designed for personal use. You own the backend, files, and state:
 
-```bash
-node appsscript/scripts/build.mts
-ls appsscript/dist/
-# Code.gs  claude.gs  drive.gs  sheet.gs  prompt.gs  tokens.gs  cost.gs  seed.gs
-```
+- Extension config lives in a Drive-hosted `jobhelp-config.json`.
+- Generated extension outputs live in your Drive output folder.
+- Extension application rows are appended to your Google Sheet.
+- MCP config lives under `~/.config/jobhelp/` by default.
+- MCP digests, resumes, and application artifacts live under `~/jobhelp/` by default.
 
-In [script.google.com](https://script.google.com):
+Do not commit API keys, Apps Script URLs, Drive config files, real resumes, generated application artifacts, or private digest outputs. For the full model, see [docs/security.md](docs/security.md).
 
-1. **New project** → rename to `JobHelp Backend`.
-2. Add one script file per `.gs` above (click **+** → **Script file**) and paste the contents.
-3. **Project Settings** → **Script Properties** → add `ANTHROPIC_API_KEY` = your `sk-ant-…` key.
-4. **Deploy** → **New deployment** → type **Web app**, execute as **Me**, access **Only myself**.
-5. Copy the `/exec` URL — you'll paste it into the extension's Settings tab.
+## Rule Files
 
-## Configure the extension (first run)
+The rule files define the writing and truthfulness constraints used by both workflows:
 
-Open the side panel → **Settings** tab and paste these values. Each saves on change.
+- Extension rules: [extension-app/prompts/shared/](extension-app/prompts/shared/)
+- MCP package rules: [jobhelp-mcp/prompts-bundle/](jobhelp-mcp/prompts-bundle/)
 
-| Field | Where to find it |
-|---|---|
-| Apps Script URL | The `/exec` URL from the deploy step above |
-| Anthropic API key | [console.anthropic.com](https://console.anthropic.com) → API Keys |
-| Source folder ID | Drive folder URL: `…/folders/<ID>` |
-| Rules folder ID | Drive folder URL: `…/folders/<ID>` |
-| Output folder ID | Drive folder URL: `…/folders/<ID>` |
-| Tracking sheet ID | Sheet URL: `…/d/<ID>/edit` |
+The most load-bearing files are anti-fabrication, bullet construction, bridge language, self-scan, output shape, and revision discipline. If you change rule behavior, run prompt tests and the full bundle verifier.
 
-Then click **Seed rule files** in Settings — this populates the rules folder with the 12 default rule files from this repo. The status banner transitions through `noConfig → needsFolders → seeding → ready`.
+## Development Standards
 
-For step-by-step screenshots and troubleshooting, see [SETUP.md](SETUP.md).
+- Keep source files near or below 300 lines when practical.
+- Keep extension and MCP boundaries separate.
+- Treat generated bundles as build output; do not hand-edit them.
+- Keep `extension-app/extension/src/types/api-contract.ts` and `extension-app/appsscript/src/types/api-contract.ts` synchronized when wire types change.
+- Use structured logging helpers instead of raw console calls in production code.
+- For behavior changes, add or update focused tests before implementation.
+- Before calling work complete, run typecheck, tests, and bundle verification.
 
-## Generate a tailored resume
+## Documentation Map
 
-1. Open any job posting (LinkedIn, Indeed, Greenhouse, Lever, Workday, Ashby, or generic HTML).
-2. Click the JobHelp toolbar icon → side panel opens.
-3. **Job Insights** auto-fills via the DOM scraper (~50–100 ms, no LLM): title, company, salary, required skills, YOE, location, visa, applicant count.
-4. Review the extracted JD; edit if needed.
-5. Click **Generate** → tailored resume appears in 5–15 seconds.
-6. Click **Save & Log** → Doc lands in your output folder, row appears in your sheet.
+| Document | Purpose |
+| --- | --- |
+| [extension-app/README.md](extension-app/README.md) | Extension app user, operator, and architecture guide |
+| [extension-app/extension/README.md](extension-app/extension/README.md) | Chrome extension implementation guide |
+| [jobhelp-mcp/README.md](jobhelp-mcp/README.md) | MCP user install, tools, and workflows |
+| [docs/jobhelp-mcp.md](docs/jobhelp-mcp.md) | MCP maintainer internals |
+| [docs/setup-for-new-users.md](docs/setup-for-new-users.md) | Extension setup walkthrough |
+| [docs/v2-features.md](docs/v2-features.md) | Optional extension pipeline features |
+| [docs/security.md](docs/security.md) | Secret storage and security recommendations |
+| [docs/code-simplifier-log.md](docs/code-simplifier-log.md) | Simplified-file tracking log |
 
-## Call the backend API directly
+## License
 
-The extension talks to Apps Script over HTTP. Every request shape is defined in [`extension/src/types/api-contract.ts`](extension/src/types/api-contract.ts) and mirrored in `appsscript/src/types/`.
-
-Generate a resume programmatically:
-
-```typescript
-import type {
-  GenerateRequest,
-  GenerateResponse,
-} from "./extension/src/types/api-contract.js";
-
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/…/exec";
-
-const request: GenerateRequest = {
-  action: "generate",
-  jd: "Senior backend engineer, Go, Postgres, Kafka…",
-  company: "Acme",
-  role: "Senior Backend Engineer",
-  url: "https://acme.example.com/jobs/123",
-  jobInsights: null,
-  toggles: {},
-  sourceFolderId: "1ABC…",
-  rulesFolderId: "1DEF…",
-  outputFolderId: "1GHI…",
-  sheetId: "1JKL…",
-  model: "claude-haiku-4-5-20251001",
-};
-
-const res = await fetch(APPS_SCRIPT_URL, {
-  method: "POST",
-  body: JSON.stringify(request),
-});
-const data = (await res.json()) as GenerateResponse;
-
-if (!data.ok) {
-  throw new Error(`${data.error.type}: ${data.error.message}`);
-}
-console.log(data.docUrl, data.cost.totalUsd, data.keywordCoverage.rate);
-```
-
-## Handle API errors
-
-Every response is an `ApiResult<T>` discriminated union. Always branch on `ok` first.
-
-```typescript
-import type { ApiError, GenerateResponse } from "./extension/src/types/api-contract.js";
-
-function describe(err: ApiError): string {
-  switch (err.type) {
-    case "auth":        return "API key invalid — re-paste in Settings.";
-    case "rate_limit":  return "Slow down; retry in a few seconds.";
-    case "drive":       return "Drive permission missing — re-authorize Apps Script.";
-    case "config":      return "A folder ID or sheet ID is missing.";
-    case "validation":  return `Bad request: ${err.message}`;
-    case "server":      return err.retryable ? "Transient — retry." : "Server error.";
-    default:            return err.message;
-  }
-}
-
-const data: GenerateResponse = await callBackend();
-if (!data.ok) {
-  console.error(describe(data.error));
-  return;
-}
-useResume(data.resumeMd);
-```
-
-## Switch the generation model
-
-Change the model from the **Settings** tab → **Default generate model**, or pass `model` directly when calling the API. Approximate per-resume costs (with prompt caching warm):
-
-```typescript
-const MODELS = {
-  fast:    "claude-haiku-4-5-20251001",   // ~$0.012/resume — default
-  balanced:"claude-sonnet-4-6",            // ~$0.04/resume — noticeably better
-  best:    "claude-opus-4-7",              // ~$0.18/resume — top quality
-} as const;
-
-await generateResume({ ...request, model: MODELS.balanced });
-```
-
-## Finalize as DOCX or PDF
-
-After generation, the user-edited markdown is converted via Google Docs' native export:
-
-```typescript
-import type { FinalizeRequest, FinalizeResponse } from "./extension/src/types/api-contract.js";
-
-const finalize: FinalizeRequest = {
-  action: "finalize",
-  docId: "1mNoP…",                  // returned by `generate`
-  jobFolderId: "1qRsT…",            // returned by `generate`
-  finalMarkdown: editedMarkdown,
-  formats: ["docx", "pdf"],
-};
-
-const res = await fetch(APPS_SCRIPT_URL, { method: "POST", body: JSON.stringify(finalize) });
-const data = (await res.json()) as FinalizeResponse;
-if (data.ok) {
-  for (const file of data.files) {
-    console.log(file.format, file.url);
-  }
-}
-```
-
-## Customize the generation rules
-
-The markdown files in `prompts/shared/` are the single source of truth for generation behavior. They live in your Drive `rules/` folder after seeding — edit them there.
-
-```bash
-ls prompts/shared/
-# 01-priority-hierarchy.md   06-bullet-construction.md  11-self-scan-checklist.md
-# 02-anti-fabrication.md     07-reframing-strategies.md 12-template-reproduction.md
-# 03-banned-words.md         08-bridge-language.md      13-output-shape.md
-# 04-banned-phrases.md       09-section-structure.md    14-revision-discipline.md
-# 05-structural-rules.md     10-cover-letter-industry.md
-```
-
-Five files are **load-bearing** — they enforce truthfulness, ATS safety, and v2-feature contracts:
-
-```text
-02-anti-fabrication.md      Never invent skills, metrics, or employers.
-06-bullet-construction.md   Bullet format: verb + metric + context.
-08-bridge-language.md       Frame transferable skills without fabricating.
-11-self-scan-checklist.md   ATS safety + AI-fingerprint removal.
-14-revision-discipline.md   Auto-revise: byte-identical outside the requested scope.
-```
-
-Edits apply on the next generation (after the 10-minute Drive cache). To restore defaults: **Settings → Reset rules to defaults**.
-
-## Add your source materials
-
-Place `.md` files in your source folder. JobHelp reads every `.md` in the folder and concatenates them.
-
-```markdown
-<!-- source-materials/experience.md -->
-# Experience
-
-## Senior Engineer — Acme (2022–present)
-- Led migration of payments service from monolith to 3 Go microservices,
-  reducing p95 latency from 480ms to 120ms.
-- Designed Kafka-based event bus handling 12k events/sec at peak.
-
-# Skills
-- Go, TypeScript, Python
-- Postgres, Kafka, Redis
-- AWS (ECS, RDS, SQS)
-```
-
-A starter template lives at [`tests/fixtures/source-materials/sample-source-materials.md`](tests/fixtures/source-materials).
-
-## Add support for a new job site
-
-Scrapers live in `extension/src/scraper.ts`. Each is a function that takes the page DOM and returns a partial `ScraperOutput`. Register it in the dispatcher.
-
-```typescript
-import type { ScraperOutput } from "./types/scraper-output.js";
-
-export function scrapeMyAts(doc: Document): Partial<ScraperOutput> {
-  return {
-    title:   doc.querySelector("h1.job-title")?.textContent?.trim() ?? null,
-    company: doc.querySelector(".company-name")?.textContent?.trim() ?? null,
-    jdHtml:  doc.querySelector(".job-description")?.innerHTML ?? "",
-    location: doc.querySelector(".location")?.textContent?.trim() ?? null,
-  };
-}
-
-// In dispatchScraper():
-if (location.hostname.endsWith("myats.example.com")) {
-  return scrapeMyAts(document);
-}
-```
-
-Add a fixture at `tests/fixtures/<site>.html` and a test that pins the expected output.
-
-## Code layout
-
-```text
-appsscript/src/
-  Code.ts                 Web-app entry; routes ApiAction → handlers
-  claude.ts               Anthropic Messages API client (forwards optional tools[])
-  drive.ts                Drive helpers (readSourceFiles, createFileInFolder, createGoogleDoc, ...)
-  message-builder.ts      Composes the canonical user-message shape; shared by generate + multi-version
-  handlers/               One file per v2 action — research, benchmark, critique, autoRevise,
-                          coverLetter, verifyHooks, multiVersion
-  types/                  api-contract.ts (mirrored from extension/src/types/), claude-api.ts, ...
-
-extension/src/
-  background.ts           Service worker — owns generate / finalize / list_files / write_file /
-                          seed_defaults / download_template / upload_filled_docx
-  sidepanel/
-    index.ts              Side-panel bootstrap
-    tabs/generate.ts      Generate-tab orchestration; wires every v2 toggle
-    components/           Reusable UI (toggleRow, jobInsights, costEstimator, resumeEditor, ...)
-    features/             One file per v2 feature — UI rendering for results/diffs
-  lib/
-    apiClient.ts          HTTP client; v2 actions are called directly from the side panel
-    docxRenderer.ts       Client-side markdown → DOCX
-    templateFiller.ts     Fills a user-supplied DOCX template
-  scraper.ts              JD scrapers
-```
-
-## Run the tests
-
-```bash
-npm test                                              # full suite (~138 tests, ~3s)
-npx vitest run extension/tests/onboarding.test.ts     # one file
-npx vitest run -t "scraper"                           # by name
-npx vitest                                            # watch mode
-```
-
-Tests use Vitest. Pure logic runs in Node; UI tests run under jsdom. `chrome.storage` is mocked — no Chrome or external services needed.
-
-## Costs
-
-You pay Anthropic directly with your own API key. There is no JobHelp subscription.
-
-```text
-Haiku 4.5 (default)   ~$0.012 warm / ~$0.024 cold   default
-Sonnet 4.6            ~$0.04                         noticeably better quality
-Opus 4.7              ~$0.18                         top quality
-```
-
-At 25 applications/day on Haiku 4.5 with prompt caching: **~$9–12/month**.
+MIT. See [LICENSE](LICENSE). The software is provided as-is, without warranty or liability for misuse.
