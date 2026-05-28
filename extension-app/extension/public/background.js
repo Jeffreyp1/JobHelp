@@ -158,7 +158,7 @@ function log(level, msg, ctx) {
   consoleFor(level)(line);
 }
 
-// extension-app/extension/src/lib/apiClient.ts
+// extension-app/extension/src/lib/apiClient-post.ts
 function networkError(message) {
   return {
     ok: false,
@@ -172,201 +172,128 @@ function networkError(message) {
 function headSnippet(s, n = 200) {
   return s.slice(0, n).replace(/\s+/g, " ").trim();
 }
+async function postToAppsScript(appsScriptUrl, body) {
+  let response;
+  try {
+    response = await fetch(appsScriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+  } catch (err) {
+    const message = err?.message ?? "Network request failed";
+    log("warn", "apiClient: network request failed", {
+      action: body.action,
+      error: message
+    });
+    return networkError(message);
+  }
+  if (!response.ok) {
+    log("warn", "apiClient: HTTP error response", {
+      action: body.action,
+      status: response.status,
+      statusText: response.statusText
+    });
+    return networkError(`HTTP ${response.status}: ${response.statusText}`);
+  }
+  let rawText;
+  try {
+    rawText = await response.text();
+  } catch (err) {
+    const message = err?.message ?? "Failed to read response body";
+    log("error", "apiClient: failed to read response body", {
+      action: body.action,
+      error: message
+    });
+    return networkError(message);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch {
+    const snippet = headSnippet(rawText);
+    log("error", "apiClient: response was not valid JSON", {
+      action: body.action,
+      bodySnippet: snippet
+    });
+    return networkError(`Response was not valid JSON: ${snippet}`);
+  }
+  if (typeof parsed !== "object" || parsed === null || typeof parsed.ok !== "boolean") {
+    const snippet = headSnippet(rawText);
+    log("error", "apiClient: malformed response \u2014 missing ok flag", {
+      action: body.action,
+      bodySnippet: snippet
+    });
+    return networkError(`Malformed response \u2014 missing ok flag: ${snippet}`);
+  }
+  return parsed;
+}
+
+// extension-app/extension/src/lib/apiClient.ts
 var ApiClient = class {
   constructor(appsScriptUrl) {
     this.appsScriptUrl = appsScriptUrl;
   }
-  /** POST a request body to the Apps Script endpoint and parse JSON response. */
   async post(body) {
-    let response;
-    try {
-      response = await fetch(this.appsScriptUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-    } catch (err) {
-      const message = err?.message ?? "Network request failed";
-      log("warn", "apiClient: network request failed", {
-        action: body.action,
-        error: message
-      });
-      return networkError(message);
-    }
-    if (!response.ok) {
-      log("warn", "apiClient: HTTP error response", {
-        action: body.action,
-        status: response.status,
-        statusText: response.statusText
-      });
-      return networkError(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    let rawText;
-    try {
-      rawText = await response.text();
-    } catch (err) {
-      const message = err?.message ?? "Failed to read response body";
-      log("error", "apiClient: failed to read response body", {
-        action: body.action,
-        error: message
-      });
-      return networkError(message);
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(rawText);
-    } catch {
-      const snippet = headSnippet(rawText);
-      log("error", "apiClient: response was not valid JSON", {
-        action: body.action,
-        bodySnippet: snippet
-      });
-      return networkError(`Response was not valid JSON: ${snippet}`);
-    }
-    if (typeof parsed !== "object" || parsed === null || typeof parsed.ok !== "boolean") {
-      const snippet = headSnippet(rawText);
-      log("error", "apiClient: malformed response \u2014 missing ok flag", {
-        action: body.action,
-        bodySnippet: snippet
-      });
-      return networkError(`Malformed response \u2014 missing ok flag: ${snippet}`);
-    }
-    return parsed;
+    return postToAppsScript(this.appsScriptUrl, body);
   }
-  /**
-   * Trigger the generate pipeline on the backend.
-   * Returns a GenerateResponse (ok:true with result, or ok:false with error).
-   */
   async generate(req) {
     return this.post({ action: "generate", ...req });
   }
-  /** List files in a Drive folder (source or rules). */
   async listFiles(req) {
     return this.post({ action: "list_files", ...req });
   }
-  /** Overwrite a Drive file's contents. */
   async writeFile(req) {
     return this.post({ action: "write_file", ...req });
   }
-  /** Seed the user's rules folder with default prompt files from GitHub. */
   async seedDefaults(req) {
     return this.post({ action: "seed_defaults", ...req });
   }
-  /** Health check — verifies the Apps Script endpoint is reachable. */
   async ping() {
     return this.post({ action: "ping" });
   }
-  /**
-   * Convert the (possibly user-edited) markdown to DOCX and/or PDF.
-   * Updates the existing tailored_resume Doc, then exports to the requested
-   * formats into the same job folder.
-   */
   async finalize(req) {
     return this.post({ action: "finalize", ...req });
   }
-  /**
-   * Download the user's uploaded resume template DOCX from Drive as base64.
-   * Used by the "Convert via Template (DOCX)" flow before client-side fill.
-   */
   async downloadTemplate(req) {
     return this.post({ action: "download_template", ...req });
   }
-  /**
-   * Upload a base64-encoded DOCX (the result of fillResumeTemplate) into a
-   * Drive folder and return the resulting file URL.
-   */
   async uploadFilledDocx(req) {
     return this.post({ action: "upload_filled_docx", ...req });
   }
-  /**
-   * Create a brand-new file in the user's Drive. Used by the v2.1 onboarding
-   * wizard to scaffold `jobhelp-config.json` (defaults: application/json,
-   * Drive root). Pass `parentFolderId` to drop the file into a specific
-   * folder, or override `mimeType` for non-JSON scaffolds.
-   */
   async createDriveFile(req) {
     return this.post({ action: "create_drive_file", ...req });
   }
-  // ─── feature owner: E1 ───────────────────────────────────────────────────
-  /**
-   * Research a company using live web search and return a structured summary.
-   * Results are cached server-side for 24h keyed by company+role.
-   */
   async researchCompany(req) {
     return this.post({ action: "research_company", ...req });
   }
-  /**
-   * Benchmark a role at a company using LinkedIn-style profile patterns.
-   * Results are cached server-side for 24h keyed by company+role.
-   */
   async benchmarkRole(req) {
     return this.post({ action: "benchmark_role", ...req });
   }
-  // ─── feature owner: E2 ───────────────────────────────────────────────────
-  /**
-   * Run the 8-dimension critique framework on a generated resume.
-   * Optionally saves critique.md to the job folder in Drive.
-   */
   async critique(req) {
     return this.post({ action: "critique", ...req });
   }
-  /**
-   * Revise a specific bullet, section, role, or the whole resume with
-   * surgical precision (rule 14-revision-discipline enforced server-side).
-   * Returns the revised markdown plus a line-level diff for user approval.
-   */
   async autoRevise(req) {
     return this.post({ action: "auto_revise", ...req });
   }
-  /**
-   * Scoped auto-revise: the model only sees the in-scope excerpt (one bullet
-   * or one section's bullets), guaranteeing byte equality of out-of-scope text
-   * by construction. Optional checker agent verifies the proposed replacement.
-   */
   async autoReviseScoped(req) {
     return this.post({ action: "auto_revise_scoped", ...req });
   }
-  // ─── feature owner: E3 ───────────────────────────────────────────────────
-  /**
-   * Generate a HOOK/EVIDENCE/CLOSING cover letter (250-300 words) from the
-   * candidate's resume + JD. Saves both .md and Google Doc to the job folder.
-   */
   async coverLetter(req) {
     return this.post({ action: "cover_letter", ...req });
   }
-  /**
-   * Scan a cover letter for named entities and verify each via web search.
-   * Unverified entities are tagged inline with [⚠ UNVERIFIED].
-   */
   async verifyClHooks(req) {
     return this.post({ action: "verify_cl_hooks", ...req });
   }
-  // ─── feature owner: E4 ───────────────────────────────────────────────────
-  /**
-   * Generate N resume variants in parallel (fan-out), each with a different
-   * framing directive. Returns all variants for user selection.
-   */
   async multiVersion(req) {
     return this.post({ action: "multi_version", ...req });
   }
-  // ─── job-pipeline (Phase 1: discovery → ranking → tracking) ──────────────
-  /**
-   * Distil the user's source materials into a JobProfile (titles, skills,
-   * search queries, filters, a ~200-word summary). The result is cached
-   * client-side; regenerate when the source materials change.
-   */
   async extractProfile(req) {
     return this.post({ action: "extract_profile", ...req });
   }
-  /**
-   * Poll the configured job sources, normalise + dedup, rank against the
-   * profile, upsert the ranked list into the Job Pipeline sheet, and return
-   * it. Does NOT tailor resumes — the digest UI calls `generate` on demand.
-   */
   async discoverAndRank(req) {
     return this.post({ action: "discover_and_rank", ...req });
   }
-  /** Change a Job Pipeline row's status (and optionally its tailored-resume link). */
   async updateJobStatus(req) {
     return this.post({ action: "update_job_status", ...req });
   }
