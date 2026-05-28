@@ -6541,107 +6541,7 @@ function _getMultiWordFlag(dict) {
   return found;
 }
 
-// extension-app/extension/src/scraper.ts
-var _dictPromise = null;
-function getDict() {
-  if (!_dictPromise) {
-    _dictPromise = loadSkillsDict();
-  }
-  return _dictPromise;
-}
-async function scrapePage(ctx) {
-  const { document: document2, url } = ctx;
-  const hostname = safeHostname(url);
-  const strategy = pickStrategy(document2, hostname);
-  const scrapedAt = Date.now();
-  const empty = (s) => ({
-    jd: "",
-    company: null,
-    role: null,
-    url,
-    scrapeStrategy: s,
-    jobInsights: null,
-    scrapedAt
-  });
-  let extracted = null;
-  switch (strategy) {
-    case "linkedin":
-      extracted = extractLinkedIn(document2);
-      break;
-    case "indeed":
-      extracted = extractIndeed(document2);
-      break;
-    case "greenhouse":
-      extracted = extractGreenhouse(document2);
-      break;
-    case "lever":
-      extracted = extractLever(document2);
-      break;
-    case "workday":
-      extracted = extractWorkday(document2);
-      break;
-    case "ashby":
-      extracted = extractAshby(document2);
-      break;
-    case "generic":
-      extracted = extractGeneric(document2);
-      break;
-    case "failed":
-      return empty("failed");
-  }
-  if (!extracted || !extracted.jd || extracted.jd.trim().length === 0) {
-    return empty("failed");
-  }
-  let dict = null;
-  try {
-    dict = await getDict();
-  } catch {
-    dict = null;
-  }
-  const jobInsights = dict ? buildJobInsights(extracted, document2, dict) : buildJobInsights(extracted, document2, /* @__PURE__ */ new Map());
-  let company = extracted.company;
-  let role = extracted.role;
-  if (!company || !role) {
-    const t = parseTitleForRoleAndCompany(document2);
-    if (!company && t.company) company = t.company;
-    if (!role && t.role) role = t.role;
-  }
-  if (!company) company = metaContent(document2, "og:site_name");
-  if (!role) role = metaContent(document2, "og:title");
-  return {
-    jd: extracted.jd,
-    company,
-    role,
-    url,
-    scrapeStrategy: strategy,
-    jobInsights,
-    scrapedAt
-  };
-}
-function safeHostname(url) {
-  try {
-    return new URL(url).hostname.toLowerCase();
-  } catch {
-    return "";
-  }
-}
-function pickStrategy(doc, hostname) {
-  if (hostname.includes("linkedin.com")) return "linkedin";
-  if (hostname.includes("indeed.com")) return "indeed";
-  if (hostname.includes("greenhouse.io")) return "greenhouse";
-  if (hostname.includes("lever.co")) return "lever";
-  if (hostname.includes("myworkdayjobs.com") || hostname.includes("workday.com")) return "workday";
-  if (hostname.includes("ashbyhq.com")) return "ashby";
-  if (doc.querySelector(".jobs-description-content")) return "linkedin";
-  if (doc.querySelector("#jobDescriptionText")) return "indeed";
-  if (doc.querySelector(".app-title") && doc.querySelector("#content")) return "greenhouse";
-  if (doc.querySelector(".posting-headline") && doc.querySelector(".posting")) return "lever";
-  if (doc.querySelector('[data-automation-id="jobPostingDescription"]')) return "workday";
-  if (doc.querySelector(".ashby-job-posting-right-pane")) return "ashby";
-  const bodyText = (doc.body?.textContent ?? "").trim();
-  if (bodyText.length < 30) return "failed";
-  return "generic";
-}
+// extension-app/extension/src/scraper-utils.ts
 function textOrNull(el) {
   if (!el) return null;
   const t = (el.textContent ?? "").trim();
@@ -6769,250 +6669,11 @@ function blockText(el) {
   walk(el, false);
   return collapseWS(parts.join(""));
 }
-function extractLinkedIn(doc) {
-  const ld = findJobPosting(doc);
-  let company = null;
-  let role = null;
-  if (ld) {
-    const org = ld["hiringOrganization"];
-    if (org && typeof org === "object" && org["name"]) {
-      company = String(org["name"]).trim() || null;
-    }
-    if (typeof ld["title"] === "string") role = ld["title"].trim() || null;
-  }
-  if (!company) {
-    company = textOrNull(doc.querySelector(".jobs-unified-top-card__company-name a")) ?? textOrNull(doc.querySelector(".jobs-unified-top-card__company-name")) ?? textOrNull(doc.querySelector('[class*="job-details-jobs-unified-top-card__company-name"] a')) ?? textOrNull(doc.querySelector('[class*="job-details-jobs-unified-top-card__company-name"]')) ?? textOrNull(doc.querySelector('[class*="jobs-unified-top-card"] [class*="company"] a')) ?? textOrNull(doc.querySelector('[class*="topcard"] [class*="company"] a')) ?? textOrNull(doc.querySelector(".topcard__org-name-link")) ?? textOrNull(doc.querySelector('a[data-tracking-control-name*="company"]'));
-  }
-  if (!role) {
-    role = textOrNull(doc.querySelector(".top-card-layout__title")) ?? textOrNull(doc.querySelector(".jobs-unified-top-card__job-title")) ?? textOrNull(doc.querySelector('[class*="job-details-jobs-unified-top-card__job-title"]')) ?? textOrNull(doc.querySelector('[class*="topcard__title"]')) ?? textOrNull(doc.querySelector("h1.t-24")) ?? textOrNull(doc.querySelector("main h1"));
-  }
-  if (!company || !role) {
-    const t = parseTitleForRoleAndCompany(doc);
-    if (!company && t.company) company = t.company;
-    if (!role && t.role) role = t.role;
-  }
-  if (!company) company = metaContent(doc, "og:site_name");
-  if (!role) role = metaContent(doc, "og:title");
-  const descEl = doc.querySelector(".jobs-description-content__text") ?? doc.querySelector(".jobs-description-content") ?? doc.querySelector(".jobs-description") ?? doc.querySelector('[class*="jobs-description"]') ?? doc.querySelector('[class*="show-more-less-html"]') ?? doc.querySelector("article");
-  const headerText = textOrNull(doc.querySelector(".top-card-layout__primary-description")) ?? void 0;
-  const jd = blockText(descEl);
-  if (!jd) return null;
-  return { company, role, jd, headerText };
-}
-function extractIndeed(doc) {
-  const role = textOrNull(doc.querySelector(".jobsearch-JobInfoHeader-title")) ?? textOrNull(doc.querySelector('[data-testid="jobsearch-JobInfoHeader-title"]'));
-  const company = textOrNull(doc.querySelector(".jobsearch-InlineCompanyRating-companyHeader")) ?? textOrNull(doc.querySelector('[data-testid="inlineHeader-companyName"]')) ?? textOrNull(doc.querySelector(".jobsearch-CompanyInfoContainer a"));
-  const descEl = doc.querySelector("#jobDescriptionText") ?? doc.querySelector(".jobsearch-JobComponent-description");
-  const headerText = [
-    textOrNull(doc.querySelector(".jobsearch-JobInfoHeader-subtitle")),
-    textOrNull(doc.querySelector(".jobsearch-JobMetadataHeader"))
-  ].filter(Boolean).join("\n") || void 0;
-  const jd = blockText(descEl);
-  if (!jd) return null;
-  return { company, role, jd, headerText };
-}
-function extractGreenhouse(doc) {
-  const role = textOrNull(doc.querySelector(".app-title")) ?? textOrNull(doc.querySelector("h1.app-title"));
-  const company = textOrNull(doc.querySelector(".company-name a")) ?? textOrNull(doc.querySelector(".company-name")) ?? textOrNull(doc.querySelector("#header .company-name"));
-  const descEl = doc.querySelector("#job-description") ?? doc.querySelector("#content #content-block") ?? doc.querySelector("#content");
-  const headerText = textOrNull(doc.querySelector(".app-title-wrapper .location")) ?? textOrNull(doc.querySelector(".location")) ?? void 0;
-  const jd = blockText(descEl);
-  if (!jd) return null;
-  return { company, role, jd, headerText };
-}
-function extractLever(doc) {
-  const role = textOrNull(doc.querySelector(".posting-headline h2")) ?? textOrNull(doc.querySelector(".posting-headline h1"));
-  let company = metaContent(doc, "og:site_name") ?? textOrNull(doc.querySelector(".main-header-logo")) ?? null;
-  if (company) {
-    company = company.replace(/\s+careers\s*$/i, "").replace(/\s*[\-—–]\s*careers\s*$/i, "").trim() || company;
-  }
-  if (!company) {
-    const t = doc.title?.trim() ?? "";
-    const m = t.split(/\s+[-–—]\s+/);
-    if (m.length > 1) company = m[m.length - 1] || null;
-  }
-  const descEl = doc.querySelector(".content.posting") ?? doc.querySelector(".posting") ?? doc.querySelector(".posting-page");
-  const headerText = textOrNull(doc.querySelector(".posting-categories")) ?? ([
-    textOrNull(doc.querySelector(".posting-categories .location")),
-    textOrNull(doc.querySelector(".posting-categories .commitment"))
-  ].filter(Boolean).join(" \xB7 ") || void 0);
-  const jd = blockText(descEl);
-  if (!jd) return null;
-  return { company, role, jd, headerText };
-}
-function extractWorkday(doc) {
-  const role = textOrNull(doc.querySelector('[data-automation-id="jobPostingHeaderTitle"]'));
-  let company = metaContent(doc, "og:site_name") ?? textOrNull(doc.querySelector('[data-automation-id="company"]'));
-  if (company) {
-    company = company.replace(/\s+careers\s*$/i, "").trim() || company;
-  }
-  const descEl = doc.querySelector('[data-automation-id="jobPostingDescription"]') ?? doc.querySelector('[data-automation-id="jobPostingPage"]');
-  const headerText = [
-    textOrNull(doc.querySelector('[data-automation-id="locations"]')),
-    textOrNull(doc.querySelector('[data-automation-id="jobPostingHeaderSubtitle"]')),
-    textOrNull(doc.querySelector('[data-automation-id="postedOn"]'))
-  ].filter(Boolean).join("\n") || void 0;
-  const jd = blockText(descEl);
-  if (!jd) return null;
-  return { company, role, jd, headerText };
-}
-function extractAshby(doc) {
-  const role = textOrNull(doc.querySelector(".ashby-job-posting-title")) ?? textOrNull(doc.querySelector("h1"));
-  let company = metaContent(doc, "og:site_name") ?? textOrNull(doc.querySelector(".ashby-company-name"));
-  if (company) {
-    company = company.replace(/\s+careers\s*$/i, "").trim() || company;
-  }
-  const descEl = doc.querySelector(".ashby-job-posting-description") ?? doc.querySelector(".ashby-job-posting-right-pane");
-  const headerText = textOrNull(doc.querySelector(".ashby-job-posting-info")) ?? ([
-    textOrNull(doc.querySelector(".ashby-job-posting-location")),
-    textOrNull(doc.querySelector(".ashby-job-posting-type"))
-  ].filter(Boolean).join(" \xB7 ") || void 0);
-  const jd = blockText(descEl);
-  if (!jd) return null;
-  return { company, role, jd, headerText };
-}
-function extractGeneric(doc) {
-  const role = textOrNull(doc.querySelector(".job-title")) ?? textOrNull(doc.querySelector("h1")) ?? metaContent(doc, "og:title");
-  let company = metaContent(doc, "og:site_name");
-  const ld = findJobPosting(doc);
-  if (!company && ld) {
-    const org = ld["hiringOrganization"];
-    if (org && typeof org === "object" && org["name"]) {
-      company = String(org["name"]).trim() || null;
-    }
-  }
-  if (!company) {
-    const headerLink = doc.querySelector("header a, nav a");
-    company = textOrNull(headerLink);
-  }
-  if (company) {
-    company = company.replace(/\s*[\-—–]\s*careers\s*$/i, "").replace(/\s+careers\s*$/i, "").trim() || company;
-  }
-  const candidates = [];
-  for (const sel of ["article", "main", ".job-description", ".job-description-section", "section.hero ~ section"]) {
-    doc.querySelectorAll(sel).forEach((el) => candidates.push(el));
-  }
-  let best = null;
-  for (const el of candidates) {
-    const t = blockText(el);
-    if (t.length > (best?.len ?? 0)) best = { el, len: t.length };
-  }
-  if (!best) {
-    const body = doc.body;
-    if (body) {
-      const clone = body.cloneNode(true);
-      for (const sel of ["nav", "footer", "header", "script", "style", "noscript"]) {
-        clone.querySelectorAll(sel).forEach((n) => n.parentNode?.removeChild(n));
-      }
-      const t = blockText(clone);
-      if (t.length > 0) best = { el: clone, len: t.length };
-    }
-  }
-  if (!best) return null;
-  const root = best.el.cloneNode(true);
-  for (const sel of ["nav", "footer", "header", "script", "style", "noscript"]) {
-    root.querySelectorAll(sel).forEach((n) => n.parentNode?.removeChild(n));
-  }
-  const jd = blockText(root);
-  if (!jd || jd.length < 50) return null;
-  const headerText = textOrNull(doc.querySelector(".job-meta")) ?? textOrNull(doc.querySelector(".hero .job-meta")) ?? void 0;
-  return { company, role, jd, headerText };
-}
-function buildJobInsights(extracted, doc, dict) {
-  const { jd, headerText } = extracted;
-  const breakdown = splitIntoSections(jd);
-  const header = headerText ?? jd.split(/\n+/).slice(0, 6).join("\n");
-  const jdWithHeader = headerText ? headerText + "\n" + jd : jd;
-  const { salaryMin, salaryMax, salaryCurrency } = parseSalary(jdWithHeader);
-  const yearsExperience = parseYears(breakdown.requirements || jd) ?? parseYears(jd);
-  const jobType = parseJobType(jdWithHeader);
-  const { location: location2, remote } = parseLocationAndRemote(jdWithHeader, doc, header);
-  const educationRequired = parseEducation(breakdown.requirements || jd) ?? parseEducation(jd);
-  const visaSponsorship = parseVisa(jd);
-  const postedDate = parsePostedDate(doc);
-  const applicantCount = parseApplicantCount(doc, jd);
-  const reqMatches = findSkillsInText(breakdown.requirements, dict);
-  const niceMatches = findSkillsInText(breakdown.niceToHave, dict);
-  const respMatches = findSkillsInText(breakdown.responsibilities, dict);
-  const otherMatches = findSkillsInText(breakdown.other, dict);
-  const fullJdMatches = findSkillsInText(jd, dict);
-  const niceSet = new Set(niceMatches.map((m) => m.canonical));
-  const reqSet = new Set(reqMatches.map((m) => m.canonical));
-  const skillsRequired = reqMatches.length > 0 ? reqMatches.slice(0, 25).map((m) => ({
-    canonical: m.canonical,
-    count: m.count,
-    section: "requirements"
-  })) : fullJdMatches.filter((m) => !niceSet.has(m.canonical)).slice(0, 25).map((m) => ({ canonical: m.canonical, count: m.count, section: "other" }));
-  const skillsNiceToHave = niceMatches.filter((m) => !reqSet.has(m.canonical)).slice(0, 15).map((m) => ({ canonical: m.canonical, count: m.count, section: "niceToHave" }));
-  return {
-    jobType,
-    location: location2,
-    remote,
-    salaryMin,
-    salaryMax,
-    salaryCurrency,
-    yearsExperience,
-    educationRequired,
-    skillsRequired,
-    skillsNiceToHave,
-    visaSponsorship,
-    postedDate,
-    applicantCount,
-    sectionBreakdown: breakdown
-  };
-}
-var REQ_RE = /^(?:requirements?|qualifications?|what\s+(?:we|you)(?:'|\s)?re\s+looking\s+for|must[\s-]haves?|you\s+have|about\s+you|who\s+you\s+are|you\s+bring|required(?:\s+qualifications?)?)\b/i;
-var RESP_RE = /^(?:responsibilit\w*|key\s+responsibilities|what\s+you(?:'|\s)?ll\s+do|what\s+you\s+will\s+do|what\s+you(?:'|\s)?ll\s+do\s+\(.*\)|the\s+role|day[\s-]to[\s-]day|you\s+will|role\s+overview)\b/i;
-var NICE_RE = /^(?:nice[\s-]?to[\s-]?haves?|bonus(?:\s+points)?|preferred(?:\s+qualifications?)?|plus|you\s+might|good\s+to\s+have)\b/i;
-function classifyHeading(line) {
-  const trimmed = line.replace(new RegExp(HEADING_MARK, "g"), "").trim().replace(/[:…]+$/u, "").trim();
-  if (!trimmed) return null;
-  if (NICE_RE.test(trimmed)) return "niceToHave";
-  if (REQ_RE.test(trimmed)) return "requirements";
-  if (RESP_RE.test(trimmed)) return "responsibilities";
-  return null;
-}
-function isMarkedHeading(line) {
-  return line.includes(HEADING_MARK);
-}
-function splitIntoSections(jd) {
-  const breakdown = {
-    requirements: "",
-    responsibilities: "",
-    niceToHave: "",
-    other: ""
-  };
-  const lines = jd.split(/\n+/);
-  let current = "other";
-  const buckets = {
-    requirements: [],
-    responsibilities: [],
-    niceToHave: [],
-    other: []
-  };
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line) continue;
-    if (isMarkedHeading(line)) {
-      const cls = classifyHeading(line);
-      if (cls) {
-        current = cls;
-        continue;
-      }
-      current = "other";
-      continue;
-    }
-    buckets[current].push(stripHeadingMark(line));
-  }
-  breakdown.requirements = buckets.requirements.join("\n").trim();
-  breakdown.responsibilities = buckets.responsibilities.join("\n").trim();
-  breakdown.niceToHave = buckets.niceToHave.join("\n").trim();
-  breakdown.other = buckets.other.join("\n").trim();
-  return breakdown;
-}
 function stripHeadingMark(line) {
   return line.replace(new RegExp(HEADING_MARK, "g"), "");
 }
+
+// extension-app/extension/src/scraper-fields.ts
 function parseSalary(text) {
   const re = /([\$£€])\s*([\d,]+)(?:\s*k)?(?:\s*[-–—]\s*\$?\s*([\d,]+)(?:\s*k)?)?/gi;
   let bestMin = null;
@@ -7175,6 +6836,348 @@ function parseApplicantCount(doc, jd) {
   const m = jd.match(/(\d+)\s+applicants?/i);
   if (m) return parseInt(m[1], 10);
   return null;
+}
+
+// extension-app/extension/src/scraper-insights.ts
+function buildJobInsights(extracted, doc, dict) {
+  const { jd, headerText } = extracted;
+  const breakdown = splitIntoSections(jd);
+  const header = headerText ?? jd.split(/\n+/).slice(0, 6).join("\n");
+  const jdWithHeader = headerText ? headerText + "\n" + jd : jd;
+  const { salaryMin, salaryMax, salaryCurrency } = parseSalary(jdWithHeader);
+  const yearsExperience = parseYears(breakdown.requirements || jd) ?? parseYears(jd);
+  const jobType = parseJobType(jdWithHeader);
+  const { location: location2, remote } = parseLocationAndRemote(jdWithHeader, doc, header);
+  const educationRequired = parseEducation(breakdown.requirements || jd) ?? parseEducation(jd);
+  const visaSponsorship = parseVisa(jd);
+  const postedDate = parsePostedDate(doc);
+  const applicantCount = parseApplicantCount(doc, jd);
+  const reqMatches = findSkillsInText(breakdown.requirements, dict);
+  const niceMatches = findSkillsInText(breakdown.niceToHave, dict);
+  const respMatches = findSkillsInText(breakdown.responsibilities, dict);
+  const otherMatches = findSkillsInText(breakdown.other, dict);
+  const fullJdMatches = findSkillsInText(jd, dict);
+  const niceSet = new Set(niceMatches.map((m) => m.canonical));
+  const reqSet = new Set(reqMatches.map((m) => m.canonical));
+  const skillsRequired = reqMatches.length > 0 ? reqMatches.slice(0, 25).map((m) => ({
+    canonical: m.canonical,
+    count: m.count,
+    section: "requirements"
+  })) : fullJdMatches.filter((m) => !niceSet.has(m.canonical)).slice(0, 25).map((m) => ({ canonical: m.canonical, count: m.count, section: "other" }));
+  const skillsNiceToHave = niceMatches.filter((m) => !reqSet.has(m.canonical)).slice(0, 15).map((m) => ({ canonical: m.canonical, count: m.count, section: "niceToHave" }));
+  return {
+    jobType,
+    location: location2,
+    remote,
+    salaryMin,
+    salaryMax,
+    salaryCurrency,
+    yearsExperience,
+    educationRequired,
+    skillsRequired,
+    skillsNiceToHave,
+    visaSponsorship,
+    postedDate,
+    applicantCount,
+    sectionBreakdown: breakdown
+  };
+}
+var REQ_RE = /^(?:requirements?|qualifications?|what\s+(?:we|you)(?:'|\s)?re\s+looking\s+for|must[\s-]haves?|you\s+have|about\s+you|who\s+you\s+are|you\s+bring|required(?:\s+qualifications?)?)\b/i;
+var RESP_RE = /^(?:responsibilit\w*|key\s+responsibilities|what\s+you(?:'|\s)?ll\s+do|what\s+you\s+will\s+do|what\s+you(?:'|\s)?ll\s+do\s+\(.*\)|the\s+role|day[\s-]to[\s-]day|you\s+will|role\s+overview)\b/i;
+var NICE_RE = /^(?:nice[\s-]?to[\s-]?haves?|bonus(?:\s+points)?|preferred(?:\s+qualifications?)?|plus|you\s+might|good\s+to\s+have)\b/i;
+function classifyHeading(line) {
+  const trimmed = line.replace(new RegExp(HEADING_MARK, "g"), "").trim().replace(/[:…]+$/u, "").trim();
+  if (!trimmed) return null;
+  if (NICE_RE.test(trimmed)) return "niceToHave";
+  if (REQ_RE.test(trimmed)) return "requirements";
+  if (RESP_RE.test(trimmed)) return "responsibilities";
+  return null;
+}
+function isMarkedHeading(line) {
+  return line.includes(HEADING_MARK);
+}
+function splitIntoSections(jd) {
+  const breakdown = {
+    requirements: "",
+    responsibilities: "",
+    niceToHave: "",
+    other: ""
+  };
+  const lines = jd.split(/\n+/);
+  let current = "other";
+  const buckets = {
+    requirements: [],
+    responsibilities: [],
+    niceToHave: [],
+    other: []
+  };
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (isMarkedHeading(line)) {
+      const cls = classifyHeading(line);
+      if (cls) {
+        current = cls;
+        continue;
+      }
+      current = "other";
+      continue;
+    }
+    buckets[current].push(stripHeadingMark(line));
+  }
+  breakdown.requirements = buckets.requirements.join("\n").trim();
+  breakdown.responsibilities = buckets.responsibilities.join("\n").trim();
+  breakdown.niceToHave = buckets.niceToHave.join("\n").trim();
+  breakdown.other = buckets.other.join("\n").trim();
+  return breakdown;
+}
+
+// extension-app/extension/src/scraper-sites.ts
+function extractLinkedIn(doc) {
+  const ld = findJobPosting(doc);
+  let company = null;
+  let role = null;
+  if (ld) {
+    const org = ld["hiringOrganization"];
+    if (org && typeof org === "object" && org["name"]) {
+      company = String(org["name"]).trim() || null;
+    }
+    if (typeof ld["title"] === "string") role = ld["title"].trim() || null;
+  }
+  if (!company) {
+    company = textOrNull(doc.querySelector(".jobs-unified-top-card__company-name a")) ?? textOrNull(doc.querySelector(".jobs-unified-top-card__company-name")) ?? textOrNull(doc.querySelector('[class*="job-details-jobs-unified-top-card__company-name"] a')) ?? textOrNull(doc.querySelector('[class*="job-details-jobs-unified-top-card__company-name"]')) ?? textOrNull(doc.querySelector('[class*="jobs-unified-top-card"] [class*="company"] a')) ?? textOrNull(doc.querySelector('[class*="topcard"] [class*="company"] a')) ?? textOrNull(doc.querySelector(".topcard__org-name-link")) ?? textOrNull(doc.querySelector('a[data-tracking-control-name*="company"]'));
+  }
+  if (!role) {
+    role = textOrNull(doc.querySelector(".top-card-layout__title")) ?? textOrNull(doc.querySelector(".jobs-unified-top-card__job-title")) ?? textOrNull(doc.querySelector('[class*="job-details-jobs-unified-top-card__job-title"]')) ?? textOrNull(doc.querySelector('[class*="topcard__title"]')) ?? textOrNull(doc.querySelector("h1.t-24")) ?? textOrNull(doc.querySelector("main h1"));
+  }
+  if (!company || !role) {
+    const t = parseTitleForRoleAndCompany(doc);
+    if (!company && t.company) company = t.company;
+    if (!role && t.role) role = t.role;
+  }
+  if (!company) company = metaContent(doc, "og:site_name");
+  if (!role) role = metaContent(doc, "og:title");
+  const descEl = doc.querySelector(".jobs-description-content__text") ?? doc.querySelector(".jobs-description-content") ?? doc.querySelector(".jobs-description") ?? doc.querySelector('[class*="jobs-description"]') ?? doc.querySelector('[class*="show-more-less-html"]') ?? doc.querySelector("article");
+  const headerText = textOrNull(doc.querySelector(".top-card-layout__primary-description")) ?? void 0;
+  const jd = blockText(descEl);
+  if (!jd) return null;
+  return { company, role, jd, headerText };
+}
+function extractIndeed(doc) {
+  const role = textOrNull(doc.querySelector(".jobsearch-JobInfoHeader-title")) ?? textOrNull(doc.querySelector('[data-testid="jobsearch-JobInfoHeader-title"]'));
+  const company = textOrNull(doc.querySelector(".jobsearch-InlineCompanyRating-companyHeader")) ?? textOrNull(doc.querySelector('[data-testid="inlineHeader-companyName"]')) ?? textOrNull(doc.querySelector(".jobsearch-CompanyInfoContainer a"));
+  const descEl = doc.querySelector("#jobDescriptionText") ?? doc.querySelector(".jobsearch-JobComponent-description");
+  const headerText = [
+    textOrNull(doc.querySelector(".jobsearch-JobInfoHeader-subtitle")),
+    textOrNull(doc.querySelector(".jobsearch-JobMetadataHeader"))
+  ].filter(Boolean).join("\n") || void 0;
+  const jd = blockText(descEl);
+  if (!jd) return null;
+  return { company, role, jd, headerText };
+}
+function extractGreenhouse(doc) {
+  const role = textOrNull(doc.querySelector(".app-title")) ?? textOrNull(doc.querySelector("h1.app-title"));
+  const company = textOrNull(doc.querySelector(".company-name a")) ?? textOrNull(doc.querySelector(".company-name")) ?? textOrNull(doc.querySelector("#header .company-name"));
+  const descEl = doc.querySelector("#job-description") ?? doc.querySelector("#content #content-block") ?? doc.querySelector("#content");
+  const headerText = textOrNull(doc.querySelector(".app-title-wrapper .location")) ?? textOrNull(doc.querySelector(".location")) ?? void 0;
+  const jd = blockText(descEl);
+  if (!jd) return null;
+  return { company, role, jd, headerText };
+}
+function extractLever(doc) {
+  const role = textOrNull(doc.querySelector(".posting-headline h2")) ?? textOrNull(doc.querySelector(".posting-headline h1"));
+  let company = metaContent(doc, "og:site_name") ?? textOrNull(doc.querySelector(".main-header-logo")) ?? null;
+  if (company) {
+    company = company.replace(/\s+careers\s*$/i, "").replace(/\s*[\-—–]\s*careers\s*$/i, "").trim() || company;
+  }
+  if (!company) {
+    const t = doc.title?.trim() ?? "";
+    const m = t.split(/\s+[-–—]\s+/);
+    if (m.length > 1) company = m[m.length - 1] || null;
+  }
+  const descEl = doc.querySelector(".content.posting") ?? doc.querySelector(".posting") ?? doc.querySelector(".posting-page");
+  const headerText = textOrNull(doc.querySelector(".posting-categories")) ?? ([
+    textOrNull(doc.querySelector(".posting-categories .location")),
+    textOrNull(doc.querySelector(".posting-categories .commitment"))
+  ].filter(Boolean).join(" \xB7 ") || void 0);
+  const jd = blockText(descEl);
+  if (!jd) return null;
+  return { company, role, jd, headerText };
+}
+function extractWorkday(doc) {
+  const role = textOrNull(doc.querySelector('[data-automation-id="jobPostingHeaderTitle"]'));
+  let company = metaContent(doc, "og:site_name") ?? textOrNull(doc.querySelector('[data-automation-id="company"]'));
+  if (company) {
+    company = company.replace(/\s+careers\s*$/i, "").trim() || company;
+  }
+  const descEl = doc.querySelector('[data-automation-id="jobPostingDescription"]') ?? doc.querySelector('[data-automation-id="jobPostingPage"]');
+  const headerText = [
+    textOrNull(doc.querySelector('[data-automation-id="locations"]')),
+    textOrNull(doc.querySelector('[data-automation-id="jobPostingHeaderSubtitle"]')),
+    textOrNull(doc.querySelector('[data-automation-id="postedOn"]'))
+  ].filter(Boolean).join("\n") || void 0;
+  const jd = blockText(descEl);
+  if (!jd) return null;
+  return { company, role, jd, headerText };
+}
+function extractAshby(doc) {
+  const role = textOrNull(doc.querySelector(".ashby-job-posting-title")) ?? textOrNull(doc.querySelector("h1"));
+  let company = metaContent(doc, "og:site_name") ?? textOrNull(doc.querySelector(".ashby-company-name"));
+  if (company) {
+    company = company.replace(/\s+careers\s*$/i, "").trim() || company;
+  }
+  const descEl = doc.querySelector(".ashby-job-posting-description") ?? doc.querySelector(".ashby-job-posting-right-pane");
+  const headerText = textOrNull(doc.querySelector(".ashby-job-posting-info")) ?? ([
+    textOrNull(doc.querySelector(".ashby-job-posting-location")),
+    textOrNull(doc.querySelector(".ashby-job-posting-type"))
+  ].filter(Boolean).join(" \xB7 ") || void 0);
+  const jd = blockText(descEl);
+  if (!jd) return null;
+  return { company, role, jd, headerText };
+}
+function extractGeneric(doc) {
+  const role = textOrNull(doc.querySelector(".job-title")) ?? textOrNull(doc.querySelector("h1")) ?? metaContent(doc, "og:title");
+  let company = metaContent(doc, "og:site_name");
+  const ld = findJobPosting(doc);
+  if (!company && ld) {
+    const org = ld["hiringOrganization"];
+    if (org && typeof org === "object" && org["name"]) {
+      company = String(org["name"]).trim() || null;
+    }
+  }
+  if (!company) {
+    const headerLink = doc.querySelector("header a, nav a");
+    company = textOrNull(headerLink);
+  }
+  if (company) {
+    company = company.replace(/\s*[\-—–]\s*careers\s*$/i, "").replace(/\s+careers\s*$/i, "").trim() || company;
+  }
+  const candidates = [];
+  for (const sel of ["article", "main", ".job-description", ".job-description-section", "section.hero ~ section"]) {
+    doc.querySelectorAll(sel).forEach((el) => candidates.push(el));
+  }
+  let best = null;
+  for (const el of candidates) {
+    const t = blockText(el);
+    if (t.length > (best?.len ?? 0)) best = { el, len: t.length };
+  }
+  if (!best) {
+    const body = doc.body;
+    if (body) {
+      const clone = body.cloneNode(true);
+      for (const sel of ["nav", "footer", "header", "script", "style", "noscript"]) {
+        clone.querySelectorAll(sel).forEach((n) => n.parentNode?.removeChild(n));
+      }
+      const t = blockText(clone);
+      if (t.length > 0) best = { el: clone, len: t.length };
+    }
+  }
+  if (!best) return null;
+  const root = best.el.cloneNode(true);
+  for (const sel of ["nav", "footer", "header", "script", "style", "noscript"]) {
+    root.querySelectorAll(sel).forEach((n) => n.parentNode?.removeChild(n));
+  }
+  const jd = blockText(root);
+  if (!jd || jd.length < 50) return null;
+  const headerText = textOrNull(doc.querySelector(".job-meta")) ?? textOrNull(doc.querySelector(".hero .job-meta")) ?? void 0;
+  return { company, role, jd, headerText };
+}
+
+// extension-app/extension/src/scraper.ts
+var _dictPromise = null;
+function getDict() {
+  if (!_dictPromise) {
+    _dictPromise = loadSkillsDict();
+  }
+  return _dictPromise;
+}
+async function scrapePage(ctx) {
+  const { document: document2, url } = ctx;
+  const hostname = safeHostname(url);
+  const strategy = pickStrategy(document2, hostname);
+  const scrapedAt = Date.now();
+  const empty = (s) => ({
+    jd: "",
+    company: null,
+    role: null,
+    url,
+    scrapeStrategy: s,
+    jobInsights: null,
+    scrapedAt
+  });
+  const extracted = extractByStrategy(document2, strategy);
+  if (!extracted || !extracted.jd || extracted.jd.trim().length === 0) {
+    return empty("failed");
+  }
+  let dict = null;
+  try {
+    dict = await getDict();
+  } catch {
+    dict = null;
+  }
+  const jobInsights = dict ? buildJobInsights(extracted, document2, dict) : buildJobInsights(extracted, document2, /* @__PURE__ */ new Map());
+  let company = extracted.company;
+  let role = extracted.role;
+  if (!company || !role) {
+    const t = parseTitleForRoleAndCompany(document2);
+    if (!company && t.company) company = t.company;
+    if (!role && t.role) role = t.role;
+  }
+  if (!company) company = metaContent(document2, "og:site_name");
+  if (!role) role = metaContent(document2, "og:title");
+  return {
+    jd: extracted.jd,
+    company,
+    role,
+    url,
+    scrapeStrategy: strategy,
+    jobInsights,
+    scrapedAt
+  };
+}
+function extractByStrategy(doc, strategy) {
+  switch (strategy) {
+    case "linkedin":
+      return extractLinkedIn(doc);
+    case "indeed":
+      return extractIndeed(doc);
+    case "greenhouse":
+      return extractGreenhouse(doc);
+    case "lever":
+      return extractLever(doc);
+    case "workday":
+      return extractWorkday(doc);
+    case "ashby":
+      return extractAshby(doc);
+    case "generic":
+      return extractGeneric(doc);
+    case "failed":
+      return null;
+  }
+}
+function safeHostname(url) {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+function pickStrategy(doc, hostname) {
+  if (hostname.includes("linkedin.com")) return "linkedin";
+  if (hostname.includes("indeed.com")) return "indeed";
+  if (hostname.includes("greenhouse.io")) return "greenhouse";
+  if (hostname.includes("lever.co")) return "lever";
+  if (hostname.includes("myworkdayjobs.com") || hostname.includes("workday.com")) return "workday";
+  if (hostname.includes("ashbyhq.com")) return "ashby";
+  if (doc.querySelector(".jobs-description-content")) return "linkedin";
+  if (doc.querySelector("#jobDescriptionText")) return "indeed";
+  if (doc.querySelector(".app-title") && doc.querySelector("#content")) return "greenhouse";
+  if (doc.querySelector(".posting-headline") && doc.querySelector(".posting")) return "lever";
+  if (doc.querySelector('[data-automation-id="jobPostingDescription"]')) return "workday";
+  if (doc.querySelector(".ashby-job-posting-right-pane")) return "ashby";
+  const bodyText = (doc.body?.textContent ?? "").trim();
+  if (bodyText.length < 30) return "failed";
+  return "generic";
 }
 
 // extension-app/extension/scripts/_scraper-shim.ts
