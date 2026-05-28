@@ -29,18 +29,15 @@ under the Chrome user profile directory — anyone with read access to that
 directory (root, an attacker who steals the laptop, a malicious process
 running as your user) can recover it.
 
-In **v2.1**, the key lives inside `jobhelp-config.json` on the user's Google
-Drive. Drive's default ACL for newly-created files is "private to owner" —
-no one except the file owner can read it, even via direct URL. This is
-strictly stronger than v2.0 against the "stolen laptop" threat (the file is
-not on disk) and strictly weaker against the "Drive ACL misconfiguration"
-threat (a new failure mode that didn't exist before).
-
-In **v2.1 with optional encryption** (this milestone), the key inside
-`jobhelp-config.json` may additionally be wrapped in an AES-GCM 256-bit
-ciphertext keyed by a user-supplied passphrase (see `configCrypto.ts`). With
-this layer on, an attacker who reads the Drive file still cannot extract the
-API key without the passphrase.
+In **v2.1**, the key is stored in two places. The extension validates,
+displays, and mirrors `anthropicApiKey` from `jobhelp-config.json` on the
+user's Google Drive. Backend Claude calls require the same key in Apps Script
+Script Properties as `ANTHROPIC_API_KEY`. Drive's default ACL for newly-created
+files is "private to owner" - no one except the file owner can read it, even
+via direct URL. This is strictly stronger than v2.0 against the "stolen
+laptop" threat for the Drive copy (the file is not on disk) and strictly
+weaker against the "Drive ACL misconfiguration" threat (a new failure mode
+that didn't exist before).
 
 ### 1.2 The Drive file id of `jobhelp-config.json`
 
@@ -51,8 +48,8 @@ read.)
 
 ### 1.3 Apps Script web app URL
 
-The `/exec` URL of the deployed Apps Script (e.g.
-`https://script.google.com/macros/s/AKfycb…/exec`) is a capability — anyone
+The `/exec` URL of the deployed Apps Script (for example,
+`<your Apps Script /exec URL>`) is a capability — anyone
 who knows it can call the deployed endpoints. JobHelp deploys with
 **Execute as: Me + Who has access: Anyone with the link** so the URL itself
 is the only authorization. Treat it as a secret.
@@ -63,10 +60,11 @@ in-memory state during a session.
 
 ### 1.4 Apps Script Script Properties
 
-The Apps Script project itself can store small key-value secrets via
-`PropertiesService`. v2.1 does **not** use this — all per-user configuration
-lives in the Drive config file instead, by design (so a fresh deployment of
-the Apps Script doesn't need any manual property setup).
+The Apps Script project stores the backend Anthropic key in Script Properties.
+v2.1 requires `ANTHROPIC_API_KEY` there because the backend reads it via
+`PropertiesService` before making Claude calls. The Drive config's
+`anthropicApiKey` is still validated/displayed/mirrored by the extension, but
+it is not a substitute for Script Properties when the backend calls Claude.
 
 ### 1.5 The Anthropic API itself
 
@@ -91,8 +89,7 @@ API key.
 
 **Mitigation:** keep `jobhelp-config.json` in a dedicated Drive folder that
 is **not** shared with anyone. Audit sharing status periodically — Drive
-displays a "shared" badge in the file list. The optional passphrase
-encryption (§4) is a defense-in-depth layer against this scenario.
+displays a "shared" badge in the file list.
 
 ### 2.2 Malicious extension installed (likelihood: low)
 
@@ -124,9 +121,7 @@ Drive document viewer. The JSON is shown as plaintext.
 
 **Mitigation:** don't open the config file in the Drive web UI. The extension
 fetches it via the API; you should never need to view the raw JSON. If you
-do (debugging), use a private tab or close the file immediately. With
-passphrase encryption (§4), only the encrypted blob is visible — useless to
-a shoulder-surfer.
+do (debugging), use a private tab or close the file immediately.
 
 ### 2.5 Drive search indexing (likelihood: low)
 
@@ -142,7 +137,7 @@ right defense.
 ### 2.6 Browser extension permission leaks (likelihood: low)
 
 JobHelp requests `<all_urls>` host permissions (see
-`extension/public/manifest.json`) so it can talk to `script.google.com`,
+`extension-app/extension/public/manifest.json`) so it can talk to `script.google.com`,
 `api.anthropic.com`, and any job-board URL the user is viewing. A future
 permission downgrade (to a narrower allowlist) would shrink the attack
 surface. This is tracked but not blocking.
@@ -186,15 +181,17 @@ you create a new key without invalidating the old one — generate the new
 key, paste it into JobHelp, verify a generate call works, then revoke the
 old key.
 
-If your Anthropic account is on a paid tier, you can also **restrict the
-key to a specific IP**. JobHelp's calls all originate from the browser, so
-restrict it to your home / office IP if you have a static one.
+JobHelp's Claude calls originate from the user's Apps Script deployment via
+`UrlFetchApp`, not directly from the browser. Static home or office IP
+restrictions are not generally compatible with that setup unless you have
+verified the actual egress behavior for your Apps Script deployment.
 
-### 3.4 Use optional passphrase encryption (defense-in-depth)
+### 3.4 Do not rely on Drive-config encryption yet
 
-See §4 below. This is optional — without it, Drive's owner-only ACL is your
-only line of defense for the API key. With it, the API key is encrypted
-inside `jobhelp-config.json` and a passphrase is required to unlock it.
+The current end-user setup does not have a passphrase prompt, encrypted config
+schema, or Settings toggle. `configCrypto.ts` exists as a standalone deferred
+helper only. Until that integration lands, Drive's owner-only ACL and Apps
+Script's access controls are the active protections for the API key.
 
 ### 3.5 Never paste config JSON into bug reports
 
@@ -222,12 +219,14 @@ generates their own API key, and creates their own `jobhelp-config.json`.
 
 ---
 
-## 4. Optional passphrase encryption (configCrypto.ts)
+## 4. Deferred passphrase encryption helper (configCrypto.ts)
 
-This milestone adds `extension/src/lib/configCrypto.ts`, which provides
-AES-GCM 256-bit encryption keyed by a PBKDF2-derived AES key. The intent is
-to give users who are worried about the Drive ACL misconfiguration scenario
-(§2.1) or the shoulder-surfer scenario (§2.4) a defense-in-depth option.
+`extension-app/extension/src/lib/configCrypto.ts` provides AES-GCM 256-bit
+encryption keyed by a PBKDF2-derived AES key. It is not wired into
+`configLoader.ts`, the config schema, or the Settings UI, so users cannot
+enable passphrase encryption in setup today. The intended future use is a
+defense-in-depth layer for the Drive ACL misconfiguration scenario (§2.1) or
+the shoulder-surfer scenario (§2.4).
 
 ### 4.1 Algorithm choices
 
@@ -256,7 +255,7 @@ The `iterations` field travels with the blob so that future increases to the
 default (e.g. when OWASP raises the floor) do not invalidate previously
 encrypted blobs.
 
-### 4.3 Integration plan — NOT yet wired
+### 4.3 Integration plan - NOT available today
 
 `configCrypto.ts` ships as standalone helpers only. The integration into
 `configLoader.ts` is deferred to a follow-up milestone. The plan:
@@ -277,10 +276,10 @@ encrypted blobs.
    *decrypted key* in memory (cleared on extension reload). Re-prompt on
    each browser session.
 
-This keeps the change scope small in the current milestone (helpers + docs
-only) and lets the integration land as a focused follow-up.
+Until this plan is implemented, `anthropicApiKey` remains a required plaintext
+field in `jobhelp-config.json`.
 
-### 4.4 What encryption does NOT protect against
+### 4.4 What the deferred layer would NOT protect against
 
 - A passphrase the user re-uses from another site that has been breached.
   → Pick a unique passphrase.
@@ -289,8 +288,8 @@ only) and lets the integration land as a focused follow-up.
 - Loss of the passphrase. There is no recovery — re-create the config file
   with a fresh API key.
 
-The encryption layer **only** protects against scenarios where an attacker
-can read the Drive file but cannot run code in your browser.
+Once wired in, this layer would only protect against scenarios where an
+attacker can read the Drive file but cannot run code in your browser.
 
 ---
 
@@ -313,5 +312,5 @@ that's a bug we'd fix immediately.
 ## 6. Change log
 
 - **v2.1 (this doc):** initial security model written. `configCrypto.ts`
-  helpers added; integration deferred to a follow-up milestone.
+  helpers documented as deferred, not end-user available.
 - **v2.0:** all secrets in `chrome.storage.local` per-machine.

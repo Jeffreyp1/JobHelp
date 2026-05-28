@@ -2,7 +2,7 @@
 
 Developer utilities for working on JobHelp from the command line. Each script
 is a Node 18+ ESM module with **zero external dependencies** beyond what the
-repo already pulls in for the extension/Apps Script builds.
+repo already pulls in for the extension and Apps Script builds.
 
 | Script | Purpose |
 | --- | --- |
@@ -80,8 +80,10 @@ network errors, non-JSON responses, and missing `APPS_SCRIPT_URL`).
 ### Supported actions
 
 `ping`, `generate`, `finalize`, `list_files`, `write_file`, `seed_defaults`,
-`download_template`, `upload_filled_docx`, `research_company`, `benchmark_role`,
-`critique`, `auto_revise`, `cover_letter`, `verify_cl_hooks`, `multi_version`.
+`download_template`, `upload_filled_docx`, `create_drive_file`,
+`research_company`, `benchmark_role`, `critique`, `auto_revise`,
+`auto_revise_scoped`, `cover_letter`, `verify_cl_hooks`, `multi_version`,
+`extract_profile`, `discover_and_rank`, `update_job_status`.
 
 Run `node scripts/test-handler.mts --help` for the full list with examples.
 
@@ -100,7 +102,7 @@ Run `node scripts/test-handler.mts --help` for the full list with examples.
 ## `iterate-template.mts`
 
 Renders a hard-coded sample resume Markdown through the docxtemplater pipeline
-in `extension/src/lib/templateFiller.ts`, converts the resulting `.docx` to PDF
+in `extension-app/extension/src/lib/templateFiller.ts`, converts the resulting `.docx` to PDF
 via `soffice`, and rasterises a preview PNG via `pdftoppm`. Useful for
 iterating on the template visually.
 
@@ -127,7 +129,7 @@ node scripts/verify-bundle.mts --no-build   # skip the build step
 
 ### What it checks
 
-**Extension** (`extension/public/`):
+**Extension** (`extension-app/extension/public/`):
 
 - `sidepanel/index.js` exists, non-empty, under **2 MB**
 - `background.js` exists, non-empty, under **500 KB**
@@ -137,16 +139,15 @@ node scripts/verify-bundle.mts --no-build   # skip the build step
   matches the latest `## [x.y.z]` heading in `CHANGELOG.md`. **This is the
   catch for "I bumped the changelog but forgot the manifest" (or vice versa).**
 
-**Apps Script** (`appsscript/dist/Code.gs`):
+**Apps Script** (`extension-app/appsscript/dist/Code.gs`):
 
 - File exists, non-empty, under **200 KB**
 - First non-comment token is valid Apps Script JS (no leftover `import type`,
   `interface`, or top-level `export` keyword)
 - Contains the literal `function doPost` (web-app entry point)
-- Contains every one of the 15 `VALID_ACTIONS` strings (`ping`, `generate`,
-  `finalize`, `list_files`, `write_file`, `seed_defaults`, `download_template`,
-  `upload_filled_docx`, `research_company`, `benchmark_role`, `critique`,
-  `auto_revise`, `cover_letter`, `verify_cl_hooks`, `multi_version`)
+- Contains every action in the verifier's `VALID_ACTIONS` mirror of
+  `Code.ts`, including `create_drive_file`, `extract_profile`,
+  `discover_and_rank`, and `update_job_status`
 
 Exit code is `0` on all-pass, `1` on any failure. Each check prints its
 wallclock duration; output respects `NO_COLOR`.
@@ -180,5 +181,5 @@ A summary block at the end prints per-phase elapsed time and total wallclock.
 Designed to run in CI (where `APPS_SCRIPT_URL` is typically absent) or
 locally as a pre-commit check.
 
-The matching vitest suite in [`tests/smoke/smoke.test.ts`](../tests/smoke/smoke.test.ts)
+When the local-only smoke suite is present, `extension-app/tests/smoke/smoke.test.ts`
 runs both scripts via `child_process.spawnSync` and asserts exit code `0`.

@@ -1,15 +1,15 @@
 # JobHelp v2 features
 
-Seven optional augmentations to the base `generate` flow. Each is a separate Apps Script action with its own request/response shape in [`appsscript/src/types/api-contract.ts`](../appsscript/src/types/api-contract.ts). Each is wired to a side-panel toggle in [`extension/src/sidepanel/tabs/generate.ts`](../extension/src/sidepanel/tabs/generate.ts); per-feature UI lives under [`extension/src/sidepanel/features/`](../extension/src/sidepanel/features/); handlers live under [`appsscript/src/handlers/`](../appsscript/src/handlers/).
+Seven optional augmentations to the base `generate` flow. Each is a separate Apps Script action with its own request/response shape in [`extension-app/appsscript/src/types/api-contract.ts`](../extension-app/appsscript/src/types/api-contract.ts). Each is wired to a side-panel toggle in [`extension-app/extension/src/sidepanel/tabs/generate.ts`](../extension-app/extension/src/sidepanel/tabs/generate.ts); per-feature UI lives under [`extension-app/extension/src/sidepanel/features/`](../extension-app/extension/src/sidepanel/features/); handlers live under [`extension-app/appsscript/src/handlers/`](../extension-app/appsscript/src/handlers/).
 
 ## Architecture notes
 
-- v2 actions are called **directly from the side panel** via [`apiClient`](../extension/src/lib/apiClient.ts) — they do not pass through the background service worker. The background worker still owns `generate` / `finalize` / `list_files` / `seed_defaults` / `write_file` / `download_template` / `upload_filled_docx`.
-- Research and benchmark run **before** the main generate call; their text output is passed through `GenerateRequest.researchSummary` / `GenerateRequest.benchmarkPatterns` and rendered into the user message under `=== Company Research ===` / `=== Role Benchmark ===` (see [`appsscript/src/message-builder.ts`](../appsscript/src/message-builder.ts)).
+- v2 actions are called **directly from the side panel** via [`apiClient`](../extension-app/extension/src/lib/apiClient.ts) - they do not pass through the background service worker. The background worker owns the current `generate`, `list_files`, and `seed_defaults` message paths. `write_file`, `finalize`, `download_template`, and `upload_filled_docx` are wired from side-panel hooks through `ApiClient`.
+- Research and benchmark run **before** the main generate call; their text output is passed through `GenerateRequest.researchSummary` / `GenerateRequest.benchmarkPatterns` and rendered into the user message under `=== Company Research ===` / `=== Role Benchmark ===` (see [`extension-app/appsscript/src/message-builder.ts`](../extension-app/appsscript/src/message-builder.ts)).
 - Critique, cover-letter, auto-revise, and verify-CL-hooks run **after** generate; multi-version is **mutually exclusive** with the standard generate flow.
 - All handlers return `ApiResult<T>` and never throw across the HTTP boundary.
 
-**v0.2.1 config model.** Starting in v0.2.1 the extension reads its configuration from a single Drive-hosted `jobhelp-config.json` (shape: [`extension/src/types/jobhelp-config.ts`](../extension/src/types/jobhelp-config.ts); loader: [`extension/src/lib/configLoader.ts`](../extension/src/lib/configLoader.ts)). The previous model — eight separate `chrome.storage.local` values per machine (`anthropicApiKey`, `appsScriptUrl`, three folder IDs, sheet ID, template DOCX ID, default model) — is now legacy. On first run after upgrading, the extension migrates existing legacy settings into a starter config file in the user's Drive and asks the user to confirm the resulting file ID; the only per-machine value retained in `chrome.storage.local` is that single Drive file ID. Multi-machine continuity is therefore "paste one ID per machine" instead of eight. v2 handlers themselves are unaffected — they continue to receive folder IDs and the sheet ID through the existing request shapes; only the *source* of those values changed. See [docs/setup-for-new-users.md](setup-for-new-users.md) for the end-user flow.
+**v0.2.1 config model.** Starting in v0.2.1 the extension reads its configuration from a single Drive-hosted `jobhelp-config.json` (shape: [`extension-app/extension/src/types/jobhelp-config.ts`](../extension-app/extension/src/types/jobhelp-config.ts); loader: [`extension-app/extension/src/lib/configLoader.ts`](../extension-app/extension/src/lib/configLoader.ts)). The previous model - eight separate `chrome.storage.local` values per machine (`anthropicApiKey`, `appsScriptUrl`, three folder IDs, sheet ID, template DOCX ID, default model) - is now legacy. On first run after upgrading, the extension migrates existing legacy settings into a starter config file in the user's Drive and asks the user to confirm the resulting file ID. The Drive config is the source of truth, but `chrome.storage.local` still keeps the config file ID, mirrors selected legacy keys for current background-worker paths, and stores Jobs-tab discovery/cache keys during the current migration window. Multi-machine continuity for the core extension config is therefore "paste one ID per machine" instead of eight. v2 handlers themselves are unaffected - they continue to receive folder IDs and the sheet ID through the existing request shapes; only the *source* of those values changed. See [docs/setup-for-new-users.md](setup-for-new-users.md) for the end-user flow.
 
 ## Feature summary
 
@@ -33,7 +33,7 @@ Cost columns are intentionally omitted — see "Cost notes" below.
 
 **When to enable.** When you have a specific company name and want the resume framing to reflect public information about that company (e.g. emphasising payments experience for a fintech, or distributed-systems experience for an infrastructure shop).
 
-**API.** [`ResearchCompanyRequest` / `ResearchCompanyResponse`](../appsscript/src/types/api-contract.ts) — input `{company, role, model, forceRefresh?}`, output `{summary, keywords[], sources[], cached, cost}`.
+**API.** [`ResearchCompanyRequest` / `ResearchCompanyResponse`](../extension-app/appsscript/src/types/api-contract.ts) — input `{company, role, model, forceRefresh?}`, output `{summary, keywords[], sources[], cached, cost}`.
 
 **Caveats.**
 
@@ -47,7 +47,7 @@ Cost columns are intentionally omitted — see "Cost notes" below.
 
 **When to enable.** When you want the generator to lean toward keywords and framing that match the public archetype for the role.
 
-**API.** [`BenchmarkRoleRequest` / `BenchmarkRoleResponse`](../appsscript/src/types/api-contract.ts) — input `{company, role, model, forceRefresh?}`, output `{patterns, keywords[], sources[], cached, cost}`.
+**API.** [`BenchmarkRoleRequest` / `BenchmarkRoleResponse`](../extension-app/appsscript/src/types/api-contract.ts) — input `{company, role, model, forceRefresh?}`, output `{patterns, keywords[], sources[], cached, cost}`.
 
 **Caveats.**
 
@@ -61,18 +61,18 @@ Cost columns are intentionally omitted — see "Cost notes" below.
 
 **When to enable.** When you want a sanity check on the generated resume before sending it.
 
-**API.** [`CritiqueRequest` / `CritiqueResponse`](../appsscript/src/types/api-contract.ts) — input `{resumeMd, jd, jobInsights, jobFolderId, model, sheetId?, rowUrl?}`, output `{scores[], totalScore, improvements[], critiqueDocUrl, cost}`.
+**API.** [`CritiqueRequest` / `CritiqueResponse`](../extension-app/appsscript/src/types/api-contract.ts) — input `{resumeMd, jd, jobInsights, jobFolderId, model, sheetId?, rowUrl?}`, output `{scores[], totalScore, improvements[], critiqueDocUrl, cost}`.
 
 **Sheet integration (since v0.2.1).** Pass optional `sheetId` + `rowUrl` and the handler writes `totalScore` into the tracking sheet's `Critique Score` column. Sheet-write failure is non-fatal.
 
 **Caveats.**
 
 - Drive write is non-fatal: a Drive failure degrades to `ok:true` with `critiqueDocUrl: null` rather than failing the call.
-- The 8-dimension weights are fixed in [`appsscript/src/handlers/critique.ts`](../appsscript/src/handlers/critique.ts); to change them, edit `DIMENSION_WEIGHTS`.
+- The 8-dimension weights are fixed in [`extension-app/appsscript/src/handlers/critique.ts`](../extension-app/appsscript/src/handlers/critique.ts); to change them, edit `DIMENSION_WEIGHTS`.
 
 ## Auto-revise
 
-**What it does.** Surgical-precision revision. Caller supplies `{currentMarkdown, targetScope, instruction}`. Claude returns the full revised markdown; the handler then byte-compares every line outside the scope and reports any drift in `unauthorizedChanges` so the UI can warn before accepting. Driven by [`prompts/shared/14-revision-discipline.md`](../prompts/shared/14-revision-discipline.md), which is injected verbatim into the system prompt.
+**What it does.** Surgical-precision revision. Caller supplies `{currentMarkdown, targetScope, instruction}`. Claude returns the full revised markdown; the handler then byte-compares every line outside the scope and reports any drift in `unauthorizedChanges` so the UI can warn before accepting. Driven by [`extension-app/prompts/shared/14-revision-discipline.md`](../extension-app/prompts/shared/14-revision-discipline.md), which is injected verbatim into the system prompt.
 
 **Scope shapes:**
 
@@ -85,7 +85,7 @@ Cost columns are intentionally omitted — see "Cost notes" below.
 
 **When to enable.** When you want a one-shot, scope-bounded revision of the generated resume after reviewing it.
 
-**API.** [`AutoReviseRequest` / `AutoReviseResponse`](../appsscript/src/types/api-contract.ts) — input `{currentMarkdown, targetScope, instruction, model}`, output `{revisedMarkdown, diff[], unauthorizedChanges[], cost}`.
+**API.** [`AutoReviseRequest` / `AutoReviseResponse`](../extension-app/appsscript/src/types/api-contract.ts) — input `{currentMarkdown, targetScope, instruction, model}`, output `{revisedMarkdown, diff[], unauthorizedChanges[], cost}`.
 
 **UI flow (since v0.2.1).** The resume editor exposes `Edit` / `Preview` tabs. In Preview mode each section / role / bullet renders with a small revise button. Clicking it dispatches a `resume:revise` `CustomEvent` carrying the scope + current markdown; the Generate tab prompts for an instruction, calls `auto_revise`, and renders the diff with Accept / Reject. Bullet IDs are CRC32-stable, so the same markdown re-renders with the same IDs across reloads.
 
@@ -98,13 +98,13 @@ Cost columns are intentionally omitted — see "Cost notes" below.
 
 ## Cover letter
 
-**What it does.** Generates a 3-paragraph industry cover letter (HOOK / EVIDENCE / CLOSING, 250-300 words) per [`prompts/shared/10-cover-letter-industry.md`](../prompts/shared/10-cover-letter-industry.md). Writes `cover_letter.md` and a Google Doc into the supplied `jobFolderId`.
+**What it does.** Generates a 3-paragraph industry cover letter (HOOK / EVIDENCE / CLOSING, 250-300 words) per [`extension-app/prompts/shared/10-cover-letter-industry.md`](../extension-app/prompts/shared/10-cover-letter-industry.md). Writes `cover_letter.md` and a Google Doc into the supplied `jobFolderId`.
 
 **When to enable.** When the posting requires (or strongly prefers) a cover letter.
 
-**API.** [`CoverLetterRequest` / `CoverLetterResponse`](../appsscript/src/types/api-contract.ts) — input `{resumeMd, jd, company, role, sourceFolderId, rulesFolderId, jobFolderId, model, tone?}`, output `{coverLetterMd, docUrl, mdFileUrl, cost}`.
+**API.** [`CoverLetterRequest` / `CoverLetterResponse`](../extension-app/appsscript/src/types/api-contract.ts) — input `{resumeMd, jd, company, role, sourceFolderId, rulesFolderId, jobFolderId, model, tone?}`, output `{coverLetterMd, docUrl, mdFileUrl, cost}`.
 
-**Tone selector (since v0.2.1).** Optional `tone` field accepts `neutral` (default — backwards-compatible with v0.2.0 output) / `formal` / `casual` / `technical` / `persuasive`. Definitions live in [`prompts/shared/15-cl-tones.md`](../prompts/shared/15-cl-tones.md); when a non-neutral tone is requested the handler appends a `=== TONE: <tone> ===` block to the system prompt. Surfaced as a dropdown alongside the Cover Letter toggle row in the side panel.
+**Tone selector (since v0.2.1).** Optional `tone` field accepts `neutral` (default — backwards-compatible with v0.2.0 output) / `formal` / `casual` / `technical` / `persuasive`. Definitions live in [`extension-app/prompts/shared/15-cl-tones.md`](../extension-app/prompts/shared/15-cl-tones.md); when a non-neutral tone is requested the handler appends a `=== TONE: <tone> ===` block to the system prompt. Surfaced as a dropdown alongside the Cover Letter toggle row in the side panel.
 
 **Sheet integration (since v0.2.1).** Pass optional `sheetId` + `rowUrl` and the handler will write `coverLetterUrl` into the tracking sheet's `Cover Letter URL` column. Failure to write is non-fatal — the response still returns `ok: true`.
 
@@ -124,7 +124,7 @@ Returns per-entity status `verified` / `unverified` / `uncertain`, plus the sour
 
 **When to enable.** Whenever a cover letter has been generated and you want to catch hallucinated names or programs before sending.
 
-**API.** [`VerifyClHooksRequest` / `VerifyClHooksResponse`](../appsscript/src/types/api-contract.ts) — input `{coverLetterMd, model, sheetId?, rowUrl?}`, output `{verifications[], unverifiedCount, cost}`.
+**API.** [`VerifyClHooksRequest` / `VerifyClHooksResponse`](../extension-app/appsscript/src/types/api-contract.ts) — input `{coverLetterMd, model, sheetId?, rowUrl?}`, output `{verifications[], unverifiedCount, cost}`.
 
 **Sheet integration (since v0.2.1).** Pass optional `sheetId` + `rowUrl` and the handler writes `unverifiedCount` into the tracking sheet's `Verify Unverified Count` column. Sheet-write failure is non-fatal.
 
@@ -140,7 +140,7 @@ Returns per-entity status `verified` / `unverified` / `uncertain`, plus the sour
 
 **When to enable.** When you have time to compare framings before committing.
 
-**API.** [`MultiVersionRequest` / `MultiVersionResponse`](../appsscript/src/types/api-contract.ts) — input `{jd, company, role, jobInsights, sourceFolderId, rulesFolderId, model, count, framings?}`, output `{variants[], cost}`.
+**API.** [`MultiVersionRequest` / `MultiVersionResponse`](../extension-app/appsscript/src/types/api-contract.ts) — input `{jd, company, role, jobInsights, sourceFolderId, rulesFolderId, model, count, framings?}`, output `{variants[], cost}`.
 
 **Caveats.**
 
@@ -158,4 +158,4 @@ Per-call costs are not documented here because the underlying token usage depend
 - prompt-cache warm vs. cold,
 - web-search query count (research, benchmark, verify-CL-hooks).
 
-Every response carries a [`CostBreakdown`](../appsscript/src/types/api-contract.ts) with the actual input/output/cache token counts and computed USD total — that is the authoritative number. The cost estimator in the side panel uses heuristic per-feature deltas; see [`extension/src/lib/costCalculator.ts`](../extension/src/lib/costCalculator.ts).
+Every response carries a [`CostBreakdown`](../extension-app/appsscript/src/types/api-contract.ts) with the actual input/output/cache token counts and computed USD total — that is the authoritative number. The cost estimator in the side panel uses heuristic per-feature deltas; see [`extension-app/extension/src/lib/costCalculator.ts`](../extension-app/extension/src/lib/costCalculator.ts).

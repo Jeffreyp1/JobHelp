@@ -8,8 +8,11 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
-const EXTENSION_PUBLIC = join(ROOT, 'extension', 'public');
-const APPSSCRIPT_DIST = join(ROOT, 'appsscript', 'dist');
+const EXTENSION_ROOT = join(ROOT, 'extension-app', 'extension');
+const APPSSCRIPT_ROOT = join(ROOT, 'extension-app', 'appsscript');
+const MCP_ROOT = join(ROOT, 'jobhelp-mcp');
+const EXTENSION_PUBLIC = join(EXTENSION_ROOT, 'public');
+const APPSSCRIPT_DIST = join(APPSSCRIPT_ROOT, 'dist');
 
 const PATHS = {
   sidepanelJs: join(EXTENSION_PUBLIC, 'sidepanel', 'index.js'),
@@ -27,7 +30,7 @@ const SIZE_LIMITS = {
   codeGs: 200 * 1024,
 } as const;
 
-// Must mirror appsscript/src/Code.ts VALID_ACTIONS.
+// Must mirror extension-app/appsscript/src/Code.ts VALID_ACTIONS.
 const VALID_ACTIONS: string[] = [
   'generate',
   'finalize',
@@ -36,13 +39,18 @@ const VALID_ACTIONS: string[] = [
   'seed_defaults',
   'download_template',
   'upload_filled_docx',
+  'create_drive_file',
   'research_company',
   'benchmark_role',
   'critique',
   'auto_revise',
+  'auto_revise_scoped',
   'cover_letter',
   'verify_cl_hooks',
   'multi_version',
+  'extract_profile',
+  'discover_and_rank',
+  'update_job_status',
   'ping',
 ];
 
@@ -220,13 +228,13 @@ async function main(): Promise<void> {
 
   if (!skipBuild) {
     await check('build: extension', () => {
-      const { durationMs } = runBuild('extension', join(ROOT, 'extension', 'scripts', 'build.mts'));
+      const { durationMs } = runBuild('extension', join(EXTENSION_ROOT, 'scripts', 'build.mts'));
       return `built in ${formatMs(durationMs)}`;
     });
     await check('build: appsscript', () => {
       const { durationMs } = runBuild(
         'appsscript',
-        join(ROOT, 'appsscript', 'scripts', 'build.mts'),
+        join(APPSSCRIPT_ROOT, 'scripts', 'build.mts'),
       );
       return `built in ${formatMs(durationMs)}`;
     });
@@ -235,10 +243,10 @@ async function main(): Promise<void> {
     console.log('');
   }
 
-  await check('job-digest: MCP regression tests', () => {
-    const { durationMs } = runCommand('job-digest MCP tests', 'npm', [
+  await check('jobhelp-mcp: MCP regression tests', () => {
+    const { durationMs } = runCommand('jobhelp-mcp MCP tests', 'npm', [
       '--prefix',
-      'job-digest',
+      MCP_ROOT,
       'test',
       '--',
       '--run',
@@ -291,7 +299,7 @@ async function main(): Promise<void> {
     if (manifest.version !== changelogVersion) {
       fail(
         `manifest.version=${manifest.version} but CHANGELOG latest is ${changelogVersion}`,
-        'A release was added to CHANGELOG but extension/public/manifest.json was not bumped (or vice versa).',
+        'A release was added to CHANGELOG but extension-app/extension/public/manifest.json was not bumped (or vice versa).',
       );
     }
     return `both at ${manifest.version}`;
@@ -317,7 +325,7 @@ async function main(): Promise<void> {
     return 'doPost entry present';
   });
 
-  await check('appsscript: Code.gs contains all 15 VALID_ACTIONS', async () => {
+  await check('appsscript: Code.gs contains all VALID_ACTIONS', async () => {
     if (codeGsText == null) codeGsText = await readFile(PATHS.codeGs, 'utf8');
     const missing: string[] = [];
     for (const action of VALID_ACTIONS) {
