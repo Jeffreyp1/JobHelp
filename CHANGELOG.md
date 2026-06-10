@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Auto-apply skill (v1):** a `/auto-apply` Claude Code skill that fills job
+  application forms in a headful browser via the Playwright MCP — ATS-agnostic,
+  no per-site adapters. Answers come from the standing profile, the job's
+  tailored resume, and a growing answer bank (`~/jobhelp/answer-bank.json`);
+  every AI answer carries provenance in `<job dir>/autoapply-review.json`. The
+  skill never submits: every application parks in an open tab for human review.
+  Spec: docs/superpowers/specs/2026-06-09-autoapply-v1-playwright-skill-design.md.
+
 ### Changed
 
 - **Auto-revise rewrite (scoped):** Replaced the broken bullet/section revise flow. The model now only sees the in-scope excerpt (one bullet or one section's bullets), so byte equality of out-of-scope text is guaranteed by construction rather than by post-hoc validation. A new `auto_revise_scoped` action runs a two-agent creator+checker prompt with one retry on checker failure; checker findings surface as warning chips in the UI. The browser-native `prompt()` dialog is replaced with an inline composer that opens beneath the targeted bullet or section heading. Edit/Preview tabs in the resume editor were merged into a single click-to-edit view; a collapsed `<details>` exposes raw markdown for power edits. `whole-resume` revise keeps the existing full-document handler.
