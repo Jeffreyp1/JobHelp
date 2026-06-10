@@ -103,7 +103,11 @@ the DOCX. (Never upload an older `.pdf` when a newer `.md` exists.)
    `reference.md`), update `~/jobhelp/autoapply-status.json` to `filled_parked`
    (or `blocked`/`failed` with reason). Leave the tab open.
 9. **Learn** — append newly drafted free-form answers to the answer bank with
-   `approved: false`.
+   `approved: false`. Then append one line to `~/jobhelp/autoapply-gaps.jsonl`
+   for EVERY field left empty, flagged, or escalated this job (schema in
+   `reference.md` — include the verbatim question, options, and a `reason`).
+   This log feeds the automated improvement run; an unlogged gap can never be
+   fixed.
 
 ## End of run
 

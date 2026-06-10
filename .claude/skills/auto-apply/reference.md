@@ -94,6 +94,25 @@ Object keyed by job folder slug (or the URL for ad-hoc jobs):
 Read-modify-write the whole file; preserve entries you didn't touch. `reason` is
 set for `blocked` (e.g. `"captcha"`, `"login required"`) and `failed`.
 
+## Gaps log — `~/jobhelp/autoapply-gaps.jsonl`
+
+Append-only, one JSON object per line, one line per unfilled/flagged field:
+
+```json
+{"ts": "2026-06-10T08:52:00Z", "ats": "ashby", "company": "WRITER",
+ "jobSlug": "writer-software-engineer-connectors-mcp-2026-06-05", "url": "https://...",
+ "question": "What percentage of your day do you spend hands-on coding?",
+ "fieldKind": "radio", "options": ["0%", "25%", "50%", "75%", "100%"],
+ "required": true, "reason": "no-standing-answer", "filledBy": "none", "notes": ""}
+```
+
+`reason` is one of: `no-standing-answer` (personal fact absent from profile),
+`no-truthful-option` (options list had no truthful choice), `unrecognized-widget`
+(couldn't operate the control), `adapter-miss` (CLI failed, AI recovered —
+set `filledBy: "ai-after-cli-miss"`), `consent-or-signature` (policy: never
+auto-completed), `captcha`, `login-wall`. Record the question verbatim — the
+weekly improver clusters on it.
+
 ## Fixture testing (local, no real applications)
 
 ```bash
