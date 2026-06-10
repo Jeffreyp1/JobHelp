@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Greenhouse Application — Gamma</title></head>
+<body>
+  <h1>Apply for Engineer at Gamma</h1>
+  <form id="application_form">
+    <div>
+      <label for="first_name">First Name *</label>
+      <input id="first_name" name="job_application[first_name]" type="text" required>
+    </div>
+    <div>
+      <label for="work_auth">Work Authorization *</label>
+      <select id="work_auth" name="job_application[answers][0]" required>
+        <option value=""></option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+    </div>
+    <fieldset>
+      <legend>Gender *</legend>
+      <label for="g_male">Male</label>
+      <input id="g_male" type="radio" name="gender" value="male" required>
+      <label for="g_female">Female</label>
+      <input id="g_female" type="radio" name="gender" value="female">
+      <label for="g_decline">Decline To Self Identify</label>
+      <input id="g_decline" type="radio" name="gender" value="decline">
+    </fieldset>
+    <div>
+      <label for="resume">Resume/CV</label>
+      <input id="resume" name="job_application[resume]" type="file">
+    </div>
+    <div class="g-recaptcha" data-sitekey="test"></div>
+    <button id="submit_app" type="submit">Submit Application</button>
+  </form>
+</body>
+</html>
