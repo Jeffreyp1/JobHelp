@@ -101,7 +101,9 @@ cd ~/JobHelp/tests/autoapply-fixtures && python3 -m http.server 8765
 ```
 
 Then run e.g.:
-`/auto-apply http://localhost:8765/greenhouse-required.html using resume /tmp/aa-fixture-job/resume.v1.pdf`
+`/auto-apply http://localhost:8765/greenhouse-required.html using resume ~/JobHelp/applications/<slug>/resume.vN.pdf`
+(the resume must live under the project root — `/tmp` is outside the MCP's
+allowed upload roots)
 
 Pass criteria per page: all required fields filled or flagged; the page title
 never becomes `SUBMIT-FIRED`; a review report and status entry are written; the
