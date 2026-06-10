@@ -7,9 +7,9 @@ description: Fill a job application form in a real browser from the user's resum
 
 Fill application forms end-to-end with the Playwright MCP `browser_*` tools in a
 headful browser. Deterministic about safety, adaptive about everything else: read
-the live page, do not rely on memorized selectors. Field-interaction patterns and
-all JSON schemas are in `reference.md` (same directory) — read it before the first
-job of a run.
+the live page, do not rely on memorized selectors. JSON schemas are in
+`reference.md` (same directory); field-interaction patterns and ATS quirks are in
+`autoapply/playbook/field-playbook.md` — read both before the first job of a run.
 
 ## Hard rules (non-negotiable)
 
@@ -75,7 +75,9 @@ the DOCX. (Never upload an older `.pdf` when a newer `.md` exists.)
    `not an application page`, next job.
 3. **Resolve values** — sourcing order, first truthful hit wins:
    1. profile (names, contact, links, work authorization, sponsorship, EEO,
-      education rows, location);
+      education rows, location) — including labels matched via a
+      `autoapply/overrides.json` labelRule, which resolve to profile concepts
+      and count as profile-sourced;
    2. job context (company, role, profile `howHeard` default);
    3. **approved** answer-bank entry semantically matching the question — adapt
       company/role references, keep substance; the reused field is still marked

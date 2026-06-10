@@ -1,30 +1,24 @@
-# Auto-Apply reference — interaction patterns and schemas
+# Auto-Apply reference — schemas and pointers
 
 ## Field-type playbook
 
-| Control | How to fill | Verify |
-|---|---|---|
-| text / email / tel / url | `browser_type` into the field | value present in next snapshot |
-| textarea | `browser_type` the full drafted answer | value present |
-| native select | `browser_select_option` with the option matching the truthful value | selected option text |
-| custom combobox (react-select style, `role="combobox"`) | click the control → type a filter string → snapshot → click the matching option from the listbox | control now shows the chosen text, not a placeholder |
-| async autocomplete (school, company, location) | type the query → wait for options to render → pick the closest option that is factually true; none true → leave + flag | chosen text shown |
-| radio group | click the option matching the sourced value; no truthful match → flag, do not guess | `checked` in snapshot |
-| checkbox group | check every option that is factually true (multi allowed); consent-to-contact boxes only when factual | checked states |
-| date | type in the placeholder's format; if a picker blocks typing, click through it | value present |
-| file | click the upload control to open the file chooser, then `browser_file_upload` with the absolute path (it acts on the open chooser; it cannot target an element) | filename appears near the field |
-| "Add another" rows (education etc.) | click the expander until row count matches profile entries, then fill rows by index | row count |
-| hidden / `display:none` / zero-size inputs | **never fill** (honeypots) | — |
+Lives at `autoapply/playbook/field-playbook.md` — read it alongside this file
+before the first job of a run. It is learnable knowledge inside the
+self-updater's writable folder; this reference file and SKILL.md are not.
 
-Quirks worth expecting: hydration can wipe early fills (fill after the page is
-stable; the double-check pass catches stragglers); some forms re-render after
-file upload (re-snapshot before touching anything else); a combobox that shows
-typed text is NOT selected until an option was clicked; after typing into a
-combobox with no matching truthful option, clear the typed filter text before
-moving on. `browser_file_upload` only accepts paths inside the Playwright MCP's
-allowed roots (the project directory by default) and compares the path string
-case-sensitively — reference resumes via the exact-cased project path
-(`~/JobHelp/applications/...`, not `~/jobhelp/...`).
+## Learned mappings — `autoapply/overrides.json`
+
+`labelRules` map recurring question labels to existing profile concepts; a match
+counts as profile-sourced in the sourcing order:
+
+```json
+{"labelRules": [{"pattern": "preferred pronouns?", "flags": "i",
+  "concept": "pronouns", "ats": null, "addedAt": "2026-06-14",
+  "evidence": ["3 gaps: sony, writer, loop"]}]}
+```
+
+A rule may only point at a concept that exists in the standing profile. Personal
+VALUES never live here — they stay in the profile, which the updater cannot write.
 
 ## Answer bank — `~/jobhelp/answer-bank.json`
 
@@ -116,7 +110,7 @@ weekly improver clusters on it.
 ## Fixture testing (local, no real applications)
 
 ```bash
-cd ~/JobHelp/tests/autoapply-fixtures && python3 -m http.server 8765
+cd ~/JobHelp/autoapply/fixtures && python3 -m http.server 8765
 ```
 
 Then run e.g.:
