@@ -17,7 +17,9 @@ job of a run.
    forms, verify a button's purpose before clicking anything after filling; when
    unsure, don't click. The only buttons you may click are: cookie dismissal,
    apply-form reveal (only valid while no application fields are visible yet),
-   dropdown/combobox open, "Add another" row expanders. Never call `browser_type`
+   dropdown/combobox open, "Add another" row expanders, boolean answer toggles
+   (Yes/No buttons rendered directly under a question label, as on Ashby —
+   verify a separate Submit button exists elsewhere first). Never call `browser_type`
    with `submit: true` and never press Enter in a form field — Enter submits many
    single-field forms.
 2. **NEVER fabricate.** No invented employers, dates, degrees, metrics, skills, or
