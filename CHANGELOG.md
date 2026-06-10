@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   application forms in a headful browser via the Playwright MCP — ATS-agnostic,
   no per-site adapters. Answers come from the standing profile, the job's
   tailored resume, and a growing answer bank (`~/jobhelp/answer-bank.json`);
-  every AI answer carries provenance in `<job dir>/autoapply-review.json`. The
+  every drafted answer carries provenance in `<job dir>/autoapply-review.json`. The
   skill never submits: every application parks in an open tab for human review.
   Spec: docs/superpowers/specs/2026-06-09-autoapply-v1-playwright-skill-design.md.
 

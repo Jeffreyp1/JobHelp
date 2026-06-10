@@ -12,7 +12,7 @@
 | radio group | click the option matching the sourced value; no truthful match → flag, do not guess | `checked` in snapshot |
 | checkbox group | check every option that is factually true (multi allowed); consent-to-contact boxes only when factual | checked states |
 | date | type in the placeholder's format; if a picker blocks typing, click through it | value present |
-| file | `browser_file_upload` with the absolute path | filename appears near the field |
+| file | click the upload control to open the file chooser, then `browser_file_upload` with the absolute path (it acts on the open chooser; it cannot target an element) | filename appears near the field |
 | "Add another" rows (education etc.) | click the expander until row count matches profile entries, then fill rows by index | row count |
 | hidden / `display:none` / zero-size inputs | **never fill** (honeypots) | — |
 
@@ -48,6 +48,7 @@ typed text is NOT selected until an option was clicked.
 - Only `approved: true` entries count as a trusted source; unapproved ones may
   seed a draft but the field stays flagged for review.
 - Increment `usedCount` / set `lastUsedAt` on reuse.
+- Read-modify-write the whole file; preserve entries you didn't touch.
 
 ## Review report — `<job dir>/autoapply-review.json`
 

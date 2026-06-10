@@ -16,7 +16,10 @@ job of a run.
 1. **NEVER submit.** Do not click Submit / Send / final Apply. On single-page
    forms, verify a button's purpose before clicking anything after filling; when
    unsure, don't click. The only buttons you may click are: cookie dismissal,
-   apply-form reveal, dropdown/combobox open, "Add another" row expanders.
+   apply-form reveal (only valid while no application fields are visible yet),
+   dropdown/combobox open, "Add another" row expanders. Never call `browser_type`
+   with `submit: true` and never press Enter in a form field — Enter submits many
+   single-field forms.
 2. **NEVER fabricate.** No invented employers, dates, degrees, metrics, skills, or
    authorizations. Every answer must trace to the profile, the resume, or an
    answer-bank entry. No truthful source → leave empty and flag.
@@ -42,32 +45,40 @@ job of a run.
 - **nothing** → "ready" jobs: folders in `~/jobhelp/applications/` that contain a
   tailored `resume.vN.md`/`.pdf` and have no `filled_parked` or `submitted` entry
   in `~/jobhelp/autoapply-status.json`.
-- `batch N` — cap jobs this run (default **5**, to bound token spend).
+- `batch N` — cap jobs this run (default **5**, to bound token spend; the cap
+  applies to ready-jobs selection and to pasted URL/jobId lists alike).
 
 Load once per run:
 - Profile: `~/.config/jobhelp/autoapply-profile.json` (respect `JOBHELP_CONFIG_DIR`).
 - Answer bank: `~/jobhelp/answer-bank.json` — create `{"entries": []}` if missing.
 
-Per job, the resume to upload is the **highest-numbered `resume.vN.pdf`** in the
-job folder; if only `.md` exists, render with
-`node scripts/render-jakestyle.mts <md> <out.docx>` and upload the DOCX.
+Per job, use the **highest version N present** in the job folder (`.md` or
+`.pdf`). If that version has a `.pdf`, upload it; otherwise render its `.md` with
+`node scripts/render-jakestyle.mts <resume.vN.md> <resume.vN.docx>` and upload
+the DOCX. (Never upload an older `.pdf` when a newer `.md` exists.)
 
 ## Per-job flow
 
-1. **Open** — `browser_navigate` to the URL. Dismiss cookie banners (only
-   cookie-specific wording: "accept all cookies", "got it"). If no form is
-   visible, click the Apply button/link once. Snapshot; if a login wall or
-   captcha gates the form → `blocked`, next job.
+1. **Open** — open the job in a **new tab**: `browser_tabs` action `new` with
+   the URL. Never `browser_navigate` to a new job — that replaces the previous
+   job's parked, unsubmitted tab. Record the tab index for the summary. Dismiss
+   cookie banners (only cookie-specific wording: "accept all cookies", "got
+   it"). If no form is visible, click the Apply button/link once. Snapshot; if a
+   login wall or captcha gates the form → `blocked`, next job.
 2. **Survey** — `browser_snapshot`. Enumerate every form control with: label,
    kind (text / email / tel / url / textarea / native select / custom combobox /
-   radio group / checkbox group / date / file), required?, options.
+   radio group / checkbox group / date / file), required?, options. If the page
+   is not recognizably a job-application form (no application fields, no resume
+   upload), do **not** type any profile data — status `blocked`, reason
+   `not an application page`, next job.
 3. **Resolve values** — sourcing order, first truthful hit wins:
    1. profile (names, contact, links, work authorization, sponsorship, EEO,
       education rows, location);
    2. job context (company, role, profile `howHeard` default);
    3. **approved** answer-bank entry semantically matching the question — adapt
-      company/role references, keep substance; unapproved entries may seed a
-      draft but stay flagged;
+      company/role references, keep substance; the reused field is still marked
+      `review: true` in the report. Unapproved entries may seed a draft but
+      stay flagged;
    4. resume-derived draft (free-form/behavioral): read the job folder's
       `resume.vN.md`; pick the most relevant real experience; first person,
       ≤150 words; record provenance (file + which bullet);
@@ -75,9 +86,10 @@ job folder; if only `.md` exists, render with
 4. **Fill** — apply each value using the patterns in `reference.md`. Re-snapshot
    only after interactions that re-render (combobox select, file upload, row
    adds) — not after every keystroke.
-5. **Upload** — resume via `browser_file_upload` on the resume field. Cover
-   letter only if a distinct cover field exists AND the profile has
-   `coverLetterPath`.
+5. **Upload** — click the resume upload control to open the file chooser, then
+   `browser_file_upload` with the absolute path (the tool acts on the open
+   chooser — it takes only `paths`, it cannot target an element). Cover letter
+   only if a distinct cover field exists AND the profile has `coverLetterPath`.
 6. **Required check** — re-snapshot. Any required control still empty: retry
    resolution once; still empty → blocker.
 7. **Double-check** — final `browser_snapshot` plus exactly **one**
@@ -95,14 +107,17 @@ job folder; if only `.md` exists, render with
 
 - Print a summary table: company · role · fields filled · drafted answers to
   review · blockers · tab.
-- Report measured token/turn cost for the run (acceptance metric).
+- Report the run's per-job turn/tool-call counts (token cost itself comes from
+  `/cost`, which the user runs — a session cannot read its own usage).
 - List new answer-bank entries; ask which to approve; set `approved: true` on the
   ones the user confirms.
-- Remind: tabs are parked — review each and click Submit yourself; closing the
-  window discards unsubmitted fills.
+- Remind: each job sits in its own parked tab (`browser_tabs` action `list`
+  enumerates them) — review each and click Submit yourself; closing the window
+  discards unsubmitted fills.
 
 ## Statuses
 
-`filled_parked` | `blocked` | `failed`. Never set `submitted` — that is the
-human's claim. A job already `filled_parked` or `submitted` is skipped (re-run is
+`filled_parked` | `blocked` | `failed`. `blocked` = a gate prevented filling
+(captcha, login, not an application page); `failed` = a tool or page error
+stopped the fill partway. Never set `submitted` — that is the human's claim. A job already `filled_parked` or `submitted` is skipped (re-run is
 idempotent); re-process only on explicit user request.
