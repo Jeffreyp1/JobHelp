@@ -1,0 +1,12 @@
+{
+  "firstName": "Ada",
+  "lastName": "Lovelace",
+  "fullName": "Ada Lovelace",
+  "email": "ada@example.com",
+  "phone": "555-0100",
+  "location": "London, UK",
+  "linkedin": "https://www.linkedin.com/in/ada",
+  "github": "https://github.com/ada",
+  "workAuthorization": "Yes",
+  "sponsorship": "No"
+}

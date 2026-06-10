@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Greenhouse (open questions) — Epsilon</title></head>
+<body>
+  <h1>Apply at Epsilon</h1>
+  <form id="application_form">
+    <div>
+      <label for="first_name">First Name *</label>
+      <input id="first_name" type="text" required>
+    </div>
+
+    <div class="field">
+      <label for="fav_color">What is your favorite color? *</label>
+      <div class="select__control" data-for="fav_color">
+        <div class="select__value-container">
+          <div class="select__placeholder">Select...</div>
+          <input id="fav_color" role="combobox" type="text" autocomplete="off">
+        </div>
+      </div>
+      <div class="select__menu" data-options="Red|Green|Blue" hidden></div>
+    </div>
+
+    <div>
+      <label for="why">Why do you want to work here? *</label>
+      <textarea id="why" required></textarea>
+    </div>
+
+    <div>
+      <label for="resume">Attach</label>
+      <input id="resume" type="file">
+    </div>
+    <div>
+      <label for="cover_letter">Attach</label>
+      <input id="cover_letter" type="file">
+    </div>
+
+    <button id="submit_app" type="submit">Submit Application</button>
+  </form>
+
+  <script>
+    document.querySelectorAll('.select__control').forEach((control) => {
+      const input = control.querySelector('input');
+      const menu = control.parentElement.querySelector('.select__menu');
+      const all = (menu.getAttribute('data-options') || '').split('|');
+      function render(filter) {
+        menu.innerHTML = '';
+        all.filter((o) => o.toLowerCase().includes(filter.toLowerCase())).forEach((o) => {
+          const div = document.createElement('div');
+          div.className = 'select__option';
+          div.textContent = o;
+          div.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const ph = control.querySelector('.select__placeholder');
+            if (ph) ph.remove();
+            let sv = control.querySelector('.select__single-value');
+            if (!sv) {
+              sv = document.createElement('div');
+              sv.className = 'select__single-value';
+              control.querySelector('.select__value-container').prepend(sv);
+            }
+            sv.textContent = o;
+            input.value = '';
+            menu.hidden = true;
+          });
+          menu.appendChild(div);
+        });
+        menu.hidden = false;
+      }
+      input.addEventListener('input', () => render(input.value));
+      input.addEventListener('focus', () => render(input.value));
+    });
+  </script>
+</body>
+</html>
