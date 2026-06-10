@@ -4,6 +4,7 @@ export type ApplyStatus =
   | 'filled'
   | 'needs_freeform'
   | 'paused'
+  | 'prefilled'
   | 'submitted'
   // Clicked submit but no success signal appeared. Terminal and NOT retried (the
   // send may have gone through); surfaced for the user to confirm manually.

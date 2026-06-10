@@ -1,4 +1,70 @@
+import { readFile } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { FieldConcept, StandingProfile } from './types.ts';
+
+const VALID_CONCEPTS = new Set<string>([
+  'firstName', 'lastName', 'fullName', 'email', 'phone', 'location', 'locationCity',
+  'country', 'linkedin', 'github', 'portfolio', 'website', 'workAuthorization',
+  'sponsorship', 'gender', 'race', 'veteranStatus', 'disabilityStatus', 'howHeard',
+]);
+
+interface LabelRule {
+  readonly pattern: string;
+  readonly flags: string;
+  readonly concept: string;
+  readonly ats: string | null;
+}
+
+interface OverridesFile {
+  readonly labelRules: readonly LabelRule[];
+}
+
+let overridesPath: string | null = null;
+let overridesCache: OverridesFile | null | 'empty' = null;
+let warnedBadFile = false;
+
+function defaultOverridesPath(): string {
+  return join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'overrides.json');
+}
+
+export function setOverridesPath(p: string): void {
+  overridesPath = p;
+  overridesCache = null;
+  warnedBadFile = false;
+}
+
+async function loadOverrides(): Promise<OverridesFile | null> {
+  if (overridesCache !== null) return overridesCache === 'empty' ? null : overridesCache;
+  const p = overridesPath ?? defaultOverridesPath();
+  let raw: string;
+  try {
+    raw = await readFile(p, 'utf8');
+  } catch {
+    if (!warnedBadFile) {
+      warnedBadFile = true;
+    }
+    overridesCache = 'empty';
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    if (!warnedBadFile) {
+      warnedBadFile = true;
+    }
+    overridesCache = 'empty';
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || !Array.isArray((parsed as Record<string, unknown>)['labelRules'])) {
+    overridesCache = 'empty';
+    return null;
+  }
+  const result = parsed as OverridesFile;
+  overridesCache = result;
+  return result;
+}
 
 const RULES: ReadonlyArray<readonly [RegExp, FieldConcept]> = [
   [/\bfirst name\b|\bgiven name\b|\bpreferred name\b|name you'?d? prefer|name you prefer/i, 'firstName'],
@@ -33,6 +99,27 @@ export function classifyLabel(label: string): FieldConcept | null {
     if (re.test(text)) return concept;
   }
   return null;
+}
+
+export async function classifyLabelWithOverrides(label: string, ats: string | null): Promise<FieldConcept | null> {
+  const overrides = await loadOverrides();
+  if (overrides) {
+    const text = label.trim();
+    for (const rule of overrides.labelRules) {
+      if (rule.ats !== null && rule.ats !== ats) continue;
+      if (!VALID_CONCEPTS.has(rule.concept)) {
+        continue;
+      }
+      let re: RegExp;
+      try {
+        re = new RegExp(rule.pattern, rule.flags);
+      } catch {
+        continue;
+      }
+      if (re.test(text)) return rule.concept as FieldConcept;
+    }
+  }
+  return classifyLabel(label);
 }
 
 export function answerFor(concept: FieldConcept, p: StandingProfile): string | undefined {

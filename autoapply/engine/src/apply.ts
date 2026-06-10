@@ -7,6 +7,7 @@ import { docxPathForJob } from './convert.ts';
 import { setStatus } from './status.ts';
 import { writeQuestions, readAnswers } from './freeform.ts';
 import { writeReview, buildReport, failedReport, type RunRow } from './review.ts';
+import { buildLeftovers, writeLeftovers } from './leftovers.ts';
 
 export function decideGate(i: {
   autoSubmit: boolean;
@@ -26,6 +27,7 @@ export interface ApplyDeps {
   sidecarPath: string;
   autoSubmit: boolean;
   dryRun: boolean;
+  prefill: boolean;
   freeformWaitMs: number;
   now: () => string;
 }
@@ -77,6 +79,26 @@ export async function applyOneJob(
       const error = 'no application fields detected (form did not load)';
       await record('failed', { error });
       return row('failed', failedReport(error));
+    }
+
+    if (deps.prefill) {
+      const validation = await deps.ats.validate(page);
+      const leftovers = buildLeftovers({
+        url: job.url,
+        company: job.company,
+        role: job.role,
+        outcome,
+        validation,
+        now: deps.now,
+      });
+      await writeLeftovers(job.dir, leftovers);
+      await record('prefilled', { resumeDocxPath: docxPath, guessed: [...outcome.guesses] });
+      return row('prefilled', buildReport({
+        green: outcome.filledKnown - outcome.guesses.length,
+        guessed: [...outcome.guesses],
+        blockers: validation.blockers,
+        captcha: validation.captcha,
+      }));
     }
 
     const guessed: GuessedField[] = [...outcome.guesses];

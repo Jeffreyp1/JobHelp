@@ -8,6 +8,8 @@ import { recruitee } from './recruitee.ts';
 
 const ADAPTERS: readonly Ats[] = [greenhouse, lever, ashby, workable, smartRecruiters, recruitee];
 
+export const ADAPTERS_BY_NAME: ReadonlyMap<string, Ats> = new Map(ADAPTERS.map((a) => [a.name, a]));
+
 export function pickAts(url: string): Ats | null {
   return ADAPTERS.find((a) => a.matches(url)) ?? null;
 }

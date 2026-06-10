@@ -8,6 +8,10 @@ export async function launchBrowser(headful: boolean): Promise<Browser> {
   });
 }
 
+export async function connectBrowser(endpoint: string): Promise<Browser> {
+  return chromium.connectOverCDP(endpoint);
+}
+
 export async function newTab(browser: Browser): Promise<Page> {
   const ctx = await browser.newContext({ acceptDownloads: false });
   return ctx.newPage();
