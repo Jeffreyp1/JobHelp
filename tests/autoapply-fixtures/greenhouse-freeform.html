@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Greenhouse Application — Beta</title></head>
+<body>
+  <h1>Apply for Product Manager at Beta</h1>
+  <form id="application_form">
+    <div>
+      <label for="first_name">First Name *</label>
+      <input id="first_name" name="job_application[first_name]" type="text" required>
+    </div>
+    <div>
+      <label for="phone">Phone *</label>
+      <input id="phone" name="job_application[phone]" type="tel" required>
+    </div>
+    <div>
+      <label for="resume">Resume/CV</label>
+      <input id="resume" name="job_application[resume]" type="file">
+    </div>
+    <div>
+      <label for="cover_why">Why do you want to work here? *</label>
+      <textarea id="cover_why" name="job_application[answers][0]" required></textarea>
+    </div>
+    <button id="submit_app" type="submit">Submit Application</button>
+  </form>
+<script>for (const f of document.querySelectorAll("form")) f.addEventListener("submit", (e) => { e.preventDefault(); document.title = "SUBMIT-FIRED"; });</script>
+</body>
+</html>
