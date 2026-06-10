@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Auto-apply phase 2 — hybrid CLI pre-fill:** a browser daemon
+  (`autoapply/engine/src/browser-daemon.ts`) owns one Chromium over CDP; the
+  deterministic engine pre-fills profile-sourced fields and uploads the resume
+  in under a second per job (`--prefill --cdp`, measured 0.7-0.9s on fixtures
+  vs minutes AI-only), writes `autoapply-leftovers.json`, and exits — tabs
+  survive in the daemon for the AI session, whose Playwright MCP now attaches
+  via `--cdp-endpoint`. The AI fills only essays and odd widgets, then
+  double-checks the whole form. Engine consults `autoapply/overrides.json`
+  labelRules before its built-in label classifier, enabling the self-update
+  loop to repair field mappings without code changes. New CLI args:
+  `--prefill`, `--cdp`, `--url/--dir/--resume` (ad-hoc), `--ats` (force
+  adapter). 16 new engine tests; never submits in prefill mode.
 - **Auto-apply self-update loop:** every field the filler can't complete is now
   logged to `~/jobhelp/autoapply-gaps.jsonl` (verbatim question, options, and a
   routing reason). A new `/auto-apply-update` skill consumes that log: it
