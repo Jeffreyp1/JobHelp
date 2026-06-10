@@ -19,7 +19,12 @@
 Quirks worth expecting: hydration can wipe early fills (fill after the page is
 stable; the double-check pass catches stragglers); some forms re-render after
 file upload (re-snapshot before touching anything else); a combobox that shows
-typed text is NOT selected until an option was clicked.
+typed text is NOT selected until an option was clicked; after typing into a
+combobox with no matching truthful option, clear the typed filter text before
+moving on. `browser_file_upload` only accepts paths inside the Playwright MCP's
+allowed roots (the project directory by default) and compares the path string
+case-sensitively — reference resumes via the exact-cased project path
+(`~/JobHelp/applications/...`, not `~/jobhelp/...`).
 
 ## Answer bank — `~/jobhelp/answer-bank.json`
 
