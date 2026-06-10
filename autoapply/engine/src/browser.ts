@@ -12,7 +12,14 @@ export async function connectBrowser(endpoint: string): Promise<Browser> {
   return chromium.connectOverCDP(endpoint);
 }
 
-export async function newTab(browser: Browser): Promise<Page> {
+/** In CDP mode pages MUST go in the daemon's default context: contexts created
+ * by a connectOverCDP client are destroyed when that client disconnects, and
+ * other CDP clients (the Playwright MCP) only see the default context. */
+export async function newTab(browser: Browser, reuseDefaultContext = false): Promise<Page> {
+  if (reuseDefaultContext) {
+    const ctx = browser.contexts()[0] ?? (await browser.newContext({ acceptDownloads: false }));
+    return ctx.newPage();
+  }
   const ctx = await browser.newContext({ acceptDownloads: false });
   return ctx.newPage();
 }

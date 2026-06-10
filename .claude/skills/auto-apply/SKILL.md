@@ -59,6 +59,36 @@ Per job, use the **highest version N present** in the job folder (`.md` or
 `node scripts/render-jakestyle.mts <resume.vN.md> <resume.vN.docx>` and upload
 the DOCX. (Never upload an older `.pdf` when a newer `.md` exists.)
 
+## Browser + engine pre-fill (hybrid mode)
+
+The browser is owned by a daemon so tabs survive both CLI exits and session
+restarts. Step 0 of every run:
+`node autoapply/engine/src/browser-daemon.ts` in the background (idempotent —
+exits 0 if CDP is already serving on port 9222). The Playwright MCP attaches to
+it via `--cdp-endpoint`.
+
+For batch/ready jobs, prefer the hybrid path — it is ~5x faster and cheaper:
+
+1. Run the deterministic pre-fill:
+   `node autoapply/engine/src/cli.ts --prefill --cdp http://localhost:9222 --job <jobId>`
+   (or `--url <url> --dir <jobDir> --resume <pdf>` for ad-hoc; `--ats <name>`
+   to force an adapter). It fills profile-sourced fields + uploads the resume in
+   seconds, writes `<job dir>/autoapply-leftovers.json`, sets status
+   `prefilled`, and leaves the tab open.
+2. Read the leftovers file; select the job's tab (`browser_tabs`); fill ONLY
+   the leftover fields using the normal sourcing order; then run the standard
+   required-check and double-check passes on the whole form (the engine's work
+   gets verified too).
+3. Gap logging extra: if a leftover field was answerable from the profile or a
+   labelRule (the engine should have caught it), log its gap entry with
+   `"reason": "adapter-miss", "filledBy": "ai-after-cli-miss"` — that drives
+   automatic engine repair.
+4. If the engine fails on a job (no adapter, crash, empty leftovers file plus
+   an unfilled form): fall back to the full AI flow below for that job and log
+   a gap with reason `adapter-miss`, notes `engine-failed`.
+
+Single ad-hoc URLs may skip the engine and use the full AI flow directly.
+
 ## Per-job flow
 
 1. **Open** — open the job in a **new tab**: `browser_tabs` action `new` with

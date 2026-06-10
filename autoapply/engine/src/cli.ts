@@ -230,15 +230,12 @@ async function main(): Promise<number> {
         now: () => new Date().toISOString(),
       };
 
-      const page = await newTab(browser);
+      const page = await newTab(browser, cdpMode);
       const jobStart = Date.now();
       try {
         rows.push(await applyOneJob(page, job, profile, deps));
       } catch (e: unknown) {
         log('error', 'job failed', { jobId: job.jobId, error: e instanceof Error ? e.message : String(e) });
-      }
-      if (!opts.prefill) {
-        await page.context().close().catch(() => undefined);
       }
       console.log(`[timing] ${job.jobId} ${((Date.now() - jobStart) / 1000).toFixed(1)}s`);
     });

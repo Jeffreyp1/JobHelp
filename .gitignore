@@ -109,3 +109,5 @@ extension-app/prompts/shared/_validate.test.ts
 !extension-app/tests/contracts/
 !extension-app/tests/contracts/configLoader.test.ts
 !extension-app/tests/contracts/verify-bundle-actions.test.ts
+!autoapply/engine/tests/
+!autoapply/engine/tests/**
