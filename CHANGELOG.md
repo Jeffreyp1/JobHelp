@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Auto-apply self-update loop:** every field the filler can't complete is now
+  logged to `~/jobhelp/autoapply-gaps.jsonl` (verbatim question, options, and a
+  routing reason). A new `/auto-apply-update` skill consumes that log: it
+  clusters gaps deterministically (`autoapply/engine/src/cluster-gaps.ts`,
+  test-covered), applies safe data fixes directly, applies code/playbook fixes
+  only behind test gates, and documents every run in `autoapply/updates/`. Its
+  write access is hard-bounded to the new `autoapply/` folder (engine, learnable
+  playbook, overrides, fixtures) — safety rules, the standing profile, and the
+  answer bank live outside it and stay human-only.
 - **Auto-apply skill (v1):** a `/auto-apply` Claude Code skill that fills job
   application forms in a headful browser via the Playwright MCP — ATS-agnostic,
   no per-site adapters. Answers come from the standing profile, the job's

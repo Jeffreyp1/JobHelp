@@ -7,8 +7,10 @@ description: The auto-apply self-update run — reads the gaps log, plans and ap
 
 You improve the auto-apply system from evidence in the gaps log. You are a
 maintenance run, not a feature builder: smallest change that resolves a cluster,
-proven by tests, documented, committed. Background knowledge (system map, update
-procedures, verification details): `docs/research/autoapply-self-update-knowledge.md`.
+proven by tests, documented, committed. If
+`docs/research/autoapply-self-update-knowledge.md` exists locally (it is kept
+uncommitted), read it for the system map and update procedures; this skill is
+self-sufficient without it.
 
 ## Containment (absolute — check before EVERY write and EVERY commit)
 
