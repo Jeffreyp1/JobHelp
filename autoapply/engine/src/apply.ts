@@ -30,6 +30,9 @@ export interface ApplyDeps {
   prefill: boolean;
   freeformWaitMs: number;
   now: () => string;
+  /** Overrides the converted-resume path; lets ad-hoc --resume uploads keep
+   * their real extension instead of landing in the .docx slot. */
+  uploadPath?: string;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -58,7 +61,7 @@ export async function applyOneJob(
 
   await record('queued');
 
-  const docxPath = docxPathForJob(job.dir);
+  const docxPath = deps.uploadPath ?? docxPathForJob(job.dir);
   try {
     await deps.converter.convert(job.resumeMdPath, docxPath);
   } catch (e: unknown) {

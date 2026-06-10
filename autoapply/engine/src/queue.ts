@@ -55,9 +55,10 @@ export async function selectReadyJobs(opts: SelectOpts): Promise<ReadyJob[]> {
     if (opts.onlyJobId && e.jobId !== opts.onlyJobId) continue;
     if (!e.url || !pickAts(e.url)) continue;
     // A possibly-sent job ('submitted' or unconfirmed) is never re-queued — re-running
-    // it would risk a duplicate application.
+    // it would risk a duplicate application. A 'prefilled' job already has an open
+    // tab awaiting the AI pass; re-queuing would open a duplicate half-filled tab.
     const prior = statuses[e.jobId]?.status;
-    if (prior === 'submitted' || prior === 'submitted_unverified') continue;
+    if (prior === 'submitted' || prior === 'submitted_unverified' || prior === 'prefilled') continue;
     const resume = await latestResume(e.dir);
     if (!resume) continue;
     out.push({

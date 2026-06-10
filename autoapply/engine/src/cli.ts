@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
+import { extname, join } from 'node:path';
 import { stateFilePath, statusSidecarPath, profilePath } from './paths.ts';
 import { loadProfile } from './profile.ts';
 import { selectReadyJobs } from './queue.ts';
@@ -228,6 +229,9 @@ async function main(): Promise<number> {
         prefill: opts.prefill,
         freeformWaitMs: opts.freeformWaitMs,
         now: () => new Date().toISOString(),
+        ...(useDirectResume && directResumePath !== undefined
+          ? { uploadPath: join(job.dir, `resume.autoapply${extname(directResumePath)}`) }
+          : {}),
       };
 
       const page = await newTab(browser, cdpMode);
