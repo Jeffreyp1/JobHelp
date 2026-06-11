@@ -28,8 +28,11 @@ the live page, do not rely on memorized selectors. JSON schemas are in
 3. **EEO/demographic fields** (gender, race, veteran, disability): answer only
    from explicit profile values. Absent → choose "Prefer not to say" / "Decline"
    when offered, else leave + flag.
-4. **Signatures and attestations** ("I certify…", typed-signature boxes, legal
-   acknowledgments): leave for the human, flag in the report.
+4. **Signatures and attestations** ("I certify…", typed-signature boxes,
+   truthfulness confirmations, rights waivers): leave for the human, flag in
+   the report. One user-opted exception (profile `acknowledgePrivacyNotices:
+   "Yes"`): plain privacy-policy / data-processing acknowledgment checkboxes
+   may be checked, and are listed in the report.
 5. **CAPTCHA visible** → record status `blocked` with reason, park, move on. Never
    attempt or wait out a captcha.
 6. **Login or account-creation wall** → status `blocked`, skip the job.
@@ -52,7 +55,14 @@ the live page, do not rely on memorized selectors. JSON schemas are in
 
 Load once per run:
 - Profile: `~/.config/jobhelp/autoapply-profile.json` (respect `JOBHELP_CONFIG_DIR`).
+  Its `_meta.volatile` keys (relocation, salary policy, etc.) go stale: if
+  `_meta.reviewedAt` is more than 30 days old, re-confirm those values with the
+  user before the first job, and update `reviewedAt`.
 - Answer bank: `~/jobhelp/answer-bank.json` — create `{"entries": []}` if missing.
+
+Salary/compensation questions follow the profile's `desiredSalaryPolicy`: use
+the job posting's own stated range first; only fall back to the policy's
+minimum when no range is posted. Record which path was used in the report.
 
 Per job, use the **highest version N present** in the job folder (`.md` or
 `.pdf`). If that version has a `.pdf`, upload it; otherwise render its `.md` with
