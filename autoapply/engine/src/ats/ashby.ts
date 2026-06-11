@@ -15,6 +15,12 @@ export const ashbyConfig: AtsConfig = {
   formSelector: 'form',
   submitSelector: 'button[type="submit"]',
   detect: detectByLabelFor,
+  // Stored job URLs usually point at the overview route, which renders the
+  // posting (no fields) behind an Application tab; /application is the form.
+  normalizeUrl(url: string): string {
+    const m = /^(https:\/\/jobs\.ashbyhq\.com\/[^/]+\/[0-9a-f-]{36})\/?$/i.exec(url.split('?')[0] ?? '');
+    return m?.[1] !== undefined ? `${m[1]}/application` : url;
+  },
 };
 
 export const ashby: Ats = makeAts(ashbyConfig);

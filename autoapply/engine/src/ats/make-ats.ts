@@ -101,7 +101,7 @@ export function makeAts(cfg: AtsConfig): Ats {
     },
 
     async openForm(page: Page, url: string): Promise<void> {
-      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await page.goto(cfg.normalizeUrl?.(url) ?? url, { waitUntil: 'domcontentloaded' });
       // Consent walls overlay the page and intercept clicks (including the apply
       // reveal below), so dismiss one first. Best-effort: a missing or stale button
       // must not block the open.

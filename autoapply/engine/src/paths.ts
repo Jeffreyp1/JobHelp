@@ -22,6 +22,7 @@ export function profilePath(): string {
   return join(configRoot(), 'autoapply-profile.json');
 }
 
+/** The engine lives at <repo>/autoapply/engine/src — three levels below the repo. */
 export function repoRoot(): string {
-  return join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  return join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 }

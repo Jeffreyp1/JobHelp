@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 import { extname, join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { stateFilePath, statusSidecarPath, profilePath } from './paths.ts';
 import { loadProfile } from './profile.ts';
 import { selectReadyJobs } from './queue.ts';
@@ -216,9 +217,15 @@ async function main(): Promise<number> {
 
       const useDirectResume = opts.url !== undefined && opts.resumeMd === undefined && opts.resume !== undefined;
       const directResumePath = opts.resume;
+      // A tailored PDF of the same version as the latest .md is the preferred
+      // upload — it already exists, so skip the renderer entirely.
+      const tailoredPdf = job.resumeMdPath.replace(/\.md$/, '.pdf');
+      const haveTailoredPdf = !useDirectResume && existsSync(tailoredPdf);
       const converter = useDirectResume && directResumePath !== undefined
         ? { convert: async (_md: string, out: string) => { await copyFile(directResumePath, out); } }
-        : renderJakestyleConverter;
+        : haveTailoredPdf
+          ? { convert: async () => undefined }
+          : renderJakestyleConverter;
 
       const deps: ApplyDeps = {
         ats,
@@ -231,7 +238,9 @@ async function main(): Promise<number> {
         now: () => new Date().toISOString(),
         ...(useDirectResume && directResumePath !== undefined
           ? { uploadPath: join(job.dir, `resume.autoapply${extname(directResumePath)}`) }
-          : {}),
+          : haveTailoredPdf
+            ? { uploadPath: tailoredPdf }
+            : {}),
       };
 
       const page = await newTab(browser, cdpMode);

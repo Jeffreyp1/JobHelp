@@ -61,6 +61,8 @@ export interface AtsConfig {
   readonly reactSelect?: ReactSelectClasses;
   /** Matches the cover-letter file input so it is not mistaken for the resume. */
   readonly coverRe?: RegExp;
+  /** Rewrite the job URL before navigation (e.g. Ashby overview → /application). */
+  normalizeUrl?(url: string): string;
   /** Enumerate the form's fillable controls. */
   detect(surface: Surface, cfg: AtsConfig): Promise<DetectedField[]>;
   /** Optional pre-fill DOM prep (e.g. add education rows for the whole profile). */
