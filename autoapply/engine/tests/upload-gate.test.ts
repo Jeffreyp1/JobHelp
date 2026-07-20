@@ -36,7 +36,7 @@ describe('makeAts validate — fill-time verified upload is authoritative', () =
     const validation = await ats.validate(page);
     expect(validation.blockers).toEqual([]);
     expect(validation.ok).toBe(true);
-    expect(decideGate({ autoSubmit: true, uploaded: outcome.resumeUploaded, validation })).toBe('submit');
+    expect(decideGate({ autoSubmit: true, uploaded: outcome.resumeUploaded, validation, repaired: false })).toBe('submit');
   });
 
   it('still reports the file blocker when no verified upload happened on this page', async () => {

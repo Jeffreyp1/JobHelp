@@ -12,12 +12,19 @@ import { writeQuestions, readAnswers } from './freeform.ts';
 import { writeReview, buildReport, failedReport, type RunRow } from './review.ts';
 import { buildLeftovers, writeLeftovers } from './leftovers.ts';
 import { unblockForReview } from './leftovers-watch.ts';
+import { hasSelectorOverride } from './selector-overrides.ts';
+import { writeRepairArtifact } from './repair-artifact.ts';
+import { repairRoot } from './paths.ts';
 
 export function decideGate(i: {
   autoSubmit: boolean;
   uploaded: boolean;
   validation: ValidationOutcome;
+  repaired: boolean;
 }): 'submit' | 'pause' {
+  // Repaired selectors mean the page changed underneath us; a human reviews
+  // every fill made through an override, no matter how clean it looks.
+  if (i.repaired) return 'pause';
   if (!i.autoSubmit) return 'pause';
   if (!i.uploaded) return 'pause';
   if (i.validation.captcha) return 'pause';
@@ -107,6 +114,8 @@ export async function applyOneJob(
   }
   await record('converted', { resumeDocxPath: docxPath });
   const notes = await conversionNotes(job);
+  const repaired = hasSelectorOverride(deps.ats.name);
+  if (repaired) notes.push('repaired selectors active - review before submitting');
 
   // Anything from here drives the live browser and can throw; on any failure
   // record 'failed' so the job is never left misrepresented (e.g. stuck at
@@ -116,6 +125,14 @@ export async function applyOneJob(
     const outcome = await deps.ats.fill(page, profile, docxPath);
 
     if (outcome.filledKnown === 0 && !outcome.resumeUploaded && outcome.freeform.length === 0) {
+      const capture = await deps.ats.captureRepair?.(page).catch(() => undefined);
+      if (capture !== undefined) {
+        await writeRepairArtifact(
+          repairRoot(),
+          { ats: deps.ats.name, url: job.url, failure: 'no fields detected', capture },
+          deps.now(),
+        ).catch(() => undefined);
+      }
       const error = 'no application fields detected (form did not load)';
       await record('failed', { error });
       return row('failed', failedReport(error));
@@ -190,6 +207,7 @@ export async function applyOneJob(
       autoSubmit: deps.autoSubmit && !deps.dryRun && guessed.length === 0,
       uploaded: outcome.resumeUploaded,
       validation,
+      repaired,
     });
 
     if (gate === 'submit') {
