@@ -111,6 +111,23 @@ For batch/ready jobs, prefer the hybrid path — it is ~5x faster and cheaper:
 
 Single ad-hoc URLs may skip the engine and use the full AI flow directly.
 
+## Selector repair (self-healing)
+
+After every batch and after any canary drift warning, check for repair artifacts:
+
+1. List `~/jobhelp/autoapply-repair/*/snapshot.md` (respect `JOBHELP_HOME`). No artifacts: skip this section.
+2. For the newest artifact per ATS, read the accessibility snapshot and form HTML excerpt, and derive corrected
+   selectors for whatever the engine could not find (`formSelector`, `submitSelector`, `toggleGroupSelector`,
+   `reactSelect.option/noOptions/singleValue/loading`).
+3. Write them to `~/jobhelp/autoapply-selector-overrides.json`:
+   `{"version": 1, "overrides": {"<ats>": {"submitSelector": "..."}}}`
+   Selectors only — never answers, never code, never new URLs. Show the user what changed in the run summary.
+4. Delete the consumed artifact directories.
+5. Failed jobs re-queue automatically on the next engine run (`failed` is retryable). Jobs on an ATS with an
+   active override ALWAYS park for human review — the engine enforces this; never pass `--auto-submit`
+   expecting it to fire there.
+6. When a later canary reports that ATS healthy again, ask the user whether to retire the override entry.
+
 ## Per-job flow
 
 1. **Open** — open the job in a **new tab**: `browser_tabs` action `new` with
