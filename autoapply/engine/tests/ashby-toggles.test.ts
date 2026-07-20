@@ -107,8 +107,8 @@ function pages(): { newPage: (html: string) => Promise<import('playwright').Page
 }
 
 describe('DEFAULT_TOGGLE_SELECTED', () => {
-  it('defaults to the _act class fragment seen on real Ashby forms', () => {
-    expect(DEFAULT_TOGGLE_SELECTED).toBe('[class*="_act"]');
+  it('tries aria-pressed/aria-checked first, keeping the _act class as fallback', () => {
+    expect(DEFAULT_TOGGLE_SELECTED).toBe('[aria-pressed="true"], [aria-checked="true"], [class*="_act"]');
   });
 });
 
@@ -161,7 +161,7 @@ describe.skipIf(browser === null)('detectToggleGroups — Ashby button pairs', (
         expect(g.kind).toBe('button');
         expect(g.required).toBe(true);
         expect(g.checked).toBe(false);
-        expect(g.selectedSelector).toBe('[class*="_act"]');
+        expect(g.selectedSelector).toBe('[aria-pressed="true"], [aria-checked="true"], [class*="_act"]');
         expect(g.key).not.toBe('');
       }
       expect(groups[0]?.options.map((o) => o.label)).toEqual(['Yes', 'No']);

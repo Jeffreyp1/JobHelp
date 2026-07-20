@@ -5,6 +5,8 @@ import { pathToFileURL } from 'node:url';
 import { describe, it, expect, afterAll } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { fillReactSelect, reactSelectSelected } from '../src/ats/react-select.ts';
+import { detectToggleGroups, fillChoiceGroup } from '../src/ats/choice-groups.ts';
+import { testCfg } from './fixtures/fake-form.ts';
 
 const ALIEN_COMBO = `
 <form>
@@ -75,6 +77,44 @@ describe('class-independent combobox verification', () => {
     const page = await openFixture(ALIEN_COMBO);
     if (page === null) return;
     expect(await reactSelectSelected(page, 'country')).toBe(false);
+    await page.close();
+  });
+});
+
+const ARIA_PRESSED_PAGE = `
+<form>
+  <fieldset class="q8">
+    <legend>Are you authorized to work in the US?*</legend>
+    <div class="q9">
+      <button type="button" aria-pressed="false">Yes</button>
+      <button type="button" aria-pressed="false">No</button>
+    </div>
+  </fieldset>
+  <button type="submit">Submit</button>
+</form>
+<script>
+  for (const b of document.querySelectorAll('button[aria-pressed]')) {
+    b.addEventListener('click', () => {
+      for (const o of document.querySelectorAll('button[aria-pressed]')) o.setAttribute('aria-pressed', 'false');
+      b.setAttribute('aria-pressed', 'true');
+    });
+  }
+</script>`;
+
+describe('aria-pressed toggle groups', () => {
+  it('fills and verifies a toggle pair marked only with aria-pressed', async () => {
+    const page = await openFixture(ARIA_PRESSED_PAGE);
+    if (page === null) return;
+    const cfg = testCfg();
+    const groups = await detectToggleGroups(page, cfg);
+    expect(groups).toHaveLength(1);
+    const first = groups[0];
+    expect(first).toBeDefined();
+    if (first === undefined) return;
+    const res = await fillChoiceGroup(page, first, 'Yes');
+    expect(res.ok).toBe(true);
+    const after = await detectToggleGroups(page, cfg);
+    expect(after[0]?.checked).toBe(true);
     await page.close();
   });
 });

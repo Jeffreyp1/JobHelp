@@ -22,9 +22,11 @@ export interface ChoiceGroup {
   readonly checked?: boolean;
 }
 
-/** Ashby marks the selected toggle button only with a CSS-module class
- * (`_active_…`/`_act…`) — no aria-pressed, no native input. */
-export const DEFAULT_TOGGLE_SELECTED = '[class*="_act"]';
+/** A selected toggle button is matched semantically first — `aria-pressed`/
+ * `aria-checked`, the accessible markers a redesigned site would ship — then by
+ * the `_act…` CSS-module class as an Ashby fallback (Ashby marks the selected
+ * button only with that class: no aria-pressed, no native input). */
+export const DEFAULT_TOGGLE_SELECTED = '[aria-pressed="true"], [aria-checked="true"], [class*="_act"]';
 
 /** Native radio/checkbox groups with their option labels. `detect-controls`
  * deliberately skips choice inputs (auto-picking a free text answer into a radio
