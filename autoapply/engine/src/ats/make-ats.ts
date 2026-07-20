@@ -9,6 +9,7 @@ import { detectChoiceGroups, fillChoiceGroup } from './choice-groups.ts';
 import { uploadFiles } from './upload.ts';
 import { EEO_CONCEPTS, eeoOption } from './eeo.ts';
 import { fillDetectedFields } from './fill-fields.ts';
+import { captureRepair, type RepairCapture } from '../repair-artifact.ts';
 import {
   byKey,
   surfaceOf,
@@ -92,6 +93,47 @@ export function makeAts(cfg0: AtsConfig): Ats {
   // freeform/select answer forces a re-detect.
   const detectCache = new WeakMap<Page, DetectSnapshot>();
 
+  const open = async (page: Page, url: string): Promise<void> => {
+    const { cfg } = eff();
+    detectCache.delete(page);
+    await page.goto(cfg.normalizeUrl?.(url) ?? url, { waitUntil: 'domcontentloaded' });
+    // Consent walls overlay the page and intercept clicks (including the apply
+    // reveal below), so dismiss one first. Best-effort: a missing or stale button
+    // must not block the open.
+    const consent = page.locator('button', { hasText: CONSENT_RE }).first();
+    if ((await consent.count().catch(() => 0)) > 0) {
+      await consent.click({ timeout: 2000 }).catch(() => undefined);
+    }
+    const surface = await surfaceOf(page, cfg);
+    const form = surface.locator(cfg.formSelector).first();
+    if ((await form.count()) === 0) {
+      const apply = surface.locator('a, button', { hasText: applyRe }).first();
+      if ((await apply.count()) > 0) {
+        await apply.click().catch(() => undefined);
+        // count() does not wait and SPA forms attach a beat after the reveal
+        // click, so wait for the form — or, on form-less ATSs (Ashby), its
+        // first control — to attach before re-checking.
+        await surface
+          .locator(`${cfg.formSelector}, input, select, textarea`)
+          .first()
+          .waitFor({ state: 'attached', timeout: FORM_ATTACH_MS })
+          .catch(() => undefined);
+      }
+    }
+    // Only wait on a form that actually exists. Some ATSs (Ashby) render the
+    // application without a <form>, where waiting would just burn the full timeout.
+    if ((await form.count()) > 0) {
+      await form.waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
+    }
+    // Hydration guard: fields set before the SPA hydrates get their values
+    // reset. With images/fonts/analytics blocked per tab, networkidle usually
+    // fires fast; the short cap keeps tracker-heavy pages (which never reach
+    // idle) from turning this into a per-job floor. A hydration reset that
+    // slips past it is still caught: fills read their values back and
+    // validate re-checks every required field before the gate.
+    await page.waitForLoadState('networkidle', { timeout: hydrationIdleMs() }).catch(() => undefined);
+  };
+
   return {
     name: cfg0.name,
 
@@ -99,45 +141,22 @@ export function makeAts(cfg0: AtsConfig): Ats {
       return cfg0.urlRe.test(url);
     },
 
-    async openForm(page: Page, url: string): Promise<void> {
+    openForm: open,
+
+    async probe(page: Page, url: string): Promise<{ fields: number; submitFound: boolean }> {
       const { cfg } = eff();
-      detectCache.delete(page);
-      await page.goto(cfg.normalizeUrl?.(url) ?? url, { waitUntil: 'domcontentloaded' });
-      // Consent walls overlay the page and intercept clicks (including the apply
-      // reveal below), so dismiss one first. Best-effort: a missing or stale button
-      // must not block the open.
-      const consent = page.locator('button', { hasText: CONSENT_RE }).first();
-      if ((await consent.count().catch(() => 0)) > 0) {
-        await consent.click({ timeout: 2000 }).catch(() => undefined);
-      }
+      await open(page, url);
       const surface = await surfaceOf(page, cfg);
-      const form = surface.locator(cfg.formSelector).first();
-      if ((await form.count()) === 0) {
-        const apply = surface.locator('a, button', { hasText: applyRe }).first();
-        if ((await apply.count()) > 0) {
-          await apply.click().catch(() => undefined);
-          // count() does not wait and SPA forms attach a beat after the reveal
-          // click, so wait for the form — or, on form-less ATSs (Ashby), its
-          // first control — to attach before re-checking.
-          await surface
-            .locator(`${cfg.formSelector}, input, select, textarea`)
-            .first()
-            .waitFor({ state: 'attached', timeout: FORM_ATTACH_MS })
-            .catch(() => undefined);
-        }
-      }
-      // Only wait on a form that actually exists. Some ATSs (Ashby) render the
-      // application without a <form>, where waiting would just burn the full timeout.
-      if ((await form.count()) > 0) {
-        await form.waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
-      }
-      // Hydration guard: fields set before the SPA hydrates get their values
-      // reset. With images/fonts/analytics blocked per tab, networkidle usually
-      // fires fast; the short cap keeps tracker-heavy pages (which never reach
-      // idle) from turning this into a per-job floor. A hydration reset that
-      // slips past it is still caught: fills read their values back and
-      // validate re-checks every required field before the gate.
-      await page.waitForLoadState('networkidle', { timeout: hydrationIdleMs() }).catch(() => undefined);
+      const fields = await cfg.detect(surface, cfg);
+      const toggles = cfg.detectToggleGroups === undefined ? [] : await cfg.detectToggleGroups(surface, cfg);
+      const form = await formScope(surface, cfg);
+      const submitFound = (await resolveSubmitButton(surface, form, cfg)) !== null;
+      return { fields: fields.length + toggles.length, submitFound };
+    },
+
+    async captureRepair(page: Page): Promise<RepairCapture> {
+      const { cfg } = eff();
+      return captureRepair(page, cfg);
     },
 
     async fill(page: Page, profile: StandingProfile, resumeFilePath: string): Promise<FillOutcome> {

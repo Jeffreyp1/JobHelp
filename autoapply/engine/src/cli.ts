@@ -2,7 +2,7 @@
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HELP, parseCli, type CliOptions } from './cli-options.ts';
-import { stateFilePath, statusSidecarPath, profilePath } from './paths.ts';
+import { stateFilePath, statusSidecarPath, profilePath, canaryStatePath, repairRoot, stateRoot } from './paths.ts';
 import { loadProfile } from './profile.ts';
 import { selectReadyJobs } from './queue.ts';
 import { launchBrowser, connectBrowser, newTab } from './browser.ts';
@@ -14,13 +14,16 @@ import type { ResumeConverter } from './convert.ts';
 import { formatRunSummary, type RunRow } from './review.ts';
 import { runLeftoverWatch } from './leftovers-watch.ts';
 import { loadSelectorOverrides } from './selector-overrides.ts';
+import { loadCanaryState, isCanaryStale } from './canary-state.ts';
+import { runCanary, formatCanaryTable } from './canary.ts';
+import { sampleCandidates, readLatestDigestUrls } from './canary-sample.ts';
 import { log } from './log.ts';
-import type { ReadyJob } from './types.ts';
+import type { ReadyJob, McpState } from './types.ts';
 import type { Browser } from 'playwright';
 
 export { parseCli } from './cli-options.ts';
 
-import { copyFile } from 'node:fs/promises';
+import { copyFile, readFile } from 'node:fs/promises';
 import { ADAPTERS_BY_NAME } from './ats/registry.ts';
 
 async function resolveJobs(opts: CliOptions): Promise<ReadyJob[]> {
@@ -117,6 +120,32 @@ async function main(): Promise<number> {
   }
 
   const { browser, cdpMode } = await openBrowser(opts);
+
+  if (opts.url === undefined && !opts.noCanary) {
+    const canaryState = await loadCanaryState(canaryStatePath());
+    if (opts.canary || isCanaryStale(canaryState, new Date().toISOString())) {
+      let apps: Array<{ url?: string }> = [];
+      try {
+        const parsed: unknown = JSON.parse(await readFile(stateFilePath(), 'utf8'));
+        if (parsed !== null && typeof parsed === 'object' && Array.isArray((parsed as McpState).applications)) {
+          apps = [...(parsed as McpState).applications];
+        }
+      } catch {
+        // canary is best-effort; a missing state file just narrows the sample
+      }
+      const candidates = sampleCandidates({
+        applications: apps,
+        digestUrls: await readLatestDigestUrls(stateRoot()),
+        atsOf: (u) => pickAts(u)?.name ?? null,
+      });
+      const canaryRows = await runCanary({
+        browser, cdpMode, adapters: ADAPTERS_BY_NAME, candidates,
+        state: canaryState, statePath: canaryStatePath(), repairRoot: repairRoot(),
+        now: () => new Date().toISOString(),
+      });
+      if (canaryRows.length > 0) console.log(`\n${formatCanaryTable(canaryRows)}\n`);
+    }
+  }
 
   const rows: RunRow[] = [];
   const runStart = Date.now();

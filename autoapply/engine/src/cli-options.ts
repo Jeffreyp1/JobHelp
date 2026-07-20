@@ -19,6 +19,8 @@ OPTIONS
   --job <jobId>            Process only this job from the queue
   --headless               Run browser headless (default: headful)
   --freeform-timeout <s>   Seconds to wait for freeform-answers.json (default: 0)
+  --canary                 Force the site health check before the batch
+  --no-canary              Skip the site health check
   --cdp <endpoint>         Attach to existing browser via CDP instead of launching
                            (e.g. http://localhost:9222); tabs survive CLI exit
   --url <url>              Ad-hoc job URL (bypasses queue; requires --dir)
@@ -44,6 +46,8 @@ export interface CliOptions {
   dryRun: boolean;
   prefill: boolean;
   watchLeftoversMs: number;
+  canary: boolean;
+  noCanary: boolean;
   job?: string;
   headful: boolean;
   freeformWaitMs: number;
@@ -68,6 +72,8 @@ export function parseCli(argv: string[]): CliOptions {
       'dry-run': { type: 'boolean', default: false },
       prefill: { type: 'boolean', default: false },
       'watch-leftovers': { type: 'string', default: '0' },
+      canary: { type: 'boolean', default: false },
+      'no-canary': { type: 'boolean', default: false },
       job: { type: 'string' },
       headless: { type: 'boolean', default: false },
       'freeform-timeout': { type: 'string', default: '0' },
@@ -91,6 +97,8 @@ export function parseCli(argv: string[]): CliOptions {
     dryRun: values['dry-run'] === true,
     prefill: values['prefill'] === true,
     watchLeftoversMs: Math.max(0, Number.parseInt(String(values['watch-leftovers']), 10) || 0) * 1000,
+    canary: values.canary === true,
+    noCanary: values['no-canary'] === true,
     ...(values.job !== undefined ? { job: String(values.job) } : {}),
     headful: values.headless !== true,
     freeformWaitMs: Math.max(0, Number.parseInt(String(values['freeform-timeout']), 10) || 0) * 1000,

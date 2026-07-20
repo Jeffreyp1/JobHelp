@@ -1,5 +1,6 @@
 import type { Page } from 'playwright';
 import type { FreeformQuestion, GuessedField, StandingProfile } from '../types.ts';
+import type { RepairCapture } from '../repair-artifact.ts';
 
 export type { FreeformQuestion };
 
@@ -27,4 +28,9 @@ export interface Ats {
   applyFreeform(page: Page, answers: Record<string, string>): Promise<readonly string[]>;
   validate(page: Page): Promise<ValidationOutcome>;
   submit(page: Page): Promise<void>;
+  /** Detect-only health probe for the canary: open the page, count detectable
+   * fields (scalar + toggle groups), and check the submit control resolves.
+   * Fills nothing and changes no job state. */
+  probe?(page: Page, url: string): Promise<{ fields: number; submitFound: boolean }>;
+  captureRepair?(page: Page): Promise<RepairCapture>;
 }
