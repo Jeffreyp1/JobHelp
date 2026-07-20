@@ -94,6 +94,11 @@ async function pickFrom(
   if (idx === -1) return { selected: false, guessed: false };
   await options.nth(idx).click();
   const chosen = texts[idx];
+  if (chosen !== undefined && chosen !== '') {
+    await input
+      .evaluate((el, c) => el.setAttribute('data-jobhelp-selected', c), chosen)
+      .catch(() => undefined);
+  }
   return { selected: true, guessed: !exact, ...(chosen !== undefined ? { chosen } : {}) };
 }
 
@@ -123,6 +128,7 @@ export async function fillReactSelect(
   }
   // Leave a failed combobox empty so `reactSelectSelected` can't read the last
   // probe's leftover text as a (false) selection.
+  await input.evaluate((el) => el.removeAttribute('data-jobhelp-selected')).catch(() => undefined);
   await input.fill('').catch(() => undefined);
   await input.press('Escape').catch(() => undefined);
   return { selected: false, guessed: false };
@@ -226,15 +232,22 @@ export async function reactSelectSelected(
       const control = inp.closest('[class*="select__control"]') ?? inp.closest('[class*="-control"]');
       if (control?.querySelector(sv)) return true;
       const value = ((inp as HTMLInputElement).value ?? '').trim();
-      if (value === '') return false;
-      // A site can pre-seed the input with its own placeholder text; that is not a
-      // user selection. Only count the value when it differs from any placeholder.
       const placeholders = [
         inp.getAttribute('aria-placeholder'),
         (inp as HTMLInputElement).placeholder,
         control?.querySelector('[class*="placeholder"]')?.textContent,
       ];
-      return !placeholders.some((p) => (p ?? '').trim() === value);
+      if (value !== '') return !placeholders.some((p) => (p ?? '').trim() === value);
+      // Class names drift with site redesigns; the pick stamp does not. Trust it
+      // only while the chosen text is still visible near the input, so a re-render
+      // that wiped the selection cannot ride a stale stamp through validate.
+      const stamped = (inp.getAttribute('data-jobhelp-selected') ?? '').trim();
+      if (stamped === '') return false;
+      let node: Element | null = inp.parentElement;
+      for (let depth = 0; node !== null && depth < 3; depth += 1, node = node.parentElement) {
+        if ((node.textContent ?? '').includes(stamped)) return true;
+      }
+      return false;
     }, rs.singleValue)
     .catch(() => false);
 }

@@ -58,8 +58,13 @@ function fakeInput(): { locator: Locator; calls: string[] } {
     return Promise.resolve();
   };
   loc['press'] = () => Promise.resolve();
-  loc['evaluate'] = (fn: (el: { getAttribute(name: string): string | null }) => unknown) =>
-    Promise.resolve(fn({ getAttribute: () => null }));
+  loc['evaluate'] = (
+    fn: (el: {
+      getAttribute(name: string): string | null;
+      setAttribute(name: string, value: string): void;
+      removeAttribute(name: string): void;
+    }) => unknown,
+  ) => Promise.resolve(fn({ getAttribute: () => null, setAttribute: () => undefined, removeAttribute: () => undefined }));
   return { locator: loc as unknown as Locator, calls };
 }
 
