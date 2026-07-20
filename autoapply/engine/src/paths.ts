@@ -30,3 +30,15 @@ export function profilePath(): string {
 export function repoRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 }
+
+export function canaryStatePath(): string {
+  return join(stateRoot(), 'autoapply-canary.json');
+}
+
+export function selectorOverridesPath(): string {
+  return join(stateRoot(), 'autoapply-selector-overrides.json');
+}
+
+export function repairRoot(): string {
+  return join(stateRoot(), 'autoapply-repair');
+}
