@@ -26,13 +26,22 @@ export function sampleCandidates(i: CanaryCandidateInputs): Record<string, strin
   return out;
 }
 
+// Persisted digests hold RankedJob entries whose url is nested (`{ job: { url } }`);
+// a flat top-level `url` is accepted defensively.
+function entryUrl(j: unknown): unknown {
+  if (typeof j !== 'object' || j === null) return undefined;
+  const r = j as Record<string, unknown>;
+  if (typeof r['url'] === 'string') return r['url'];
+  const job = r['job'];
+  if (typeof job !== 'object' || job === null) return undefined;
+  return (job as Record<string, unknown>)['url'];
+}
+
 function jobsUrls(v: unknown): string[] | null {
   if (typeof v !== 'object' || v === null) return null;
   const jobs = (v as Record<string, unknown>)['jobs'];
   if (!Array.isArray(jobs)) return null;
-  return jobs
-    .map((j) => (typeof j === 'object' && j !== null ? (j as Record<string, unknown>)['url'] : undefined))
-    .filter((u): u is string => typeof u === 'string' && u !== '');
+  return jobs.map(entryUrl).filter((u): u is string => typeof u === 'string' && u !== '');
 }
 
 export async function readLatestDigestUrls(stateRootDir: string): Promise<string[]> {
