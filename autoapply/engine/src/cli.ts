@@ -13,6 +13,7 @@ import { chooseUploadSource, jaketexPdfConverter } from './convert-pdf.ts';
 import type { ResumeConverter } from './convert.ts';
 import { formatRunSummary, type RunRow } from './review.ts';
 import { runLeftoverWatch } from './leftovers-watch.ts';
+import { loadSelectorOverrides } from './selector-overrides.ts';
 import { log } from './log.ts';
 import type { ReadyJob } from './types.ts';
 import type { Browser } from 'playwright';
@@ -106,6 +107,8 @@ async function main(): Promise<number> {
     console.error(`\nCreate ${profilePath()} with your standing answers (firstName, email, etc.).`);
     return 1;
   }
+
+  await loadSelectorOverrides();
 
   const jobs = await resolveJobs(opts);
   if (jobs.length === 0) {

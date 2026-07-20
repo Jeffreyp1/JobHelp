@@ -1,7 +1,8 @@
 import type { Locator, Page } from 'playwright';
 import type { Ats, FillOutcome, ValidationOutcome } from './types.ts';
 import type { StandingProfile } from '../types.ts';
-import { DEFAULT_REACT_SELECT, type AtsConfig, type DetectedField } from './form-config.ts';
+import { DEFAULT_REACT_SELECT, type AtsConfig, type DetectedField, type ReactSelectClasses } from './form-config.ts';
+import { withSelectorOverrides } from '../selector-overrides.ts';
 import { classifyLabelWithRules, loadLabelOverrides, answerFor } from '../match.ts';
 import { lookupApproved } from '../answer-bank.ts';
 import { detectChoiceGroups, fillChoiceGroup } from './choice-groups.ts';
@@ -76,10 +77,13 @@ interface DetectSnapshot {
 /** Produce an `Ats` from a declarative config + a detection strategy. All the
  * browser behavior (open, fill, freeform handoff, validate, submit) is shared;
  * adapters only differ in their selectors and how they enumerate fields. */
-export function makeAts(cfg: AtsConfig): Ats {
-  const rs = cfg.reactSelect ?? DEFAULT_REACT_SELECT;
-  const coverRe = cfg.coverRe ?? DEFAULT_COVER_RE;
-  const applyRe = cfg.applyButtonRe ?? DEFAULT_APPLY_RE;
+export function makeAts(cfg0: AtsConfig): Ats {
+  const eff = (): { cfg: AtsConfig; rs: ReactSelectClasses } => {
+    const cfg = withSelectorOverrides(cfg0);
+    return { cfg, rs: cfg.reactSelect ?? DEFAULT_REACT_SELECT };
+  };
+  const coverRe = cfg0.coverRe ?? DEFAULT_COVER_RE;
+  const applyRe = cfg0.applyButtonRe ?? DEFAULT_APPLY_RE;
   const isCoverField = (id: string, label: string): boolean =>
     (coverRe.test(id) || coverRe.test(label)) && !(DEFAULT_RESUME_RE.test(id) || DEFAULT_RESUME_RE.test(label));
   // Detection costs evaluate roundtrips and runs twice per job (fill, validate).
@@ -89,13 +93,14 @@ export function makeAts(cfg: AtsConfig): Ats {
   const detectCache = new WeakMap<Page, DetectSnapshot>();
 
   return {
-    name: cfg.name,
+    name: cfg0.name,
 
     matches(url: string): boolean {
-      return cfg.urlRe.test(url);
+      return cfg0.urlRe.test(url);
     },
 
     async openForm(page: Page, url: string): Promise<void> {
+      const { cfg } = eff();
       detectCache.delete(page);
       await page.goto(cfg.normalizeUrl?.(url) ?? url, { waitUntil: 'domcontentloaded' });
       // Consent walls overlay the page and intercept clicks (including the apply
@@ -136,6 +141,7 @@ export function makeAts(cfg: AtsConfig): Ats {
     },
 
     async fill(page: Page, profile: StandingProfile, resumeFilePath: string): Promise<FillOutcome> {
+      const { cfg, rs } = eff();
       await loadLabelOverrides();
       const surface = await surfaceOf(page, cfg);
       if (cfg.beforeFill) await cfg.beforeFill(surface, profile, cfg);
@@ -190,6 +196,7 @@ export function makeAts(cfg: AtsConfig): Ats {
     },
 
     async applyFreeform(page: Page, answers: Record<string, string>): Promise<readonly string[]> {
+      const { cfg, rs } = eff();
       const surface = await surfaceOf(page, cfg);
       const applied: string[] = [];
       for (const [fieldKey, answer] of Object.entries(answers)) {
@@ -203,6 +210,7 @@ export function makeAts(cfg: AtsConfig): Ats {
     },
 
     async validate(page: Page): Promise<ValidationOutcome> {
+      const { cfg, rs } = eff();
       const surface = await surfaceOf(page, cfg);
       const captcha = await captchaPresent(surface);
       const cached = detectCache.get(page);
@@ -252,6 +260,7 @@ export function makeAts(cfg: AtsConfig): Ats {
     },
 
     async submit(page: Page): Promise<void> {
+      const { cfg } = eff();
       const surface = await surfaceOf(page, cfg);
       // Scope the submit click to the form so a broad fallback selector can't match
       // an unrelated page button (newsletter, modal) on an SPA landing page.

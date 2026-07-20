@@ -73,6 +73,9 @@ export interface AtsConfig {
   /** Clicked to reveal the form when the page lands on a posting view first. */
   readonly applyButtonRe?: RegExp;
   readonly reactSelect?: ReactSelectClasses;
+  /** Selector a selected toggle-button option matches (see choice-groups).
+   * Overridable via selector-overrides when a site renames its marker class. */
+  readonly toggleGroupSelector?: string;
   /** Matches the cover-letter file input so it is not mistaken for the resume. */
   readonly coverRe?: RegExp;
   /** Rewrite the job URL before navigation (e.g. Ashby overview → /application). */

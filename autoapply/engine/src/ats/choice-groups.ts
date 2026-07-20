@@ -85,8 +85,9 @@ export async function detectChoiceGroups(surface: Surface, cfg: AtsConfig): Prom
 export async function detectToggleGroups(
   surface: Surface,
   cfg: AtsConfig,
-  selectedSelector: string = DEFAULT_TOGGLE_SELECTED,
+  selectedSelector?: string,
 ): Promise<ChoiceGroup[]> {
+  const sel = selectedSelector ?? cfg.toggleGroupSelector ?? DEFAULT_TOGGLE_SELECTED;
   const form = await formScope(surface, cfg);
   return form.evaluate((root, sel) => {
     const clean = (s: string): string => s.replace(/\s+/g, ' ').trim();
@@ -162,7 +163,7 @@ export async function detectToggleGroups(
       });
     });
     return groups;
-  }, selectedSelector);
+  }, sel);
 }
 
 export interface ChoiceFillResult {
