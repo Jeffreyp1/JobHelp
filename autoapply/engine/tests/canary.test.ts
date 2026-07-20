@@ -85,6 +85,27 @@ describe('runCanary', () => {
     expect(after.baselines['fixture']?.fields).toBe(saved.baselines['fixture']?.fields); // drift keeps the old baseline
   });
 
+  it('resolves without throwing when the browser is dead and the state file is unwritable', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'jobhelp-canaryerr-'));
+    const blocker = join(dir, 'blocker');
+    await writeFile(blocker, 'x');
+    // A browser whose newContext rejects makes newTab throw (dead browser / CDP
+    // drop); a statePath nested under a regular file makes saveCanaryState reject.
+    const deadBrowser = {
+      newContext: async (): Promise<never> => { throw new Error('browser is gone'); },
+      contexts: (): never[] => [],
+    } as unknown as Browser;
+    const rows = await runCanary({
+      browser: deadBrowser, cdpMode: false,
+      adapters: new Map([['fixture', makeAts(canaryCfg())]]),
+      candidates: { fixture: ['https://example.test/dead'] },
+      state: { baselines: {} },
+      statePath: join(blocker, 'canary.json'), repairRoot: join(dir, 'r'),
+      now: () => '2026-07-20T09:00:00.000Z',
+    });
+    expect(rows).toEqual([]);
+  });
+
   it('skips an ats whose candidates are all dead', async () => {
     if (browser === null) return;
     const stateDir = await mkdtemp(join(tmpdir(), 'jobhelp-canarydead-'));

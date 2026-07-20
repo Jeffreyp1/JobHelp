@@ -1,4 +1,4 @@
-import type { Browser } from 'playwright';
+import type { Browser, Page } from 'playwright';
 import type { Ats } from './ats/types.ts';
 import { newTab } from './browser.ts';
 import { evaluateCanary, saveCanaryState, type CanaryState, type CanaryVerdict } from './canary-state.ts';
@@ -36,8 +36,11 @@ export async function runCanary(deps: CanaryDeps): Promise<CanaryRow[]> {
     let probed: { fields: number; submitFound: boolean; url: string } | null = null;
     let capture: RepairCapture | null = null;
     for (const url of urls) {
-      const page = await newTab(deps.browser, deps.cdpMode);
+      // newTab is inside the try so a dead browser/CDP drop is swallowed like any
+      // other dead candidate — runCanary must never reject out to its caller.
+      let page: Page | null = null;
       try {
+        page = await newTab(deps.browser, deps.cdpMode);
         const p = await adapter.probe(page, url);
         probed = { ...p, url };
         // On drift the page is still open — grab a repair snapshot before it closes.
@@ -48,7 +51,7 @@ export async function runCanary(deps: CanaryDeps): Promise<CanaryRow[]> {
       } catch {
         // dead or closed posting — not drift; try the next candidate
       } finally {
-        await page.close().catch(() => undefined);
+        await page?.close().catch(() => undefined);
       }
     }
     if (probed === null) {
@@ -79,7 +82,9 @@ export async function runCanary(deps: CanaryDeps): Promise<CanaryRow[]> {
       overrideActive: hasSelectorOverride(ats),
     });
   }
-  await saveCanaryState(deps.statePath, { lastRun: deps.now(), baselines });
+  // Persisting the baseline is best-effort: a disk-write failure must not turn the
+  // canary into a batch-killer, so the tail swallows its own error too.
+  await saveCanaryState(deps.statePath, { lastRun: deps.now(), baselines }).catch(() => undefined);
   return rows;
 }
 

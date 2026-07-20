@@ -121,29 +121,35 @@ async function main(): Promise<number> {
 
   const { browser, cdpMode } = await openBrowser(opts);
 
+  // The canary is a best-effort preflight: a dead browser, a CDP drop, or an
+  // unwritable state file must degrade to a logged warning, never abort the batch.
   if (opts.url === undefined && !opts.noCanary) {
-    const canaryState = await loadCanaryState(canaryStatePath());
-    if (opts.canary || isCanaryStale(canaryState, new Date().toISOString())) {
-      let apps: Array<{ url?: string }> = [];
-      try {
-        const parsed: unknown = JSON.parse(await readFile(stateFilePath(), 'utf8'));
-        if (parsed !== null && typeof parsed === 'object' && Array.isArray((parsed as McpState).applications)) {
-          apps = [...(parsed as McpState).applications];
+    try {
+      const canaryState = await loadCanaryState(canaryStatePath());
+      if (opts.canary || isCanaryStale(canaryState, new Date().toISOString())) {
+        let apps: Array<{ url?: string }> = [];
+        try {
+          const parsed: unknown = JSON.parse(await readFile(stateFilePath(), 'utf8'));
+          if (parsed !== null && typeof parsed === 'object' && Array.isArray((parsed as McpState).applications)) {
+            apps = [...(parsed as McpState).applications];
+          }
+        } catch {
+          // canary is best-effort; a missing state file just narrows the sample
         }
-      } catch {
-        // canary is best-effort; a missing state file just narrows the sample
+        const candidates = sampleCandidates({
+          applications: apps,
+          digestUrls: await readLatestDigestUrls(stateRoot()),
+          atsOf: (u) => pickAts(u)?.name ?? null,
+        });
+        const canaryRows = await runCanary({
+          browser, cdpMode, adapters: ADAPTERS_BY_NAME, candidates,
+          state: canaryState, statePath: canaryStatePath(), repairRoot: repairRoot(),
+          now: () => new Date().toISOString(),
+        });
+        if (canaryRows.length > 0) console.log(`\n${formatCanaryTable(canaryRows)}\n`);
       }
-      const candidates = sampleCandidates({
-        applications: apps,
-        digestUrls: await readLatestDigestUrls(stateRoot()),
-        atsOf: (u) => pickAts(u)?.name ?? null,
-      });
-      const canaryRows = await runCanary({
-        browser, cdpMode, adapters: ADAPTERS_BY_NAME, candidates,
-        state: canaryState, statePath: canaryStatePath(), repairRoot: repairRoot(),
-        now: () => new Date().toISOString(),
-      });
-      if (canaryRows.length > 0) console.log(`\n${formatCanaryTable(canaryRows)}\n`);
+    } catch (e: unknown) {
+      log('warn', 'canary skipped after error', { error: e instanceof Error ? e.message : String(e) });
     }
   }
 
