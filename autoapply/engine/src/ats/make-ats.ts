@@ -18,6 +18,7 @@ import {
   captchaPresent,
   fileInputsMissingUpload,
   requiredUncheckedGroups,
+  resolveSubmitButton,
 } from './form-dom.ts';
 
 const DEFAULT_COVER_RE = /cover/i;
@@ -259,7 +260,9 @@ export function makeAts(cfg: AtsConfig): Ats {
       // counts as proof — pre-existing "thank you" copy can't false-confirm.
       const startUrl = page.url();
       const successBefore = (await page.locator('body', { hasText: SUCCESS_TEXT_RE }).count().catch(() => 0)) > 0;
-      await form.locator(cfg.submitSelector).first().click();
+      const button = await resolveSubmitButton(surface, form, cfg);
+      if (button === null) throw new Error('submit button not found');
+      await button.click();
       // A click on a wrong/disabled button is silent; only a real success signal
       // (navigation, a new confirmation message, or the form detaching) proves the send.
       const confirmed = await awaitSubmitConfirmed(page, form, startUrl, successBefore, Date.now() + submitConfirmMs());

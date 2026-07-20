@@ -213,3 +213,21 @@ export async function fillScalar(
   const landed = await input.inputValue().catch(() => '');
   return { ok: landed.trim() !== '' };
 }
+
+/** Resolve the submit control drift-tolerantly: the adapter's configured selector
+ * is most precise, so it wins; when a redesign renames it, fall back to the
+ * semantic signals (native submit type, then submit/apply text). Null means
+ * nothing was clicked — callers treat it as a typed, retryable failure. */
+export async function resolveSubmitButton(
+  surface: Surface,
+  form: Locator,
+  cfg: AtsConfig,
+): Promise<Locator | null> {
+  const configured = form.locator(cfg.submitSelector).first();
+  if ((await configured.count().catch(() => 0)) > 0) return configured;
+  const native = form.locator('button[type="submit"], input[type="submit"]').first();
+  if ((await native.count().catch(() => 0)) > 0) return native;
+  const named = form.locator('button', { hasText: /submit|apply/i }).first();
+  if ((await named.count().catch(() => 0)) > 0) return named;
+  return null;
+}
