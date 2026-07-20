@@ -52,8 +52,22 @@ export async function detectControls(surface: Surface, cfg: AtsConfig): Promise<
       const id = el.getAttribute('id') ?? '';
       const name = el.getAttribute('name') ?? '';
       if (captchaRe.test(id) || captchaRe.test(name)) continue;
-      const key = id || name;
-      if (!key) continue;
+      // A control with neither id nor name gets a stamped key so fill/validate
+      // can still address it; an empty key marks the (pathological) unstampable
+      // case, which validate surfaces as a fail-closed blocker.
+      let key = id || name;
+      if (!key) {
+        try {
+          key = el.getAttribute('data-jobhelp-key') ?? '';
+          if (!key) {
+            const stamp = `jobhelp-${Math.random().toString(36).slice(2, 10)}`;
+            el.setAttribute('data-jobhelp-key', stamp);
+            key = el.getAttribute('data-jobhelp-key') === stamp ? stamp : '';
+          }
+        } catch {
+          key = '';
+        }
+      }
       const label = labelText(el).replace(/\s+/g, ' ').trim();
       const required =
         (el as HTMLInputElement).required === true ||
@@ -68,9 +82,9 @@ export async function detectControls(surface: Surface, cfg: AtsConfig): Promise<
   const seen = new Set<string>();
   const fields: DetectedField[] = [];
   for (const r of raw) {
-    if (seen.has(r.id)) continue;
+    if (r.id !== '' && seen.has(r.id)) continue;
     if (r.tag !== 'input' && r.tag !== 'textarea' && r.tag !== 'select') continue;
-    seen.add(r.id);
+    if (r.id !== '') seen.add(r.id);
     fields.push({ id: r.id, label: r.label, tag: r.tag, type: r.type, required: r.required, reactSelect: r.combo });
   }
   return fields;

@@ -14,6 +14,10 @@ export function statusSidecarPath(): string {
   return join(stateRoot(), 'autoapply-status.json');
 }
 
+export function answerBankPath(): string {
+  return join(stateRoot(), 'answer-bank.json');
+}
+
 export function configRoot(): string {
   return process.env['JOBHELP_CONFIG_DIR'] ?? join(homedir(), '.config', 'jobhelp');
 }

@@ -17,6 +17,7 @@ export function buildReport(i: {
   guessed: readonly GuessedField[];
   blockers: readonly string[];
   captcha: boolean;
+  notes?: readonly string[];
 }): ReviewReport {
   const yellow: ReviewField[] = i.guessed.map((g) => ({
     field: g.question || g.fieldKey,
@@ -26,7 +27,14 @@ export function buildReport(i: {
   const red: ReviewField[] = i.blockers.map((b) => ({ field: b, why: 'required, still blank' }));
   if (i.captcha) red.push({ field: 'captcha', why: 'solve it before submitting' });
   const verdict: ReviewVerdict = red.length > 0 ? 'blocked' : yellow.length > 0 ? 'review' : 'ready';
-  return { verdict, green: Math.max(0, i.green), yellow, red, captcha: i.captcha };
+  return {
+    verdict,
+    green: Math.max(0, i.green),
+    yellow,
+    red,
+    captcha: i.captcha,
+    ...(i.notes !== undefined && i.notes.length > 0 ? { notes: i.notes } : {}),
+  };
 }
 
 /** A failed job (form never loaded, conversion error) still needs a row. */
@@ -65,6 +73,7 @@ export function formatRunSummary(rows: readonly RunRow[]): string {
     out.push(`${TAG[rep.verdict]} ${r.company} — ${r.role}   ·  ${counts}`);
     for (const rd of rep.red) out.push(`     MISSING  ${rd.field} (${rd.why})`);
     for (const y of rep.yellow) out.push(`     check    ${y.field}${y.answer ? ` = "${trunc(y.answer)}"` : ''} (${y.why})`);
+    for (const n of rep.notes ?? []) out.push(`     note     ${n}`);
     out.push('');
   }
   out.push('Keep the browser open and submit each tab yourself.');

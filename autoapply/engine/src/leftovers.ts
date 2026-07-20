@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FillOutcome } from './ats/types.ts';
 import type { ValidationOutcome } from './ats/types.ts';
@@ -15,6 +15,9 @@ export interface LeftoversFile {
   readonly guesses: readonly GuessedField[];
   readonly filledKnown: number;
   readonly prefilledAt: string;
+  /** Run-level caveats (e.g. resume PDF trimmed to fit one page). Present only
+   * when non-empty. */
+  readonly notes?: readonly string[];
 }
 
 export interface BuildLeftoversInput {
@@ -24,6 +27,7 @@ export interface BuildLeftoversInput {
   readonly outcome: FillOutcome;
   readonly validation: ValidationOutcome;
   readonly now: () => string;
+  readonly notes?: readonly string[];
 }
 
 export function buildLeftovers(i: BuildLeftoversInput): LeftoversFile {
@@ -42,9 +46,35 @@ export function buildLeftovers(i: BuildLeftoversInput): LeftoversFile {
     guesses: [...i.outcome.guesses],
     filledKnown: i.outcome.filledKnown,
     prefilledAt: i.now(),
+    ...(i.notes !== undefined && i.notes.length > 0 ? { notes: i.notes } : {}),
   };
 }
 
 export async function writeLeftovers(dir: string, data: LeftoversFile): Promise<void> {
   await writeFile(join(dir, 'autoapply-leftovers.json'), JSON.stringify(data, null, 2));
+}
+
+function isLeftoversFile(v: unknown): v is LeftoversFile {
+  if (typeof v !== 'object' || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r['url'] === 'string' &&
+    typeof r['resumeUploaded'] === 'boolean' &&
+    Array.isArray(r['fields']) &&
+    Array.isArray(r['blockers'])
+  );
+}
+
+export async function readLeftovers(dir: string): Promise<LeftoversFile | null> {
+  const path = join(dir, 'autoapply-leftovers.json');
+  let raw: string;
+  try {
+    raw = await readFile(path, 'utf8');
+  } catch (e: unknown) {
+    if (typeof e === 'object' && e !== null && Reflect.get(e, 'code') === 'ENOENT') return null;
+    throw e;
+  }
+  const parsed: unknown = JSON.parse(raw);
+  if (!isLeftoversFile(parsed)) throw new Error(`${path} is not a valid leftovers file`);
+  return parsed;
 }

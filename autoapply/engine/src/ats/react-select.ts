@@ -1,22 +1,21 @@
-import { DEFAULT_REACT_SELECT, type ReactSelectClasses, type Surface } from './form-config.ts';
+import {
+  DEFAULT_PROBE_BUDGET_MS,
+  DEFAULT_REACT_SELECT,
+  type ReactSelectClasses,
+  type Surface,
+} from './form-config.ts';
 import { byKey } from './locate.ts';
+import { chooseOption, probeSequence } from './option-match.ts';
 import type { Locator } from 'playwright';
 
-function tokens(s: string): string[] {
-  return s.toLowerCase().split(/\W+/).filter(Boolean);
-}
+export { chooseOption, isDeclineValue, probeSequence, DECLINE_RE, POLARITY_TOKENS } from './option-match.ts';
 
-// Generic words that appear across many option labels (especially schools), so a
-// shared one is no evidence of a real match. "Example State University - Fremont"
-// and "Academy of Art University" share only "of"/"university"; matching on those
-// fills the WRONG school. Scoring ignores these and keys on the distinctive words.
-const COMMON_TOKENS = new Set([
-  'of', 'the', 'at', 'and', 'a', 'an', 'in', 'for', 'to', 'de',
-  'university', 'college', 'institute', 'school', 'univ',
-]);
+const PROBE_MENU_TIMEOUT_MS = 2500;
+const READ_MENU_TIMEOUT_MS = 1500;
+const POLL_MS = 50;
 
-function distinctive(toks: readonly string[]): string[] {
-  return toks.filter((t) => !COMMON_TOKENS.has(t));
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Scope the option query to the listbox a combobox input explicitly owns via
@@ -41,37 +40,34 @@ async function optionsFor(
   return surface.locator(rs.option);
 }
 
-/** Pick the option index for `value`. `exact` is true for a direct text match;
- * false means a fuzzy (shared-token) best guess. -1 means no reasonable match. */
-export function chooseOption(texts: readonly string[], value: string): { idx: number; exact: boolean } {
-  const lc = texts.map((t) => t.trim().toLowerCase());
-  const want = value.trim().toLowerCase();
-  let idx = lc.findIndex((t) => t === want);
-  if (idx === -1) idx = lc.findIndex((t) => t.startsWith(want) || t.startsWith(`${want} `));
-  if (idx === -1) idx = lc.findIndex((t) => t.includes(want));
-  if (idx !== -1) return { idx, exact: true };
-  // Fuzzy fallback: score on DISTINCTIVE token overlap so a shared generic word
-  // can't carry a match, and require at least one distinctive hit — leaving a
-  // field empty (to flag) is safer than confidently filling the wrong option.
-  const wantToks = tokens(want);
-  const wantAll = new Set(wantToks);
-  const wantDistinct = new Set(distinctive(wantToks));
-  const keyOnDistinct = wantDistinct.size > 0;
-  let best = -1;
-  let bestKey = 0;
-  let bestTotal = 0;
-  texts.forEach((t, i) => {
-    const toks = tokens(t);
-    const total = toks.filter((tok) => wantAll.has(tok)).length;
-    const key = keyOnDistinct ? distinctive(toks).filter((tok) => wantDistinct.has(tok)).length : total;
-    if (key > bestKey || (key === bestKey && total > bestTotal)) {
-      bestKey = key;
-      bestTotal = total;
-      best = i;
-    }
-  });
-  if (bestKey === 0) return { idx: -1, exact: false };
-  return { idx: best, exact: false };
+export type MenuOutcome = 'options' | 'empty' | 'none';
+
+/** Wait for a combobox menu to settle: real options, a "no options" notice, or
+ * nothing. A visible loading indicator extends the wait past `baseTimeout` (a
+ * lookup mid-flight is evidence a real menu is coming) but never past `deadline`
+ * — the field's overall probe budget. */
+export async function awaitMenuOutcome(
+  surface: Surface,
+  options: Locator,
+  rs: ReactSelectClasses,
+  baseTimeout: number,
+  deadline: number,
+): Promise<MenuOutcome> {
+  const first = options.first();
+  const noOptions = surface.locator(rs.noOptions).first();
+  const loading = rs.loading === undefined ? null : surface.locator(rs.loading).first();
+  const softDeadline = Date.now() + baseTimeout;
+  for (;;) {
+    // Read loading BEFORE options: when a lookup finishes between the two reads
+    // we still see the options it just rendered, never a spurious bail.
+    const loadingVisible = loading === null ? false : await loading.isVisible().catch(() => false);
+    if (await first.isVisible().catch(() => false)) return 'options';
+    if (await noOptions.isVisible().catch(() => false)) return 'empty';
+    const now = Date.now();
+    if (now >= deadline) return 'none';
+    if (!loadingVisible && now >= softDeadline) return 'none';
+    await sleep(POLL_MS);
+  }
 }
 
 export interface ReactSelectResult {
@@ -86,14 +82,10 @@ async function pickFrom(
   value: string,
   timeout: number,
   rs: ReactSelectClasses,
+  deadline: number,
 ): Promise<ReactSelectResult> {
   const options = await optionsFor(surface, input, rs);
-  // Resolve as soon as EITHER real options render OR a "No options" notice appears
-  // — whichever comes first — instead of always waiting out `timeout`.
-  const outcome = await Promise.race([
-    options.first().waitFor({ state: 'visible', timeout }).then(() => 'options' as const).catch(() => 'none' as const),
-    surface.locator(rs.noOptions).first().waitFor({ state: 'visible', timeout }).then(() => 'empty' as const).catch(() => 'none' as const),
-  ]);
+  const outcome = await awaitMenuOutcome(surface, options, rs, timeout, deadline);
   if (outcome !== 'options' && (await options.count()) === 0) {
     return { selected: false, guessed: false };
   }
@@ -105,28 +97,12 @@ async function pickFrom(
   return { selected: true, guessed: !exact, ...(chosen !== undefined ? { chosen } : {}) };
 }
 
-function firstToken(value: string): string {
-  const m = value.match(/[a-z0-9]+/i);
-  return m ? m[0] : value;
-}
-
-/** Probe order for an async typeahead. The most DISTINCTIVE words first (longest
- * non-generic tokens — "Fairview", "Springfield"): a typeahead keyed on those returns
- * the right option on the FIRST query, while the full value (with punctuation or
- * extra words) and the generic first word ("University") usually miss and cost a
- * full loading -> "No options" round-trip each. chooseOption still compares every
- * candidate against the full value, so leading with a token doesn't weaken the
- * match. Full value and first word follow as fallbacks; '' shows a fixed list's
- * whole set for fuzzy matching. */
-function probeSequence(value: string): string[] {
-  const distinct = distinctive(tokens(value)).sort((a, b) => b.length - a.length).slice(0, 2);
-  return [...new Set([...distinct, value, firstToken(value), ''])];
-}
-
 /** Drive a react-select: type the value and click the matching option. These are
  * often async autocompletes that only return options matching what's typed, so
  * when the full value matches nothing we retry with shorter probes to surface
- * candidates, then pick the closest to the full value — a flagged guess. */
+ * candidates, then pick the closest to the full value — a flagged guess. The
+ * whole loop is capped by `probeBudgetMs`; on exhaustion the field falls to the
+ * caller's freeform/handoff path. */
 export async function fillReactSelect(
   surface: Surface,
   id: string,
@@ -135,11 +111,14 @@ export async function fillReactSelect(
 ): Promise<ReactSelectResult> {
   const input = byKey(surface, id);
   await input.click();
-  const probes = probeSequence(value);
-  for (let i = 0; i < probes.length; i += 1) {
-    await input.fill('');
-    await input.pressSequentially(probes[i] ?? '', { delay: 15 });
-    const res = await pickFrom(surface, input, value, 2500, rs);
+  const deadline = Date.now() + (rs.probeBudgetMs ?? DEFAULT_PROBE_BUDGET_MS);
+  for (const probe of probeSequence(value)) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    // fill(), not pressSequentially: react-select reacts to fill's input event
+    // (the clear below has always depended on that) without the per-char delay.
+    await input.fill(probe);
+    const res = await pickFrom(surface, input, value, Math.min(PROBE_MENU_TIMEOUT_MS, remaining), rs, deadline);
     if (res.selected) return res;
   }
   // Leave a failed combobox empty so `reactSelectSelected` can't read the last
@@ -150,7 +129,9 @@ export async function fillReactSelect(
 }
 
 /** Open a dropdown without typing and read its visible options. Fixed lists show
- * all options; async autocompletes show none (return []). Capped. */
+ * all options; async autocompletes show none (return []). Resolves as soon as the
+ * menu settles — options, "no options", or a dead base wait — extending only
+ * while a loading indicator is visible. Capped. */
 export async function readSelectOptions(
   surface: Surface,
   id: string,
@@ -160,13 +141,12 @@ export async function readSelectOptions(
   const input = byKey(surface, id);
   await input.click().catch(() => undefined);
   const options = await optionsFor(surface, input, rs);
-  let texts: string[] = [];
-  try {
-    await options.first().waitFor({ state: 'visible', timeout: 1500 });
-    texts = (await options.allTextContents()).map((t) => t.trim()).filter(Boolean);
-  } catch {
-    texts = [];
-  }
+  const deadline = Date.now() + (rs.probeBudgetMs ?? DEFAULT_PROBE_BUDGET_MS);
+  const outcome = await awaitMenuOutcome(surface, options, rs, READ_MENU_TIMEOUT_MS, deadline);
+  const texts =
+    outcome === 'options'
+      ? (await options.allTextContents().catch(() => [] as string[])).map((t) => t.trim()).filter(Boolean)
+      : [];
   await input.press('Escape').catch(() => undefined);
   return texts.slice(0, cap);
 }
@@ -183,6 +163,26 @@ export async function readNativeOptions(surface: Surface, id: string, cap = 30):
     )
     .catch(() => [] as string[]);
   return texts.slice(0, cap);
+}
+
+/** Fill a native <select>: exact label first, then chooseOption over its real
+ * options. Select by the MATCHED OPTION'S TEXT — readNativeOptions filters
+ * placeholder options, so an index into its list points at the wrong raw
+ * <option>. */
+export async function fillNativeSelect(
+  surface: Surface,
+  id: string,
+  value: string,
+): Promise<ReactSelectResult> {
+  const el = byKey(surface, id);
+  const trySelect = (label: string): Promise<boolean> =>
+    el.selectOption({ label }, { timeout: 2000 }).then(() => true).catch(() => false);
+  if (await trySelect(value)) return { selected: true, guessed: false, chosen: value };
+  const texts = await readNativeOptions(surface, id);
+  const { idx, exact } = chooseOption(texts, value);
+  const chosen = idx === -1 ? undefined : texts[idx];
+  if (chosen === undefined || !(await trySelect(chosen))) return { selected: false, guessed: false };
+  return { selected: true, guessed: !exact, chosen };
 }
 
 /** Apply a session-provided answer to a field, dispatching by its DOM kind, and
@@ -203,7 +203,8 @@ export async function applyAnswer(
     return reactSelectSelected(surface, id, rs);
   }
   if (info.tag === 'select') {
-    await byKey(surface, id).selectOption({ label: answer }).catch(() => undefined);
+    const res = await fillNativeSelect(surface, id, answer);
+    if (!res.selected) return false;
     const value = await byKey(surface, id).inputValue().catch(() => '');
     return value.trim() !== '';
   }

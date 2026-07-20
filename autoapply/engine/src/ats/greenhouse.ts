@@ -5,16 +5,19 @@ import { formScope } from './form-dom.ts';
 import { detectControls } from './detect-controls.ts';
 import { makeAts } from './make-ats.ts';
 
-/** Education rows use ids like school--0 / degree--0 / start-year--0. */
-export const EDUCATION_FIELD_RE = /^(school|degree|discipline|start-year|end-year)--(\d+)$/;
+/** Education rows use ids like school--0 / degree--0 / start-month--0 / start-year--0. */
+export const EDUCATION_FIELD_RE = /^(school|degree|discipline|start-month|start-year|end-month|end-year)--(\d+)$/;
 
-function eduValue(kind: string, e: EducationEntry): string {
+function eduValue(kind: string, e: EducationEntry): string | undefined {
   switch (kind) {
     case 'school': return e.school;
     case 'degree': return e.degree;
     case 'discipline': return e.discipline;
+    case 'start-month': return e.startMonth;
+    case 'end-month': return e.endMonth;
     case 'start-year': return e.startYear;
-    default: return e.endYear;
+    case 'end-year': return e.endYear;
+    default: return undefined;
   }
 }
 

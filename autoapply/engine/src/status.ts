@@ -1,11 +1,48 @@
 import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { StatusRecord } from './types.ts';
+import type { ApplyStatus, QuarantinedStatusRecord, StatusRecord } from './types.ts';
+import { log } from './log.ts';
 
-export type StatusMap = Record<string, StatusRecord>;
+export type StatusMap = Record<string, StatusRecord | QuarantinedStatusRecord>;
 
 function isErrno(e: unknown, code: string): boolean {
   return typeof e === 'object' && e !== null && Reflect.get(e, 'code') === code;
+}
+
+// Record<ApplyStatus, true> so adding a union member without updating this
+// table is a compile error.
+const KNOWN_STATUSES: Record<ApplyStatus, true> = {
+  queued: true,
+  converted: true,
+  filled: true,
+  filled_parked: true,
+  needs_freeform: true,
+  paused: true,
+  prefilled: true,
+  blocked: true,
+  submitted: true,
+  submitted_unverified: true,
+  failed: true,
+};
+
+function isApplyStatus(s: unknown): s is ApplyStatus {
+  return typeof s === 'string' && Object.hasOwn(KNOWN_STATUSES, s);
+}
+
+function normalizeRecord(path: string, jobId: string, value: unknown): StatusRecord | QuarantinedStatusRecord {
+  const rec = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+  if (isApplyStatus(rec['status'])) return value as StatusRecord;
+  if (rec['status'] === 'quarantined' && typeof rec['rawStatus'] === 'string') {
+    return value as QuarantinedStatusRecord;
+  }
+  const rawStatus = typeof rec['status'] === 'string' ? rec['status'] : JSON.stringify(rec['status'] ?? null);
+  log('warn', 'unknown status in sidecar; quarantined so the queue skips this job', { path, jobId, rawStatus });
+  return {
+    jobId,
+    status: 'quarantined',
+    rawStatus,
+    updatedAt: typeof rec['updatedAt'] === 'string' ? rec['updatedAt'] : new Date().toISOString(),
+  };
 }
 
 export async function loadStatuses(path: string): Promise<StatusMap> {
@@ -24,7 +61,12 @@ export async function loadStatuses(path: string): Promise<StatusMap> {
     // 'submitted' record and let a job be submitted twice.
     throw new Error(`status sidecar ${path} is corrupt (invalid JSON); refusing to overwrite it`);
   }
-  return typeof parsed === 'object' && parsed !== null ? (parsed as StatusMap) : {};
+  if (typeof parsed !== 'object' || parsed === null) return {};
+  const out: StatusMap = {};
+  for (const [jobId, value] of Object.entries(parsed)) {
+    out[jobId] = normalizeRecord(path, jobId, value);
+  }
+  return out;
 }
 
 // Serialize writes per sidecar path. setStatus is read-modify-write, so two

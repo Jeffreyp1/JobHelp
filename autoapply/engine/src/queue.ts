@@ -25,6 +25,21 @@ async function latestResume(dir: string): Promise<string | null> {
   return bestName ? join(dir, bestName) : null;
 }
 
+// A possibly-sent job ('submitted' or unconfirmed) is never re-queued — re-running
+// it would risk a duplicate application. A 'prefilled' job already has an open tab
+// awaiting the AI pass; re-queuing would open a duplicate half-filled tab.
+// 'filled_parked' tabs await human review and may already have been submitted by
+// hand. 'blocked' needs a human to clear the blocker. 'quarantined' is an unknown
+// status string — could mean anything including "sent", so fail safe and skip.
+const SKIP_STATUSES: ReadonlySet<string> = new Set([
+  'submitted',
+  'submitted_unverified',
+  'prefilled',
+  'filled_parked',
+  'blocked',
+  'quarantined',
+]);
+
 export interface SelectOpts {
   stateFile: string;
   sidecar: string;
@@ -54,11 +69,8 @@ export async function selectReadyJobs(opts: SelectOpts): Promise<ReadyJob[]> {
   for (const e of entries) {
     if (opts.onlyJobId && e.jobId !== opts.onlyJobId) continue;
     if (!e.url || !pickAts(e.url)) continue;
-    // A possibly-sent job ('submitted' or unconfirmed) is never re-queued — re-running
-    // it would risk a duplicate application. A 'prefilled' job already has an open
-    // tab awaiting the AI pass; re-queuing would open a duplicate half-filled tab.
     const prior = statuses[e.jobId]?.status;
-    if (prior === 'submitted' || prior === 'submitted_unverified' || prior === 'prefilled') continue;
+    if (prior !== undefined && SKIP_STATUSES.has(prior)) continue;
     const resume = await latestResume(e.dir);
     if (!resume) continue;
     out.push({

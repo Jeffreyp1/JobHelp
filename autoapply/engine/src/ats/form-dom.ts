@@ -8,7 +8,7 @@ import {
   type Surface,
 } from './form-config.ts';
 import { byKey } from './locate.ts';
-import { fillReactSelect } from './react-select.ts';
+import { fillNativeSelect, fillReactSelect } from './react-select.ts';
 
 // Facade: keep the form-dom import surface stable for adapters and the
 // greenhouse-dom shim while the dropdown logic lives in react-select.ts.
@@ -54,15 +54,27 @@ export async function captchaPresent(surface: Surface): Promise<boolean> {
   return (await surface.locator(CAPTCHA).count()) > 0;
 }
 
-/** Ids of file inputs in the form that have no file attached. Treated as required
+/** The one key derivation for file inputs, shared by upload verification and
+ * validate's missing-upload check. An empty-string id must fall through to the
+ * name — deriving different keys on the two sides makes a verified upload look
+ * missing and false-blocks the gate. Two file inputs with neither id nor name
+ * still collide on 'file'. */
+export function fileInputKey(id: string, name: string): string {
+  return id !== '' ? id : name !== '' ? name : 'file';
+}
+
+/** Keys of file inputs in the form that have no file attached. Treated as required
  * for gating: a present upload field with nothing in it blocks submit. */
 export async function fileInputsMissingUpload(surface: Surface, cfg: AtsConfig): Promise<string[]> {
   const form = await formScope(surface, cfg);
-  return form.locator('input[type=file]').evaluateAll((els) =>
-    (els as HTMLInputElement[])
-      .filter((el) => !el.files || el.files.length === 0)
-      .map((el) => el.getAttribute('id') ?? el.getAttribute('name') ?? 'file'),
+  const raw = await form.locator('input[type=file]').evaluateAll((els) =>
+    (els as HTMLInputElement[]).map((el) => ({
+      id: el.getAttribute('id') ?? '',
+      name: el.getAttribute('name') ?? '',
+      missing: !el.files || el.files.length === 0,
+    })),
   );
+  return raw.filter((r) => r.missing).map((r) => fileInputKey(r.id, r.name));
 }
 
 /** Required choice groups with nothing selected, by readable label. Covers both
@@ -115,6 +127,49 @@ export async function requiredUncheckedGroups(surface: Surface, cfg: AtsConfig):
   });
 }
 
+/** Cheap change probe for the detect cache: the raw fillable-control count under
+ * the form scope. One roundtrip instead of a full re-detect. */
+export async function fillableControlCount(surface: Surface, cfg: AtsConfig): Promise<number> {
+  const form = await formScope(surface, cfg);
+  return form.locator('input, select, textarea').count();
+}
+
+/** Set many plain-text values in ONE evaluate over the form scope instead of a
+ * fill + read-back roundtrip per field. Values are written through the native
+ * prototype value setter and announced with bubbling input and change events —
+ * the standard technique for React-controlled inputs, whose value tracker
+ * ignores events after a plain `el.value = x` write. Every value is read back
+ * at the end of the same call and only the keys that stuck are returned, so
+ * callers fall back to the per-field path for the rest and no miss goes silent. */
+export async function batchFillText(
+  surface: Surface,
+  cfg: AtsConfig,
+  entries: ReadonlyArray<{ readonly key: string; readonly value: string }>,
+): Promise<Set<string>> {
+  if (entries.length === 0) return new Set();
+  const form = await formScope(surface, cfg);
+  const pairs = entries.map((e) => ({ key: e.key, value: e.value }));
+  const landed = await form.evaluate((root, targets) => {
+    const esc = (v: string): string => v.replace(/[\\"]/g, '\\$&');
+    const written: Array<{ key: string; el: HTMLInputElement | HTMLTextAreaElement }> = [];
+    for (const { key, value } of targets) {
+      const el = root.querySelector(`[id="${esc(key)}"], [name="${esc(key)}"], [data-jobhelp-key="${esc(key)}"]`);
+      if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement)) continue;
+      const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const set = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      if (set === undefined) continue;
+      set.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      written.push({ key, el });
+    }
+    // Read back only after every dispatch so a synchronous controlled re-render
+    // (React setState during the input handler) has already run.
+    return written.filter((w) => w.el.value.trim() !== '').map((w) => w.key);
+  }, pairs);
+  return new Set(landed);
+}
+
 export interface ScalarResult {
   readonly ok: boolean;
   readonly guess?: { fieldKey: string; question: string; answer: string; reason: 'dropdown' };
@@ -140,11 +195,15 @@ export async function fillScalar(
     return { ok: true };
   }
   if (field.tag === 'select') {
-    const ok = await byKey(surface, field.id)
-      .selectOption({ label: value }, { timeout: 2000 })
-      .then(() => true)
-      .catch(() => false);
-    return { ok };
+    const r = await fillNativeSelect(surface, field.id, value);
+    if (!r.selected) return { ok: false };
+    if (r.guessed) {
+      return {
+        ok: true,
+        guess: { fieldKey: field.id, question: field.label, answer: r.chosen ?? value, reason: 'dropdown' },
+      };
+    }
+    return { ok: true };
   }
   const input = byKey(surface, field.id);
   await input.fill(value);

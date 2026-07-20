@@ -79,16 +79,28 @@ it via `--cdp-endpoint`.
 
 For batch/ready jobs, prefer the hybrid path — it is ~5x faster and cheaper:
 
-1. Run the deterministic pre-fill:
-   `node autoapply/engine/src/cli.ts --prefill --cdp http://localhost:9222 --job <jobId>`
-   (or `--url <url> --dir <jobDir> --resume <pdf>` for ad-hoc; `--ats <name>`
-   to force an adapter). It fills profile-sourced fields + uploads the resume in
-   seconds, writes `<job dir>/autoapply-leftovers.json`, sets status
-   `prefilled`, and leaves the tab open.
-2. Read the leftovers file; select the job's tab (`browser_tabs`); fill ONLY
-   the leftover fields using the normal sourcing order; then run the standard
-   required-check and double-check passes on the whole form (the engine's work
-   gets verified too).
+1. Run the deterministic pre-fill ONCE for the whole batch — not one CLI
+   process per job:
+   `node autoapply/engine/src/cli.ts --prefill --cdp http://localhost:9222 --batch <N> --concurrency 3`
+   (add `--job <jobId>` to limit it to one queued job, or use
+   `--url <url> --dir <jobDir> --resume <pdf>` for ad-hoc; `--ats <name>`
+   to force an adapter). Start it in the background: it fills profile-sourced
+   fields + uploads the resume for up to 3 jobs in parallel, writes each
+   `<job dir>/autoapply-leftovers.json` as that job finishes, sets status
+   `prefilled`, and leaves every tab open. Adding `--watch-leftovers <seconds>`
+   makes the same invocation also apply each job's answers file (below) to its
+   open tab as the file appears.
+2. Iterate the per-job `autoapply-leftovers.json` files as they appear — job 1
+   is ready to work while jobs 2..N are still filling. Per job, draft answers
+   for ONLY the leftover fields using the normal sourcing order, then either
+   select the job's tab (`browser_tabs`) and fill them yourself, or write
+   `<job dir>/freeform-answers.json` and let the watcher apply it — the
+   `--watch-leftovers` run above, or a standalone
+   `node autoapply/engine/src/apply-leftovers-cli.ts --watch <seconds> --cdp http://localhost:9222`
+   (one watcher covers the whole batch: it applies each answers file to that
+   job's tab, re-validates, and sets status `filled_parked`). Then run the
+   standard required-check and double-check passes on the whole form (the
+   engine's work gets verified too).
 3. Gap logging extra: if a leftover field was answerable from the profile or a
    labelRule (the engine should have caught it), log its gap entry with
    `"reason": "adapter-miss", "filledBy": "ai-after-cli-miss"` — that drives
@@ -157,11 +169,20 @@ Single ad-hoc URLs may skip the engine and use the full AI flow directly.
   review · blockers · tab.
 - Report the run's per-job turn/tool-call counts (token cost itself comes from
   `/cost`, which the user runs — a session cannot read its own usage).
-- List new answer-bank entries; ask which to approve; set `approved: true` on the
-  ones the user confirms.
+- New answer-bank entries stay `approved: false` — do NOT ask for approval
+  here; the human hasn't reviewed the parked tabs yet. Point them to
+  `/auto-apply-review` (run it after reviewing/submitting the tabs) — that is
+  where outcomes get recorded and answers earn `approved: true`.
+- Standing-answer harvest: list this run's `no-standing-answer` freeform
+  questions (relocation, salary expectation, pronouns, notice period, start
+  date, ...) and ask which are worth saving as standing answers. Write each
+  value the user explicitly confirms in this conversation to
+  `~/.config/jobhelp/autoapply-profile.json` (the engine reads the expanded
+  keys on the next run); never infer a value the user didn't state.
 - Remind: each job sits in its own parked tab (`browser_tabs` action `list`
   enumerates them) — review each and click Submit yourself; closing the window
-  discards unsubmitted fills.
+  discards unsubmitted fills. After submitting/discarding, run
+  `/auto-apply-review` to record outcomes and grow the approved answer bank.
 
 ## Statuses
 

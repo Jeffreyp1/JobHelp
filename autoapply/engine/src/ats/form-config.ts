@@ -1,5 +1,6 @@
 import type { Page, Frame } from 'playwright';
 import type { StandingProfile } from '../types.ts';
+import type { ChoiceGroup } from './choice-groups.ts';
 
 export type Surface = Page | Frame;
 
@@ -25,13 +26,26 @@ export interface ReactSelectClasses {
   readonly noOptions: string;
   /** Marker rendered inside the control once a value is chosen. */
   readonly singleValue: string;
+  /** Loading indicator/notice of an async lookup. While visible the menu wait
+   * extends past its base timeout (never past the probe budget). */
+  readonly loading?: string;
+  /** Cap on one field's whole probe loop before bailing to freeform/handoff. */
+  readonly probeBudgetMs?: number;
 }
+
+/** A dead or nonstandard combobox used to burn every probe's full menu wait
+ * (>12s per field); this caps the loop and hands the field to a human instead. */
+export const DEFAULT_PROBE_BUDGET_MS = 5000;
 
 export const DEFAULT_REACT_SELECT: ReactSelectClasses = {
   option: '.select__option:visible, [role="option"]:visible',
   noOptions:
     '.select__menu-notice--no-options:visible, [class*="menu-notice--no-options"]:visible, [class*="noOptionsMessage"]:visible',
   singleValue: '[class*="select__single-value"], [class*="singleValue"]',
+  // Classic prefixed classes (select__menu-notice--loading, select__loading-indicator)
+  // plus the emotion-generated labels (css-*-loadingMessage, css-*-loadingIndicator).
+  loading:
+    '[class*="menu-notice--loading"]:visible, [class*="loadingMessage"]:visible, [class*="loading-indicator"]:visible, [class*="loadingIndicator"]:visible',
 };
 
 export const CAPTCHA = [
@@ -70,4 +84,9 @@ export interface AtsConfig {
   /** Adapter-specific field→value mapping checked before the generic label
    * classifier (e.g. Greenhouse education rows). Return undefined to defer. */
   resolveValue?(field: DetectedField, profile: StandingProfile): string | undefined;
+  /** ATS-specific detection of styled choice widgets with no native inputs
+   * (button toggle pairs, aria radiogroups). Groups are filled through the same
+   * option matcher as native choice groups; required ones left unselected become
+   * validate blockers — requiredUncheckedGroups cannot see these widgets. */
+  detectToggleGroups?(surface: Surface, cfg: AtsConfig): Promise<ChoiceGroup[]>;
 }

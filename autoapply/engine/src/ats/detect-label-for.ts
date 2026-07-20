@@ -2,45 +2,51 @@ import { formScope } from './form-dom.ts';
 import type { AtsConfig, DetectedField, Surface } from './form-config.ts';
 
 /** Field detection for forms that wire labels to controls with `label[for]` — the
- * standard accessible pattern used by Greenhouse, SmartRecruiters and Recruitee.
- * Each label resolves its target control; the control's tag/type/role classify it. */
+ * standard accessible pattern; Ashby is the adapter that relies on it (the other
+ * ATSs use control-first detection). Runs as ONE evaluate over the form's labels,
+ * mirroring detect-controls, instead of paying several locator roundtrips per
+ * label. */
 export async function detectByLabelFor(surface: Surface, cfg: AtsConfig): Promise<DetectedField[]> {
   const form = await formScope(surface, cfg);
-  const labels = form.locator('label[for]');
-  const count = await labels.count();
-  const captchaRe = /g-recaptcha|recaptcha|h-captcha|cf-turnstile|hcaptcha/i;
-  const out: DetectedField[] = [];
-  const seen = new Set<string>();
-  for (let i = 0; i < count; i += 1) {
-    const lbl = labels.nth(i);
-    const forId = await lbl.getAttribute('for');
-    if (!forId || seen.has(forId)) continue;
-    if (captchaRe.test(forId)) continue;
-    const field = surface.locator(`[id="${forId}"]`);
-    if ((await field.count()) === 0) continue;
-    const info = await field.first().evaluate((el) => ({
-      tag: el.tagName.toLowerCase(),
-      type: (el as HTMLInputElement).type ?? '',
-      name: el.getAttribute('name') ?? '',
-      required: (el as HTMLInputElement).required === true,
-      ariaRequired: el.getAttribute('aria-required') === 'true',
-      role: el.getAttribute('role') ?? '',
-    }));
-    if (info.tag !== 'input' && info.tag !== 'textarea' && info.tag !== 'select') continue;
-    if (captchaRe.test(info.name)) continue;
-    const text = ((await lbl.textContent()) ?? '').replace(/\s+/g, ' ').trim();
-    seen.add(forId);
-    out.push({
-      id: forId,
-      label: text,
-      tag: info.tag,
-      type: info.tag === 'input' ? info.type : info.tag,
+  const raw = await form.locator('label[for]').evaluateAll((els) => {
+    const captchaRe = /g-recaptcha|recaptcha|h-captcha|cf-turnstile|hcaptcha/i;
+    const out: Array<{ id: string; label: string; tag: string; type: string; required: boolean; combo: boolean }> = [];
+    for (const lbl of els) {
+      const forId = lbl.getAttribute('for') ?? '';
+      if (forId === '' || captchaRe.test(forId)) continue;
+      const el = lbl.ownerDocument.getElementById(forId);
+      if (el === null) continue;
+      const tag = el.tagName.toLowerCase();
+      if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') continue;
+      if (captchaRe.test(el.getAttribute('name') ?? '')) continue;
+      const label = (lbl.textContent ?? '').replace(/\s+/g, ' ').trim();
       // The required marker on modern forms is an asterisk in the label or
       // `aria-required` on the control, not always the HTML `required` attribute.
       // Honor the plain and heavy asterisk and both required attributes.
-      required: info.required || info.ariaRequired || text.includes('*') || text.includes('✱'),
-      reactSelect: info.role === 'combobox',
-    });
+      const required =
+        (el as HTMLInputElement).required === true ||
+        el.getAttribute('aria-required') === 'true' ||
+        label.includes('*') ||
+        label.includes('✱');
+      out.push({
+        id: forId,
+        label,
+        tag,
+        type: tag === 'input' ? ((el as HTMLInputElement).type ?? '') : tag,
+        required,
+        combo: el.getAttribute('role') === 'combobox',
+      });
+    }
+    return out;
+  });
+
+  const seen = new Set<string>();
+  const fields: DetectedField[] = [];
+  for (const r of raw) {
+    if (seen.has(r.id)) continue;
+    if (r.tag !== 'input' && r.tag !== 'textarea' && r.tag !== 'select') continue;
+    seen.add(r.id);
+    fields.push({ id: r.id, label: r.label, tag: r.tag, type: r.type, required: r.required, reactSelect: r.combo });
   }
-  return out;
+  return fields;
 }

@@ -1,13 +1,17 @@
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import type { Page } from 'playwright';
 import type { Ats, ValidationOutcome } from './ats/types.ts';
 import { SUBMIT_NOT_CONFIRMED } from './ats/make-ats.ts';
 import type { ApplyStatus, GuessedField, ReadyJob, ReviewReport, StandingProfile, StatusRecord } from './types.ts';
 import type { ResumeConverter } from './convert.ts';
 import { docxPathForJob } from './convert.ts';
+import { metaPathForPdf, pdfPathForJob } from './convert-pdf.ts';
 import { setStatus } from './status.ts';
 import { writeQuestions, readAnswers } from './freeform.ts';
 import { writeReview, buildReport, failedReport, type RunRow } from './review.ts';
 import { buildLeftovers, writeLeftovers } from './leftovers.ts';
+import { unblockForReview } from './leftovers-watch.ts';
 
 export function decideGate(i: {
   autoSubmit: boolean;
@@ -36,6 +40,38 @@ export interface ApplyDeps {
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/** Human-visible caveats from the PDF renderer's sidecar (bullets trimmed to fit
+ * one page, page count unverified/over). The sidecar's srcSha256 must match the
+ * CURRENT resume markdown — a stale sidecar from an earlier render of a different
+ * version must not annotate this run. */
+async function conversionNotes(job: ReadyJob): Promise<string[]> {
+  let srcSha256: string;
+  let droppedBullets: number;
+  let pageCount: number | null;
+  try {
+    const parsed: unknown = JSON.parse(await readFile(metaPathForPdf(pdfPathForJob(job.dir)), 'utf8'));
+    if (typeof parsed !== 'object' || parsed === null) return [];
+    const m = parsed as Record<string, unknown>;
+    if (typeof m['srcSha256'] !== 'string' || typeof m['droppedBullets'] !== 'number') return [];
+    srcSha256 = m['srcSha256'];
+    droppedBullets = m['droppedBullets'];
+    pageCount = typeof m['pageCount'] === 'number' ? m['pageCount'] : null;
+  } catch {
+    return [];
+  }
+  try {
+    const src = await readFile(job.resumeMdPath, 'utf8');
+    if (createHash('sha256').update(src).digest('hex') !== srcSha256) return [];
+  } catch {
+    return [];
+  }
+  const notes: string[] = [];
+  if (droppedBullets > 0) notes.push(`PDF trimmed: ${droppedBullets} bullets dropped`);
+  if (pageCount === null) notes.push('PDF page count unverified');
+  else if (pageCount > 1) notes.push(`PDF is still ${pageCount} pages after trimming`);
+  return notes;
+}
 
 async function waitForAnswers(dir: string, waitMs: number): Promise<Record<string, string> | null> {
   const deadline = Date.now() + waitMs;
@@ -70,6 +106,7 @@ export async function applyOneJob(
     return row('failed', failedReport(error));
   }
   await record('converted', { resumeDocxPath: docxPath });
+  const notes = await conversionNotes(job);
 
   // Anything from here drives the live browser and can throw; on any failure
   // record 'failed' so the job is never left misrepresented (e.g. stuck at
@@ -93,14 +130,17 @@ export async function applyOneJob(
         outcome,
         validation,
         now: deps.now,
+        notes,
       });
       await writeLeftovers(job.dir, leftovers);
+      await unblockForReview(page);
       await record('prefilled', { resumeDocxPath: docxPath, guessed: [...outcome.guesses] });
       return row('prefilled', buildReport({
         green: outcome.filledKnown - outcome.guesses.length,
         guessed: [...outcome.guesses],
         blockers: validation.blockers,
         captcha: validation.captcha,
+        notes,
       }));
     }
 
@@ -141,6 +181,7 @@ export async function applyOneJob(
       guessed,
       blockers: validation.blockers,
       captcha: validation.captcha,
+      notes,
     });
     await writeReview(job.dir, report);
     const gate = decideGate({
@@ -169,7 +210,11 @@ export async function applyOneJob(
       return row('submitted', report);
     }
 
-    const status: ApplyStatus = unansweredFreeform ? 'needs_freeform' : 'filled';
+    // The pause gate is where the tab is parked for human review; 'filled_parked'
+    // keeps it out of the re-queue (the human may submit from the parked tab).
+    // A dry run closes the browser instead of parking, so it stays re-queueable.
+    if (!deps.dryRun) await unblockForReview(page);
+    const status: ApplyStatus = unansweredFreeform ? 'needs_freeform' : deps.dryRun ? 'filled' : 'filled_parked';
     await record(status, { resumeDocxPath: docxPath, guessed });
     return row(status, report);
   } catch (e: unknown) {
