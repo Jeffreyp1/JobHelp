@@ -11,6 +11,12 @@ import { EEO_CONCEPTS, eeoOption } from './eeo.ts';
 import { fillDetectedFields } from './fill-fields.ts';
 import { captureRepair, type RepairCapture } from '../repair-artifact.ts';
 import {
+  SUCCESS_TEXT_RE,
+  SUBMIT_NOT_CONFIRMED,
+  submitConfirmMs,
+  awaitSubmitConfirmed,
+} from './submit-confirm.ts';
+import {
   byKey,
   surfaceOf,
   formScope,
@@ -23,6 +29,8 @@ import {
   resolveSubmitButton,
 } from './form-dom.ts';
 
+export { SUBMIT_NOT_CONFIRMED } from './submit-confirm.ts';
+
 const DEFAULT_COVER_RE = /cover/i;
 const DEFAULT_RESUME_RE = /resume|\bcv\b/i;
 const DEFAULT_APPLY_RE = /apply|i'?m interested/i;
@@ -30,40 +38,9 @@ const DEFAULT_APPLY_RE = /apply|i'?m interested/i;
 // button, and clicking it before the form loads would be a real side effect.
 const CONSENT_RE = /accept all|accept cookies|allow all cookies|allow cookies|got it/i;
 
-const DEFAULT_SUBMIT_CONFIRM_MS = 8000;
-const submitConfirmMs = (): number => Number(process.env.JOBHELP_SUBMIT_CONFIRM_MS) || DEFAULT_SUBMIT_CONFIRM_MS;
 const FORM_ATTACH_MS = 10000;
 const DEFAULT_HYDRATION_IDLE_MS = 2500;
 const hydrationIdleMs = (): number => Number(process.env.JOBHELP_HYDRATION_IDLE_MS) || DEFAULT_HYDRATION_IDLE_MS;
-const SUCCESS_TEXT_RE =
-  /thank you|application (was )?(received|submitted|sent)|we('| ha)?ve received|submitted successfully|successfully (applied|submitted)/i;
-
-/** Thrown by submit() when the click produced no observable success signal. The
- * orchestrator treats this as terminal-but-unverified (do not retry: the send may
- * have gone through) — distinct from a click failure, which is retryable. */
-export const SUBMIT_NOT_CONFIRMED = 'submit not confirmed';
-
-/** Wait for a real success signal after the submit click: a navigation away, a
- * NEW confirmation message, or the form detaching. `startUrl` and `successBefore`
- * are sampled BEFORE the click so pre-existing page copy (a "thank you for your
- * interest" blurb) can't be mistaken for proof of a send. The form may detach on
- * success, so a per-poll timeout swallows detached-frame errors. */
-async function awaitSubmitConfirmed(
-  page: Page,
-  form: Locator,
-  startUrl: string,
-  successBefore: boolean,
-  deadline: number,
-): Promise<boolean> {
-  const success = page.locator('body', { hasText: SUCCESS_TEXT_RE });
-  while (Date.now() < deadline) {
-    if (page.url() !== startUrl) return true;
-    if (!successBefore && (await success.count().catch(() => 0)) > 0) return true;
-    if (!(await form.isVisible().catch(() => false))) return true;
-    await page.waitForTimeout(150);
-  }
-  return false;
-}
 
 // Fill-time verified uploads, per page: SPA forms (Ashby) clear input.files on the
 // post-upload re-render, so validate's re-read would report a false blocker.
@@ -295,6 +272,16 @@ export function makeAts(cfg0: AtsConfig): Ats {
       // (navigation, a new confirmation message, or the form detaching) proves the send.
       const confirmed = await awaitSubmitConfirmed(page, form, startUrl, successBefore, Date.now() + submitConfirmMs());
       if (!confirmed) throw new Error(SUBMIT_NOT_CONFIRMED);
+    },
+
+    async submitConfigured(page: Page): Promise<boolean> {
+      // Whether the adapter's DECLARED submit selector still matches. When it does
+      // not, resolveSubmitButton would click a button inferred on the fly; the gate
+      // treats that like a repaired-selectors run and parks instead of auto-submitting.
+      const { cfg } = eff();
+      const surface = await surfaceOf(page, cfg);
+      const form = await formScope(surface, cfg);
+      return (await form.locator(cfg.submitSelector).count().catch(() => 0)) > 0;
     },
   };
 }

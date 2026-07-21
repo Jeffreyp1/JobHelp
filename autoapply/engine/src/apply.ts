@@ -21,10 +21,14 @@ export function decideGate(i: {
   uploaded: boolean;
   validation: ValidationOutcome;
   repaired: boolean;
+  submitDrifted: boolean;
 }): 'submit' | 'pause' {
   // Repaired selectors mean the page changed underneath us; a human reviews
   // every fill made through an override, no matter how clean it looks.
   if (i.repaired) return 'pause';
+  // The submit button no longer matches the configured selector, so an auto-submit
+  // would click a button inferred on the fly — park for review, same as a repair.
+  if (i.submitDrifted) return 'pause';
   if (!i.autoSubmit) return 'pause';
   if (!i.uploaded) return 'pause';
   if (i.validation.captcha) return 'pause';
@@ -193,6 +197,10 @@ export async function applyOneJob(
     }
     const unansweredFreeform = outcome.freeform.length > freeformAnswered;
     const validation = await deps.ats.validate(page);
+    // Adapters expose whether their declared submit selector still matches; an
+    // adapter without the hook is treated as configured (no drift signal).
+    const submitConfigured = (await deps.ats.submitConfigured?.(page)) ?? true;
+    if (!submitConfigured) notes.push('submit selector drifted - review before submitting');
     const report = buildReport({
       green: outcome.filledKnown - outcome.guesses.length,
       guessed,
@@ -208,6 +216,7 @@ export async function applyOneJob(
       uploaded: outcome.resumeUploaded,
       validation,
       repaired,
+      submitDrifted: !submitConfigured,
     });
 
     if (gate === 'submit') {

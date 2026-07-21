@@ -14,8 +14,19 @@ const OK_VALIDATION = { ok: true, blockers: [], captcha: false };
 
 describe('decideGate with repaired selectors', () => {
   it('pauses even a fully deterministic form when repaired', () => {
-    expect(decideGate({ autoSubmit: true, uploaded: true, validation: OK_VALIDATION, repaired: true })).toBe('pause');
-    expect(decideGate({ autoSubmit: true, uploaded: true, validation: OK_VALIDATION, repaired: false })).toBe('submit');
+    expect(decideGate({ autoSubmit: true, uploaded: true, validation: OK_VALIDATION, repaired: true, submitDrifted: false })).toBe('pause');
+    expect(decideGate({ autoSubmit: true, uploaded: true, validation: OK_VALIDATION, repaired: false, submitDrifted: false })).toBe('submit');
+  });
+});
+
+describe('decideGate with a drifted submit selector', () => {
+  it('pauses auto-submit when the configured submit button no longer matches', () => {
+    expect(
+      decideGate({ autoSubmit: true, uploaded: true, validation: OK_VALIDATION, repaired: false, submitDrifted: true }),
+    ).toBe('pause');
+    expect(
+      decideGate({ autoSubmit: true, uploaded: true, validation: OK_VALIDATION, repaired: false, submitDrifted: false }),
+    ).toBe('submit');
   });
 });
 
@@ -68,6 +79,47 @@ describe('applyOneJob repair behavior', () => {
     const row = await applyOneJob({} as Page, jobIn(dir), {} as StandingProfile, makeDeps(ats));
     expect(row.status).toBe('failed');
     expect(await listRepairArtifacts(repairRoot())).toHaveLength(1);
+  });
+
+  it('force-parks and does not submit when the submit selector has drifted', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'jobhelp-job-'));
+    let submitted = false;
+    const ats: Ats = {
+      name: 'fake',
+      matches: () => true,
+      openForm: async () => undefined,
+      fill: async () => ({ filledKnown: 3, freeform: [], guesses: [], resumeUploaded: true }),
+      applyFreeform: async () => [],
+      validate: async () => OK_VALIDATION,
+      submitConfigured: async () => false,
+      submit: async () => {
+        submitted = true;
+      },
+    };
+    const row = await applyOneJob({} as Page, jobIn(dir), {} as StandingProfile, makeDeps(ats));
+    expect(submitted).toBe(false);
+    expect(row.status).toBe('filled_parked');
+    expect(row.report.notes).toContain('submit selector drifted - review before submitting');
+  });
+
+  it('still auto-submits when the submit selector is intact', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'jobhelp-job-'));
+    let submitted = false;
+    const ats: Ats = {
+      name: 'fake',
+      matches: () => true,
+      openForm: async () => undefined,
+      fill: async () => ({ filledKnown: 3, freeform: [], guesses: [], resumeUploaded: true }),
+      applyFreeform: async () => [],
+      validate: async () => OK_VALIDATION,
+      submitConfigured: async () => true,
+      submit: async () => {
+        submitted = true;
+      },
+    };
+    const row = await applyOneJob({} as Page, jobIn(dir), {} as StandingProfile, makeDeps(ats));
+    expect(submitted).toBe(true);
+    expect(row.status).toBe('submitted');
   });
 
   it('force-parks and annotates when the ats has an active selector override', async () => {
