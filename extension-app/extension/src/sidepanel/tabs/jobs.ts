@@ -19,6 +19,8 @@ import type { DiscoverAndRankResult } from '../../types/api-contract.js';
 import type { RankedJob, JobProfile, JobPipelineStatus } from '../../types/job-discovery.js';
 import { el, renderJobList, type JobListView } from './jobs-row.js';
 import { buildJobsHeader, createControlsState } from './jobs-controls.js';
+import { importDigestText, DigestImportError } from '../../lib/digestImport.js';
+import { saveDigest } from '../../lib/digestCache.js';
 
 /** Result envelope the parent hooks return — a digest payload or an error message. */
 export type DigestHookResult =
@@ -73,7 +75,8 @@ export function renderJobsTab(hooks: JobsTabHooks = {}): JobsTabController {
   const state = createControlsState();
 
   // ─── 1. Header row ────────────────────────────────────────────────
-  const { header, refreshBtn, reExtractLink, statusEl } = buildJobsHeader(state);
+  const { header, refreshBtn, reExtractLink, importBtn, importFileInput, statusEl } =
+    buildJobsHeader(state);
   root.appendChild(header);
 
   // ─── 2. Ranked job list ──────────────────────────────────────────
@@ -166,8 +169,36 @@ export function renderJobsTab(hooks: JobsTabHooks = {}): JobsTabController {
     }
   }
 
+  async function importDigestFile(file: File): Promise<void> {
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      showError('Could not read the selected file.');
+      return;
+    }
+    try {
+      const result = importDigestText(text);
+      renderJobList(result, undefined, view);
+      void saveDigest(result);
+      showInfo(`Imported ${result.jobs.length} jobs.`);
+    } catch (e) {
+      if (e instanceof DigestImportError) {
+        showError(`Not a valid digest file: ${e.message}`);
+        return;
+      }
+      throw e;
+    }
+  }
+
   refreshBtn.addEventListener('click', () => void runDigest());
   reExtractLink.addEventListener('click', () => void reExtractProfile());
+  importBtn.addEventListener('click', () => importFileInput.click());
+  importFileInput.addEventListener('change', () => {
+    const file = importFileInput.files?.[0];
+    importFileInput.value = '';
+    if (file) void importDigestFile(file);
+  });
 
   if (hooks.initialResult) {
     renderJobList(hooks.initialResult.result, hooks.initialResult.savedAt, view);

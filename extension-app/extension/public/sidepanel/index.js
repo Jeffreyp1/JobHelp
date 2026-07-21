@@ -28842,7 +28842,9 @@ var STORAGE_DEFAULTS = {
   onboardingState: "noConfig",
   lastJobInsights: null,
   lastDigest: null,
-  v2Toggles: null
+  v2Toggles: null,
+  autofillProfile: null,
+  autofillResumeDump: null
 };
 var LEGACY_SETTINGS_KEYS = [
   "anthropicApiKey",
@@ -30751,7 +30753,162 @@ function buildJobsHeader(state) {
   const reExtractLink = el2("button", "btn btn-ghost jobs__reextract", "Re-extract profile");
   reExtractLink.type = "button";
   header.appendChild(reExtractLink);
-  return { header, refreshBtn, reExtractLink, statusEl };
+  const importBtn = el2("button", "btn btn-ghost jobs__import", "Import digest file");
+  importBtn.type = "button";
+  header.appendChild(importBtn);
+  const importFileInput = document.createElement("input");
+  importFileInput.type = "file";
+  importFileInput.accept = "application/json,.json";
+  importFileInput.hidden = true;
+  header.appendChild(importFileInput);
+  return { header, refreshBtn, reExtractLink, importBtn, importFileInput, statusEl };
+}
+
+// extension-app/extension/src/lib/digestImport.ts
+var DigestImportError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "DigestImportError";
+  }
+};
+function isRecord(v) {
+  return typeof v === "object" && v !== null;
+}
+function reqString(o, k, where) {
+  const v = o[k];
+  if (typeof v !== "string") throw new DigestImportError(`${where}.${k} must be a string`);
+  return v;
+}
+function reqNumber(o, k, where) {
+  const v = o[k];
+  if (typeof v !== "number") throw new DigestImportError(`${where}.${k} must be a number`);
+  return v;
+}
+function parseMcpDigest(text) {
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new DigestImportError("file is not valid JSON");
+  }
+  if (!isRecord(raw)) throw new DigestImportError("digest root must be an object");
+  const date = reqString(raw, "date", "digest");
+  const generatedAt = typeof raw["generatedAt"] === "string" ? raw["generatedAt"] : "";
+  if (!Array.isArray(raw["jobs"])) throw new DigestImportError("digest.jobs must be an array");
+  const jobs = raw["jobs"].map((j, i) => {
+    if (!isRecord(j)) throw new DigestImportError(`digest.jobs[${i}] must be an object`);
+    if (!isRecord(j["job"])) throw new DigestImportError(`digest.jobs[${i}].job must be an object`);
+    const job = j["job"];
+    const where = `digest.jobs[${i}].job`;
+    const bd = isRecord(j["breakdown"]) ? j["breakdown"] : {};
+    return {
+      job: {
+        id: reqString(job, "id", where),
+        source: reqString(job, "source", where),
+        url: reqString(job, "url", where),
+        title: reqString(job, "title", where),
+        company: reqString(job, "company", where),
+        location: typeof job["location"] === "string" ? job["location"] : "",
+        remote: typeof job["remote"] === "string" ? job["remote"] : "unknown",
+        description: typeof job["description"] === "string" ? job["description"] : "",
+        salaryMin: typeof job["salaryMin"] === "number" ? job["salaryMin"] : void 0,
+        salaryMax: typeof job["salaryMax"] === "number" ? job["salaryMax"] : void 0,
+        salaryCurrency: typeof job["salaryCurrency"] === "string" ? job["salaryCurrency"] : void 0,
+        postedAt: typeof job["postedAt"] === "string" ? job["postedAt"] : void 0
+      },
+      rank: reqNumber(j, "rank", `digest.jobs[${i}]`),
+      score: reqNumber(j, "score", `digest.jobs[${i}]`),
+      breakdown: {
+        keywordOverlap: typeof bd["keywordOverlap"] === "number" ? bd["keywordOverlap"] : 0,
+        recencyBoost: typeof bd["recencyBoost"] === "number" ? bd["recencyBoost"] : 1,
+        bm25f: typeof bd["bm25f"] === "number" ? bd["bm25f"] : 0,
+        llmFitScore: typeof bd["llmFitScore"] === "number" ? bd["llmFitScore"] : void 0
+      }
+    };
+  });
+  return { date, generatedAt, jobs };
+}
+var KNOWN_SOURCES = /* @__PURE__ */ new Set([
+  "adzuna",
+  "jsearch",
+  "greenhouse",
+  "lever",
+  "usajobs",
+  "email_alert",
+  "manual"
+]);
+function toSource(s) {
+  return KNOWN_SOURCES.has(s) ? s : "manual";
+}
+function toRemote(r) {
+  if (r === "remote") return true;
+  if (r === "hybrid" || r === "onsite") return false;
+  return null;
+}
+function toMs(iso) {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? null : ms;
+}
+function zeroCost() {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    totalUsd: 0
+  };
+}
+function mcpDigestToResult(digest) {
+  const discoveredAt = toMs(digest.generatedAt) ?? Date.now();
+  const jobs = digest.jobs.map((rj) => ({
+    id: rj.job.id,
+    source: toSource(rj.job.source),
+    company: rj.job.company,
+    title: rj.job.title,
+    location: rj.job.location || null,
+    remote: toRemote(rj.job.remote),
+    url: rj.job.url,
+    descriptionText: rj.job.description,
+    postedAt: toMs(rj.job.postedAt),
+    discoveredAt,
+    salaryMin: rj.job.salaryMin ?? null,
+    salaryMax: rj.job.salaryMax ?? null,
+    salaryCurrency: rj.job.salaryCurrency ?? null,
+    keywordScore: rj.breakdown.keywordOverlap,
+    fitScore: rj.breakdown.llmFitScore ?? null,
+    recencyBoost: rj.breakdown.recencyBoost,
+    finalScore: rj.score,
+    matchedSkills: [],
+    missingSkills: []
+  }));
+  return {
+    discoveredCount: jobs.length,
+    rankedCount: jobs.length,
+    jobs,
+    sheetUrl: "",
+    cost: zeroCost()
+  };
+}
+function importDigestText(text) {
+  return mcpDigestToResult(parseMcpDigest(text));
+}
+
+// extension-app/extension/src/lib/digestCache.ts
+async function saveDigest(result) {
+  try {
+    await set("lastDigest", { result, savedAt: Date.now() });
+  } catch (error) {
+    log("warn", "digest cache write failed", { error });
+  }
+}
+async function loadDigest() {
+  try {
+    return await get("lastDigest");
+  } catch (error) {
+    log("warn", "digest cache read failed", { error });
+    return null;
+  }
 }
 
 // extension-app/extension/src/sidepanel/tabs/jobs.ts
@@ -30759,7 +30916,7 @@ function renderJobsTab(hooks = {}) {
   const root = el2("section", "tab-pane tab-pane--jobs");
   let profile = null;
   const state = createControlsState();
-  const { header, refreshBtn, reExtractLink, statusEl } = buildJobsHeader(state);
+  const { header, refreshBtn, reExtractLink, importBtn, importFileInput, statusEl } = buildJobsHeader(state);
   root.appendChild(header);
   const listEl = el2("ul", "jobs__list");
   root.appendChild(listEl);
@@ -30839,8 +30996,35 @@ function renderJobsTab(hooks = {}) {
       setBusy(false);
     }
   }
+  async function importDigestFile(file) {
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      showError("Could not read the selected file.");
+      return;
+    }
+    try {
+      const result = importDigestText(text);
+      renderJobList(result, void 0, view);
+      void saveDigest(result);
+      showInfo(`Imported ${result.jobs.length} jobs.`);
+    } catch (e) {
+      if (e instanceof DigestImportError) {
+        showError(`Not a valid digest file: ${e.message}`);
+        return;
+      }
+      throw e;
+    }
+  }
   refreshBtn.addEventListener("click", () => void runDigest());
   reExtractLink.addEventListener("click", () => void reExtractProfile());
+  importBtn.addEventListener("click", () => importFileInput.click());
+  importFileInput.addEventListener("change", () => {
+    const file = importFileInput.files?.[0];
+    importFileInput.value = "";
+    if (file) void importDigestFile(file);
+  });
   if (hooks.initialResult) {
     renderJobList(hooks.initialResult.result, hooks.initialResult.savedAt, view);
   }
@@ -32070,23 +32254,6 @@ function parseResumeMarkdown2(md) {
     lookup("education", "academic background")
   );
   return { name, contact, skills, experiences, projects, education };
-}
-
-// extension-app/extension/src/lib/digestCache.ts
-async function saveDigest(result) {
-  try {
-    await set("lastDigest", { result, savedAt: Date.now() });
-  } catch (error) {
-    log("warn", "digest cache write failed", { error });
-  }
-}
-async function loadDigest() {
-  try {
-    return await get("lastDigest");
-  } catch (error) {
-    log("warn", "digest cache read failed", { error });
-    return null;
-  }
 }
 
 // extension-app/extension/src/sidepanel/index.ts

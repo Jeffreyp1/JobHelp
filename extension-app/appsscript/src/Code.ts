@@ -40,6 +40,7 @@ import type {
   ExtractProfileRequest,
   DiscoverAndRankRequest,
   UpdateJobStatusRequest,
+  AnswerQuestionRequest,
 } from './types/api-contract.js';
 
 import { handleCreateDriveFile, validateCreateDriveFile } from './handlers/createDriveFile.js';
@@ -58,6 +59,7 @@ import { handleMultiVersion, validateMultiVersion } from './handlers/multiVersio
 import { handleExtractProfile, validateExtractProfile } from './handlers/extractProfile.js';
 import { handleDiscoverAndRank, validateDiscoverAndRank } from './handlers/discoverAndRank.js';
 import { handleUpdateJobStatus, validateUpdateJobStatus } from './handlers/updateJobStatus.js';
+import { handleAnswerQuestion, validateAnswerQuestion } from './handlers/answerQuestion.js';
 import type { DriveOps, FileEntry } from './types/drive-ops.js';
 import type { ClaudeClient, SystemBlock } from './types/claude-api.js';
 import { ClaudeApiError } from './types/claude-api.js';
@@ -152,6 +154,7 @@ const VALID_ACTIONS: ApiAction[] = [
   'extract_profile',
   'discover_and_rank',
   'update_job_status',
+  'answer_question',
   'ping',
 ];
 
@@ -174,6 +177,12 @@ function route(body: unknown, deps: Deps): ApiResult<unknown> {
   switch (action as ApiAction) {
     case 'ping':
       return handlePing();
+
+    case 'answer_question': {
+      const validationErr = validateAnswerQuestion(raw);
+      if (validationErr) return validationErr;
+      return handleAnswerQuestion(deps, raw as unknown as AnswerQuestionRequest);
+    }
 
     case 'generate': {
       const validateErr = validateGenerate(raw);

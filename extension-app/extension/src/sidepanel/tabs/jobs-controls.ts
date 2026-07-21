@@ -38,6 +38,8 @@ export interface JobsHeader {
   header: HTMLElement;
   refreshBtn: HTMLButtonElement;
   reExtractLink: HTMLButtonElement;
+  importBtn: HTMLButtonElement;
+  importFileInput: HTMLInputElement;
   statusEl: HTMLElement;
 }
 
@@ -117,5 +119,15 @@ export function buildJobsHeader(state: JobsControlsState): JobsHeader {
   reExtractLink.type = 'button';
   header.appendChild(reExtractLink);
 
-  return { header, refreshBtn, reExtractLink, statusEl };
+  const importBtn = el('button', 'btn btn-ghost jobs__import', 'Import digest file');
+  importBtn.type = 'button';
+  header.appendChild(importBtn);
+
+  const importFileInput = document.createElement('input');
+  importFileInput.type = 'file';
+  importFileInput.accept = 'application/json,.json';
+  importFileInput.hidden = true;
+  header.appendChild(importFileInput);
+
+  return { header, refreshBtn, reExtractLink, importBtn, importFileInput, statusEl };
 }

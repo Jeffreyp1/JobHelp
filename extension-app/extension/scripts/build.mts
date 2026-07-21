@@ -123,6 +123,15 @@ const builds: LabeledBuild[] = [
     entryPoints: [join(SRC, 'sidepanel', 'index.ts')],
     outfile: join(PUBLIC, 'sidepanel', 'index.js'),
   },
+  {
+    label: 'autofill.content',
+    ...sharedOptions,
+    // Manifest-declared content scripts run as classic scripts, not modules —
+    // bundle to a self-contained IIFE so there are no runtime imports.
+    format: 'iife',
+    entryPoints: [join(SRC, 'autofill-content.ts')],
+    outfile: join(PUBLIC, 'autofill.content.js'),
+  },
 ];
 
 function esbuildOpts(opts: LabeledBuild): BuildOptions {
