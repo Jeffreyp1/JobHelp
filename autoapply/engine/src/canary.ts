@@ -83,8 +83,11 @@ export async function runCanary(deps: CanaryDeps): Promise<CanaryRow[]> {
     });
   }
   // Persisting the baseline is best-effort: a disk-write failure must not turn the
-  // canary into a batch-killer, so the tail swallows its own error too.
-  await saveCanaryState(deps.statePath, { lastRun: deps.now(), baselines }).catch(() => undefined);
+  // canary into a batch-killer. But swallowing it silently hides a permanently
+  // unwritable state path (canary then re-probes every batch, invisibly), so warn.
+  await saveCanaryState(deps.statePath, { lastRun: deps.now(), baselines }).catch((e: unknown) =>
+    log('warn', 'canary state save failed', { error: e instanceof Error ? e.message : String(e) }),
+  );
   return rows;
 }
 
@@ -92,7 +95,9 @@ export function formatCanaryTable(rows: readonly CanaryRow[]): string {
   const lines = ['[canary] ats        fields  baseline  submit  verdict'];
   for (const r of rows) {
     const verdict = r.verdict === 'drift' ? 'DRIFT — repair artifact written' : r.verdict;
-    const override = r.overrideActive ? '  (override active — consider retiring it)' : '';
+    // The probe runs THROUGH any active override, so a healthy reading reflects the
+    // override, not the site recovering — say so instead of nudging a retire.
+    const override = r.overrideActive ? '  (override active — measured WITH the override)' : '';
     lines.push(
       `[canary] ${r.ats.padEnd(10)} ${String(r.fields).padEnd(7)} ${String(r.baselineFields ?? '-').padEnd(9)} ${r.submitFound ? 'yes' : 'NO '}     ${verdict}${override}`,
     );

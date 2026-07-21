@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, vi } from 'vitest';
 import { chromium, type Browser } from 'playwright';
 import { parseCli } from '../src/cli-options.ts';
 import { makeAts } from '../src/ats/make-ats.ts';
@@ -95,15 +95,23 @@ describe('runCanary', () => {
       newContext: async (): Promise<never> => { throw new Error('browser is gone'); },
       contexts: (): never[] => [],
     } as unknown as Browser;
-    const rows = await runCanary({
-      browser: deadBrowser, cdpMode: false,
-      adapters: new Map([['fixture', makeAts(canaryCfg())]]),
-      candidates: { fixture: ['https://example.test/dead'] },
-      state: { baselines: {} },
-      statePath: join(blocker, 'canary.json'), repairRoot: join(dir, 'r'),
-      now: () => '2026-07-20T09:00:00.000Z',
-    });
-    expect(rows).toEqual([]);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const rows = await runCanary({
+        browser: deadBrowser, cdpMode: false,
+        adapters: new Map([['fixture', makeAts(canaryCfg())]]),
+        candidates: { fixture: ['https://example.test/dead'] },
+        state: { baselines: {} },
+        statePath: join(blocker, 'canary.json'), repairRoot: join(dir, 'r'),
+        now: () => '2026-07-20T09:00:00.000Z',
+      });
+      expect(rows).toEqual([]);
+      // The unwritable state path must not be swallowed silently: a warn surfaces
+      // it so the per-batch re-probe cost is visible.
+      expect(errSpy.mock.calls.flat().join('\n')).toContain('canary state save failed');
+    } finally {
+      errSpy.mockRestore();
+    }
   });
 
   it('skips an ats whose candidates are all dead', async () => {
@@ -130,5 +138,9 @@ describe('formatCanaryTable', () => {
     expect(table).toContain('ashby');
     expect(table).toContain('DRIFT');
     expect(table).toContain('override active');
+    // The probe runs THROUGH the override, so a healthy reading does not mean the
+    // site recovered — the table must not nudge the user to retire the override.
+    expect(table).not.toContain('retiring');
+    expect(table).toContain('measured WITH the override');
   });
 });
