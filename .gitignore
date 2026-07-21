@@ -48,10 +48,14 @@ jobhelp-mcp/scripts/*-tokens.json
 /experiments/
 /docs/research/
 
-# Auto-apply run artifacts (personal answers, per-job status, location/gap logs)
+# Auto-apply run artifacts (personal answers, per-job status, location/gap logs,
+# canary baselines, learned selector overrides, and repair page-snapshots).
+# JOBHELP_HOME defaults to ~/jobhelp, which is this repo root on a case-insensitive
+# filesystem, so the engine's local state lands here and must never be committed.
 /answer-bank.json
 /autoapply-*.json
 /autoapply-*.jsonl
+/autoapply-repair/
 
 # Root-level images are filled-application screenshots and fixture captures
 # (root-anchored: extension icons under extension-app/ are unaffected)
