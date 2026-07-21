@@ -2,6 +2,8 @@ import { constants } from 'node:fs';
 import { access, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { atomicWriteFile } from '../lib/atomicWrite.js';
+import { log } from '../lib/log.js';
 import type { SourcesConfig } from '../types/config.js';
 
 export const COMPANY_SOURCES_FILENAME = 'company-sources.json';
@@ -19,6 +21,19 @@ type TokenSource =
 
 const PACKAGE_NAME = '@jeffreyp1/jobhelp-mcp';
 const MAX_PACKAGE_ROOT_WALK = 8;
+
+type MutableCompanySources = {
+  ashby?: { tokens: string[] };
+  breezy?: { tokens: string[] };
+  greenhouse?: { tokens: string[] };
+  lever?: { slugs: string[] };
+  personio?: { tokens: string[] };
+  pinpoint?: { tokens: string[] };
+  recruitee?: { tokens: string[] };
+  smartrecruiters?: { tokens: string[] };
+  teamtailor?: { tokens: string[] };
+  workable?: { tokens: string[] };
+};
 
 const TOKEN_SOURCE_FILES: Readonly<Record<TokenSource, string>> = {
   ashby: 'ashby.json',
@@ -111,6 +126,42 @@ export async function writeDefaultCompanySourcesIfMissing(
   }
 }
 
+interface SourceDelta {
+  readonly before: number;
+  readonly after: number;
+  readonly added: number;
+}
+
+function unionPreserveOrder(base: readonly string[], additions: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of base) {
+    if (!seen.has(t)) {
+      seen.add(t);
+      out.push(t);
+    }
+  }
+  for (const t of additions) {
+    if (!seen.has(t)) {
+      seen.add(t);
+      out.push(t);
+    }
+  }
+  return out;
+}
+
+function mergeSource(
+  existing: readonly string[] | undefined,
+  bundled: readonly string[],
+): { readonly merged: string[]; readonly delta: SourceDelta } {
+  const existingArr = existing ?? [];
+  const merged = unionPreserveOrder(existingArr, bundled);
+  return {
+    merged,
+    delta: { before: existingArr.length, after: merged.length, added: merged.length - existingArr.length },
+  };
+}
+
 export async function loadCompanySourcesForConfig(
   configPath: string,
 ): Promise<SourcesConfig | undefined> {
@@ -125,38 +176,61 @@ export async function loadCompanySourcesForConfig(
   }
   const parsed = JSON.parse(raw) as unknown;
   if (!isRecord(parsed)) throw new Error(`${COMPANY_SOURCES_FILENAME} must contain an object`);
-  const out: {
-    ashby?: { tokens: string[] };
-    breezy?: { tokens: string[] };
-    greenhouse?: { tokens: string[] };
-    lever?: { slugs: string[] };
-    personio?: { tokens: string[] };
-    pinpoint?: { tokens: string[] };
-    recruitee?: { tokens: string[] };
-    smartrecruiters?: { tokens: string[] };
-    teamtailor?: { tokens: string[] };
-    workable?: { tokens: string[] };
-  } = {};
-  const ashby = parseTokenBlock(parsed['ashby'], 'ashby');
-  const breezy = parseTokenBlock(parsed['breezy'], 'breezy');
-  const greenhouse = parseTokenBlock(parsed['greenhouse'], 'greenhouse');
-  const lever = parseLeverBlock(parsed['lever']);
-  const personio = parseTokenBlock(parsed['personio'], 'personio');
-  const pinpoint = parseTokenBlock(parsed['pinpoint'], 'pinpoint');
-  const recruitee = parseTokenBlock(parsed['recruitee'], 'recruitee');
-  const smartrecruiters = parseTokenBlock(parsed['smartrecruiters'], 'smartrecruiters');
-  const teamtailor = parseTokenBlock(parsed['teamtailor'], 'teamtailor');
-  const workable = parseTokenBlock(parsed['workable'], 'workable');
-  if (ashby !== undefined) out.ashby = ashby;
-  if (breezy !== undefined) out.breezy = breezy;
-  if (greenhouse !== undefined) out.greenhouse = greenhouse;
-  if (lever !== undefined) out.lever = lever;
-  if (personio !== undefined) out.personio = personio;
-  if (pinpoint !== undefined) out.pinpoint = pinpoint;
-  if (recruitee !== undefined) out.recruitee = recruitee;
-  if (smartrecruiters !== undefined) out.smartrecruiters = smartrecruiters;
-  if (teamtailor !== undefined) out.teamtailor = teamtailor;
-  if (workable !== undefined) out.workable = workable;
+
+  const userAshby = parseTokenBlock(parsed['ashby'], 'ashby');
+  const userBreezy = parseTokenBlock(parsed['breezy'], 'breezy');
+  const userGreenhouse = parseTokenBlock(parsed['greenhouse'], 'greenhouse');
+  const userLever = parseLeverBlock(parsed['lever']);
+  const userPersonio = parseTokenBlock(parsed['personio'], 'personio');
+  const userPinpoint = parseTokenBlock(parsed['pinpoint'], 'pinpoint');
+  const userRecruitee = parseTokenBlock(parsed['recruitee'], 'recruitee');
+  const userSmartrecruiters = parseTokenBlock(parsed['smartrecruiters'], 'smartrecruiters');
+  const userTeamtailor = parseTokenBlock(parsed['teamtailor'], 'teamtailor');
+  const userWorkable = parseTokenBlock(parsed['workable'], 'workable');
+
+  const bundled = await loadDefaultCompanySources();
+
+  const out: MutableCompanySources = {};
+  const deltas: Record<string, SourceDelta> = {};
+
+  const tokenMerges: readonly [TokenSource, { tokens: string[] } | undefined][] = [
+    ['ashby', userAshby],
+    ['breezy', userBreezy],
+    ['greenhouse', userGreenhouse],
+    ['personio', userPersonio],
+    ['pinpoint', userPinpoint],
+    ['recruitee', userRecruitee],
+    ['smartrecruiters', userSmartrecruiters],
+    ['teamtailor', userTeamtailor],
+    ['workable', userWorkable],
+  ];
+  for (const [source, userBlock] of tokenMerges) {
+    const { merged, delta } = mergeSource(userBlock?.tokens, bundled[source]?.tokens ?? []);
+    out[source] = { tokens: merged };
+    if (delta.added > 0) deltas[source] = delta;
+  }
+
+  const { merged: leverMerged, delta: leverDelta } = mergeSource(
+    userLever?.slugs,
+    bundled.lever?.slugs ?? [],
+  );
+  out.lever = { slugs: leverMerged };
+  if (leverDelta.added > 0) deltas['lever'] = leverDelta;
+
+  if (Object.keys(deltas).length > 0) {
+    log('info', 'company-sources union merge added bundled tokens', { path, deltas });
+    const updated: Record<string, unknown> = { ...parsed };
+    for (const [source] of tokenMerges) updated[source] = { tokens: out[source]?.tokens ?? [] };
+    updated['lever'] = { slugs: out.lever.slugs };
+    const written = await atomicWriteFile(path, JSON.stringify(updated, null, 2) + '\n');
+    if (!written.ok) {
+      log('warn', 'failed to persist company-sources union merge', {
+        path,
+        error: written.error.message,
+      });
+    }
+  }
+
   return out;
 }
 

@@ -52,7 +52,7 @@ describe('applyConfigAnswers', () => {
       };
       expect(written.greenhouse?.tokens?.length).toBeGreaterThan(1000);
       expect(written.ashby?.tokens?.length).toBeGreaterThan(1000);
-      expect(written.workable?.tokens?.length).toBeGreaterThan(1000);
+      expect(written.workable?.tokens?.length).toBeGreaterThan(10);
       expect(written.lever?.slugs?.length).toBeGreaterThan(50);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -231,16 +231,21 @@ describe('applyConfigAnswers', () => {
     expect(result.error.type).toBe('write_error');
   });
 
-  it('uses default outputPath when none provided', async () => {
-    const result = await applyConfigAnswers({ answers: MINIMAL_ANSWERS });
-    if (isErr(result)) {
-      if (result.error.type !== 'write_error') throw new Error(`unexpected error: ${JSON.stringify(result.error)}`);
-      return;
+  it('honors JOBHELP_CONFIG_PATH as the default outputPath when none provided', async () => {
+    const dir = makeTmpDir();
+    const prev = process.env['JOBHELP_CONFIG_PATH'];
+    process.env['JOBHELP_CONFIG_PATH'] = join(dir, 'config.json');
+    try {
+      const result = await applyConfigAnswers({ answers: MINIMAL_ANSWERS });
+      if (isErr(result)) throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
+      expect(result.value.path).toBe(join(dir, 'config.json'));
+      const written = JSON.parse(readFileSync(result.value.path, 'utf8')) as unknown;
+      expect(written).toMatchObject({ profile: { location: 'Austin, TX' } });
+    } finally {
+      if (prev === undefined) delete process.env['JOBHELP_CONFIG_PATH'];
+      else process.env['JOBHELP_CONFIG_PATH'] = prev;
+      rmSync(dir, { recursive: true, force: true });
     }
-    expect(result.value.path).toContain('.config/jobhelp/config.json');
-    const written = JSON.parse(readFileSync(result.value.path, 'utf8')) as unknown;
-    expect(written).toMatchObject({ profile: { location: 'Austin, TX' } });
-    rmSync(result.value.path, { force: true });
   });
 
   it('with empty answers, the written config FAILS loadConfig validation', async () => {

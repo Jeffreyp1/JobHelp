@@ -84,7 +84,20 @@ describe('ashby adapter', () => {
       expect(first.postedAt).toBeDefined();
       expect(first.description).toContain('Build distributed systems');
       expect(first.description).not.toContain('<p>');
-      expect(first.rawSourceData).toBeDefined();
+    });
+
+    it('applies the accept predicate: reject-all yields [], accept-all keeps jobs', async () => {
+      const fixture = loadFixture();
+      const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+        new Response(JSON.stringify(fixture), { status: 200 }),
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const rejected = await ashby.fetch(makeConfig(['acmecorp']), { accept: () => false });
+      expect(rejected).toEqual([]);
+
+      const accepted = await ashby.fetch(makeConfig(['acmecorp']), { accept: () => true });
+      expect(accepted.length).toBeGreaterThan(0);
     });
 
     it('maps workplaceType Hybrid → remote=hybrid and omits salary when compensation absent', async () => {

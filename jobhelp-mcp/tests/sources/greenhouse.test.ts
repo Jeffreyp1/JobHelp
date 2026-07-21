@@ -79,7 +79,7 @@ describe('greenhouse adapter', () => {
       expect(first.description).not.toContain('<p>');
       expect(first.description).not.toContain('<strong>');
       expect(first.description.length).toBeGreaterThan(0);
-      expect(first.rawSourceData).toBeDefined();
+      expect(first.rawSourceData).toBeUndefined();
     });
     it('detects hybrid remote-mode for second job', async () => {
       const fixture = loadFixture();

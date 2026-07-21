@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -9,7 +10,8 @@ import {
   runWithConcurrency,
 } from './_shared.js';
 
-const PERSONIO_CONCURRENCY = 10;
+// Each slug is its own *.jobs.personio.de tenant, so cross-slug parallelism is rate-limit safe.
+const PERSONIO_CONCURRENCY = 25;
 
 export { SourceFetchError };
 
@@ -95,7 +97,7 @@ function parsePositionBlock(slug: string, block: string): PersonioPosition | und
   };
 }
 
-function normalize(slug: string, p: PersonioPosition, raw: string): NormalizedJob {
+function normalize(slug: string, p: PersonioPosition): NormalizedJob {
   const remote = detectRemoteMode(`${p.title} ${p.location} ${p.description}`);
   const norm: NormalizedJob = {
     id: `personio:${p.id}`,
@@ -106,7 +108,6 @@ function normalize(slug: string, p: PersonioPosition, raw: string): NormalizedJo
     location: p.location,
     remote,
     description: p.description,
-    rawSourceData: raw,
     ...((): { postedAt: string } | object => {
       const iso = asIsoString(p.publishedAt);
       return iso !== undefined ? { postedAt: iso } : {};
@@ -115,11 +116,11 @@ function normalize(slug: string, p: PersonioPosition, raw: string): NormalizedJo
   return norm;
 }
 
-async function fetchBoard(slug: string): Promise<string> {
+async function fetchBoard(slug: string, http?: SharedHttpOptions): Promise<string> {
   const url = `https://${encodeURIComponent(slug)}.jobs.personio.de/xml`;
-  let response: Response;
+  let response: HttpTextResult;
   try {
-    response = await fetch(url, { redirect: 'manual', headers: { Accept: 'application/xml' } });
+    response = await httpGetText(url, { redirect: 'manual', headers: { Accept: 'application/xml' }, ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `personio network error: ${msg}`);
@@ -130,21 +131,27 @@ async function fetchBoard(slug: string): Promise<string> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `personio HTTP ${response.status}`);
   }
-  const text = await response.text();
+  const text = response.bodyText;
   if (!/<workzag-jobs\b/i.test(text) && !/<position\b/i.test(text)) {
     throw new SourceFetchError('parse', 'personio: response missing <workzag-jobs> and <position> tags');
   }
   return text;
 }
 
-async function fetchSlugJobs(slug: string): Promise<NormalizedJob[]> {
-  const xml = await fetchBoard(slug);
+async function fetchSlugJobs(
+  slug: string,
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<NormalizedJob[]> {
+  const xml = await fetchBoard(slug, http);
   const positions = extractAllTags(xml, 'position');
   const out: NormalizedJob[] = [];
   for (const block of positions) {
     const parsed = parsePositionBlock(slug, block);
     if (parsed === undefined) continue;
-    out.push(normalize(slug, parsed, block));
+    const job = normalize(slug, parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
   return out;
 }
@@ -155,13 +162,15 @@ export const personio: SourceAdapter = {
     const c = config.sources.personio;
     return c !== undefined && c.tokens.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.personio;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'personio config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const tokens = c.tokens;
-    const tasks = tokens.map((slug) => (): Promise<NormalizedJob[]> => fetchSlugJobs(slug));
+    const tasks = tokens.map((slug) => (): Promise<NormalizedJob[]> => fetchSlugJobs(slug, accept, http));
     const settled = await runWithConcurrency(tasks, { limit: PERSONIO_CONCURRENCY });
     const all: NormalizedJob[] = [];
     let lastError: unknown;

@@ -1,6 +1,6 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -9,9 +9,14 @@ import {
   classifyHttpStatus,
   detectRemoteMode,
   isRecord,
+  runWithConcurrency,
 } from './_shared.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 
 export { SourceFetchError };
+
+// Tenant subdomains share recruitee's edge infra: observed HTTP 429s at concurrency 8.
+const RECRUITEE_CONCURRENCY = 3;
 
 function stripHtml(html: string): string {
   return html
@@ -88,7 +93,7 @@ function parseRecruiteeOffer(raw: unknown): RecruiteeOffer | undefined {
   };
 }
 
-function normalize(slug: string, offer: RecruiteeOffer, raw: unknown): NormalizedJob {
+function normalize(slug: string, offer: RecruiteeOffer): NormalizedJob {
   const combined = offer.requirements.length > 0
     ? `${offer.description}\n\n${offer.requirements}`
     : offer.description;
@@ -102,7 +107,6 @@ function normalize(slug: string, offer: RecruiteeOffer, raw: unknown): Normalize
     location: offer.location,
     remote,
     description: combined,
-    rawSourceData: raw,
     ...(offer.salaryMin !== undefined ? { salaryMin: offer.salaryMin } : {}),
     ...(offer.salaryMax !== undefined ? { salaryMax: offer.salaryMax } : {}),
     ...(offer.salaryCurrency !== undefined ? { salaryCurrency: offer.salaryCurrency } : {}),
@@ -114,11 +118,11 @@ function normalize(slug: string, offer: RecruiteeOffer, raw: unknown): Normalize
   return norm;
 }
 
-async function fetchBoard(slug: string): Promise<unknown> {
+async function fetchBoard(slug: string, http?: SharedHttpOptions): Promise<unknown> {
   const url = `https://${encodeURIComponent(slug)}.recruitee.com/api/offers/`;
-  let response: Response;
+  let response: HttpTextResult;
   try {
-    response = await fetch(url);
+    response = await httpGetText(url, { ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `recruitee network error: ${msg}`);
@@ -126,16 +130,20 @@ async function fetchBoard(slug: string): Promise<unknown> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `recruitee HTTP ${response.status}`);
   }
-  const text = await response.text();
   try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(response.bodyText) as unknown;
   } catch {
     throw new SourceFetchError('parse', 'recruitee response was not valid JSON');
   }
 }
 
-async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void> {
-  const body = await fetchBoard(slug);
+async function fetchAndCollect(
+  slug: string,
+  out: NormalizedJob[],
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<void> {
+  const body = await fetchBoard(slug, http);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'recruitee response was not an object');
   }
@@ -146,7 +154,9 @@ async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void
   for (const rawOffer of offers) {
     const parsed = parseRecruiteeOffer(rawOffer);
     if (parsed === undefined) continue;
-    out.push(normalize(slug, parsed, rawOffer));
+    const job = normalize(slug, parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
 }
 
@@ -156,25 +166,29 @@ export const recruitee: SourceAdapter = {
     const c = config.sources.recruitee;
     return c !== undefined && c.tokens.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.recruitee;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'recruitee config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const all: NormalizedJob[] = [];
     let attempts = 0;
     let failures = 0;
     let lastError: unknown;
-    for (const slug of c.tokens) {
+    // Each slug is its own tenant subdomain, so cross-slug parallelism is rate-limit safe.
+    const tasks = c.tokens.map((slug) => async (): Promise<void> => {
       attempts += 1;
       try {
-        await fetchAndCollect(slug, all);
+        await fetchAndCollect(slug, all, accept, http);
       } catch (err: unknown) {
         failures += 1;
         lastError = err;
         log('warn', 'recruitee fetch failed', { slug, error: err instanceof Error ? err.message : 'unknown' });
       }
-    }
+    });
+    await runWithConcurrency(tasks, { limit: RECRUITEE_CONCURRENCY });
     if (attempts > 0 && failures === attempts) {
       if (lastError instanceof Error) throw lastError;
       throw new SourceFetchError('unknown', 'recruitee: all slugs failed');

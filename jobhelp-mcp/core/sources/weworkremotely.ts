@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -111,7 +112,7 @@ function parseItem(block: string): WwrItem | undefined {
   };
 }
 
-function normalize(item: WwrItem, raw: string): NormalizedJob {
+function normalize(item: WwrItem): NormalizedJob {
   const norm: NormalizedJob = {
     id: `weworkremotely:${item.id}`,
     source: 'weworkremotely',
@@ -121,7 +122,6 @@ function normalize(item: WwrItem, raw: string): NormalizedJob {
     location: item.location,
     remote: 'remote',
     description: item.description,
-    rawSourceData: raw,
     ...((): { postedAt: string } | object => {
       const iso = asIsoString(item.publishedAt);
       return iso !== undefined ? { postedAt: iso } : {};
@@ -130,10 +130,10 @@ function normalize(item: WwrItem, raw: string): NormalizedJob {
   return norm;
 }
 
-async function fetchFeed(url: string): Promise<string> {
-  let response: Response;
+async function fetchFeed(url: string, http?: SharedHttpOptions): Promise<string> {
+  let response: HttpTextResult;
   try {
-    response = await fetch(url);
+    response = await httpGetText(url, { ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `weworkremotely network error: ${msg}`);
@@ -141,8 +141,8 @@ async function fetchFeed(url: string): Promise<string> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `weworkremotely HTTP ${response.status}`);
   }
-  const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
-  const text = await response.text();
+  const contentType = response.contentType.toLowerCase();
+  const text = response.bodyText;
   if (!contentType.includes('xml') && !contentType.includes('rss') && !/<rss\b/i.test(text)) {
     throw new SourceFetchError('parse', `weworkremotely: non-RSS content-type (${contentType})`);
   }
@@ -152,13 +152,19 @@ async function fetchFeed(url: string): Promise<string> {
   return text;
 }
 
-async function fetchOne(url: string): Promise<NormalizedJob[]> {
-  const xml = await fetchFeed(url);
+async function fetchOne(
+  url: string,
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<NormalizedJob[]> {
+  const xml = await fetchFeed(url, http);
   const out: NormalizedJob[] = [];
   for (const block of extractAllItems(xml)) {
     const parsed = parseItem(block);
     if (parsed === undefined) continue;
-    out.push(normalize(parsed, block));
+    const job = normalize(parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
   return out;
 }
@@ -166,14 +172,16 @@ async function fetchOne(url: string): Promise<NormalizedJob[]> {
 export const weworkremotely: SourceAdapter = {
   name: 'weworkremotely',
   enabled: (config): boolean => Boolean(config.sources.weworkremotely),
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.weworkremotely;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'weworkremotely config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const categories = c.categories ?? [];
     const urls = categories.length > 0 ? categories.map(categoryFeedUrl) : [MAIN_FEED];
-    const tasks = urls.map((url) => (): Promise<NormalizedJob[]> => fetchOne(url));
+    const tasks = urls.map((url) => (): Promise<NormalizedJob[]> => fetchOne(url, accept, http));
     const settled = await runWithConcurrency(tasks, { limit: WWR_CONCURRENCY });
     const all: NormalizedJob[] = [];
     let failures = 0;

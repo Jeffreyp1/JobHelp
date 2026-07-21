@@ -1,0 +1,2834 @@
+[
+  {
+    "slug": "gopuff",
+    "count": 814
+  },
+  {
+    "slug": "veeva",
+    "count": 794
+  },
+  {
+    "slug": "lyrahealth",
+    "count": 479
+  },
+  {
+    "slug": "shieldai",
+    "count": 408
+  },
+  {
+    "slug": "latitudeinc",
+    "count": 314
+  },
+  {
+    "slug": "palantir",
+    "count": 277
+  },
+  {
+    "slug": "binance",
+    "count": 272
+  },
+  {
+    "slug": "sila",
+    "count": 265
+  },
+  {
+    "slug": "solidcore",
+    "count": 256
+  },
+  {
+    "slug": "distro",
+    "count": 238
+  },
+  {
+    "slug": "paytm",
+    "count": 229
+  },
+  {
+    "slug": "zoox",
+    "count": 216
+  },
+  {
+    "slug": "wyetechllc",
+    "count": 203
+  },
+  {
+    "slug": "ninjavan",
+    "count": 174
+  },
+  {
+    "slug": "whoop",
+    "count": 156
+  },
+  {
+    "slug": "fresha",
+    "count": 153
+  },
+  {
+    "slug": "woven-by-toyota",
+    "count": 149
+  },
+  {
+    "slug": "lalamove",
+    "count": 139
+  },
+  {
+    "slug": "despegar",
+    "count": 138
+  },
+  {
+    "slug": "filevine",
+    "count": 136
+  },
+  {
+    "slug": "octoenergy",
+    "count": 136
+  },
+  {
+    "slug": "saviynt",
+    "count": 130
+  },
+  {
+    "slug": "crypto",
+    "count": 123
+  },
+  {
+    "slug": "sophos",
+    "count": 115
+  },
+  {
+    "slug": "thinkahead",
+    "count": 114
+  },
+  {
+    "slug": "tractian",
+    "count": 111
+  },
+  {
+    "slug": "veepee",
+    "count": 111
+  },
+  {
+    "slug": "waremalcomb",
+    "count": 111
+  },
+  {
+    "slug": "spotify",
+    "count": 109
+  },
+  {
+    "slug": "sonarsource",
+    "count": 107
+  },
+  {
+    "slug": "includedhealth",
+    "count": 105
+  },
+  {
+    "slug": "hermeus",
+    "count": 104
+  },
+  {
+    "slug": "pigment",
+    "count": 99
+  },
+  {
+    "slug": "coupa",
+    "count": 96
+  },
+  {
+    "slug": "pattern",
+    "count": 96
+  },
+  {
+    "slug": "aleph",
+    "count": 90
+  },
+  {
+    "slug": "arrivelogistics",
+    "count": 87
+  },
+  {
+    "slug": "t5datacenters",
+    "count": 84
+  },
+  {
+    "slug": "aircall",
+    "count": 80
+  },
+  {
+    "slug": "matchgroup",
+    "count": 80
+  },
+  {
+    "slug": "pingwind",
+    "count": 76
+  },
+  {
+    "slug": "hive",
+    "count": 75
+  },
+  {
+    "slug": "lendbuzz",
+    "count": 73
+  },
+  {
+    "slug": "kpler",
+    "count": 71
+  },
+  {
+    "slug": "bluebottlecoffee",
+    "count": 67
+  },
+  {
+    "slug": "sambatv",
+    "count": 66
+  },
+  {
+    "slug": "ion",
+    "count": 65
+  },
+  {
+    "slug": "ttecdigital",
+    "count": 65
+  },
+  {
+    "slug": "bannerbank",
+    "count": 64
+  },
+  {
+    "slug": "cirquedusoleil",
+    "count": 64
+  },
+  {
+    "slug": "nitra",
+    "count": 63
+  },
+  {
+    "slug": "walkme",
+    "count": 61
+  },
+  {
+    "slug": "elfbeauty",
+    "count": 60
+  },
+  {
+    "slug": "spreetail",
+    "count": 60
+  },
+  {
+    "slug": "waabi",
+    "count": 59
+  },
+  {
+    "slug": "dlocal",
+    "count": 58
+  },
+  {
+    "slug": "farfetch",
+    "count": 57
+  },
+  {
+    "slug": "floqast",
+    "count": 57
+  },
+  {
+    "slug": "protolabs",
+    "count": 56
+  },
+  {
+    "slug": "life",
+    "count": 53
+  },
+  {
+    "slug": "qonto",
+    "count": 52
+  },
+  {
+    "slug": "payjoy",
+    "count": 51
+  },
+  {
+    "slug": "ro",
+    "count": 51
+  },
+  {
+    "slug": "magnetforensics",
+    "count": 48
+  },
+  {
+    "slug": "acceldata",
+    "count": 47
+  },
+  {
+    "slug": "amanotes",
+    "count": 47
+  },
+  {
+    "slug": "appen",
+    "count": 47
+  },
+  {
+    "slug": "lessen",
+    "count": 46
+  },
+  {
+    "slug": "aledade",
+    "count": 44
+  },
+  {
+    "slug": "anchorage",
+    "count": 44
+  },
+  {
+    "slug": "oxylabs",
+    "count": 43
+  },
+  {
+    "slug": "capital",
+    "count": 42
+  },
+  {
+    "slug": "meesho",
+    "count": 42
+  },
+  {
+    "slug": "synergyecp",
+    "count": 42
+  },
+  {
+    "slug": "caseware",
+    "count": 41
+  },
+  {
+    "slug": "cologix",
+    "count": 41
+  },
+  {
+    "slug": "foodstuffs",
+    "count": 41
+  },
+  {
+    "slug": "kepler",
+    "count": 41
+  },
+  {
+    "slug": "reply",
+    "count": 41
+  },
+  {
+    "slug": "intersect",
+    "count": 40
+  },
+  {
+    "slug": "finn",
+    "count": 39
+  },
+  {
+    "slug": "ispace-inc",
+    "count": 39
+  },
+  {
+    "slug": "last-energy",
+    "count": 39
+  },
+  {
+    "slug": "bumbleinc",
+    "count": 38
+  },
+  {
+    "slug": "nium",
+    "count": 38
+  },
+  {
+    "slug": "allegiantair",
+    "count": 37
+  },
+  {
+    "slug": "provectus",
+    "count": 37
+  },
+  {
+    "slug": "360learning",
+    "count": 36
+  },
+  {
+    "slug": "outreach",
+    "count": 36
+  },
+  {
+    "slug": "cloudwalk",
+    "count": 35
+  },
+  {
+    "slug": "innophos",
+    "count": 35
+  },
+  {
+    "slug": "trendyol",
+    "count": 34
+  },
+  {
+    "slug": "voodoo",
+    "count": 34
+  },
+  {
+    "slug": "webfx",
+    "count": 34
+  },
+  {
+    "slug": "emburse",
+    "count": 33
+  },
+  {
+    "slug": "shyftlabs",
+    "count": 33
+  },
+  {
+    "slug": "sofarsounds",
+    "count": 33
+  },
+  {
+    "slug": "swordhealth",
+    "count": 33
+  },
+  {
+    "slug": "iru",
+    "count": 32
+  },
+  {
+    "slug": "scaleway",
+    "count": 32
+  },
+  {
+    "slug": "xcimer",
+    "count": 32
+  },
+  {
+    "slug": "eleks",
+    "count": 31
+  },
+  {
+    "slug": "weride",
+    "count": 31
+  },
+  {
+    "slug": "contentsquare",
+    "count": 30
+  },
+  {
+    "slug": "neowiz",
+    "count": 30
+  },
+  {
+    "slug": "netomi",
+    "count": 30
+  },
+  {
+    "slug": "watchguard",
+    "count": 30
+  },
+  {
+    "slug": "zopa",
+    "count": 30
+  },
+  {
+    "slug": "erg",
+    "count": 29
+  },
+  {
+    "slug": "momsmeals",
+    "count": 29
+  },
+  {
+    "slug": "cloudinary",
+    "count": 28
+  },
+  {
+    "slug": "doctrine",
+    "count": 28
+  },
+  {
+    "slug": "ekimetrics",
+    "count": 28
+  },
+  {
+    "slug": "luxurypresence",
+    "count": 28
+  },
+  {
+    "slug": "mendix",
+    "count": 28
+  },
+  {
+    "slug": "swile",
+    "count": 28
+  },
+  {
+    "slug": "wpromote",
+    "count": 28
+  },
+  {
+    "slug": "gridware",
+    "count": 27
+  },
+  {
+    "slug": "knix",
+    "count": 26
+  },
+  {
+    "slug": "pivotal",
+    "count": 26
+  },
+  {
+    "slug": "scottlogic",
+    "count": 26
+  },
+  {
+    "slug": "superside",
+    "count": 26
+  },
+  {
+    "slug": "bounteous",
+    "count": 25
+  },
+  {
+    "slug": "captivateiq",
+    "count": 25
+  },
+  {
+    "slug": "circadiahealth",
+    "count": 25
+  },
+  {
+    "slug": "h1",
+    "count": 25
+  },
+  {
+    "slug": "isee",
+    "count": 24
+  },
+  {
+    "slug": "levelai",
+    "count": 24
+  },
+  {
+    "slug": "make-rain",
+    "count": 24
+  },
+  {
+    "slug": "achievers",
+    "count": 23
+  },
+  {
+    "slug": "glide",
+    "count": 23
+  },
+  {
+    "slug": "matillion",
+    "count": 23
+  },
+  {
+    "slug": "rise",
+    "count": 23
+  },
+  {
+    "slug": "angellist",
+    "count": 22
+  },
+  {
+    "slug": "freedompay",
+    "count": 22
+  },
+  {
+    "slug": "layup",
+    "count": 22
+  },
+  {
+    "slug": "perforce",
+    "count": 22
+  },
+  {
+    "slug": "rover",
+    "count": 22
+  },
+  {
+    "slug": "bazaarvoice",
+    "count": 21
+  },
+  {
+    "slug": "fiscalnote",
+    "count": 21
+  },
+  {
+    "slug": "heetch",
+    "count": 21
+  },
+  {
+    "slug": "lamudi",
+    "count": 21
+  },
+  {
+    "slug": "mable",
+    "count": 21
+  },
+  {
+    "slug": "mindtickle",
+    "count": 21
+  },
+  {
+    "slug": "skyways",
+    "count": 21
+  },
+  {
+    "slug": "trustly",
+    "count": 21
+  },
+  {
+    "slug": "dutch",
+    "count": 20
+  },
+  {
+    "slug": "equativ",
+    "count": 20
+  },
+  {
+    "slug": "fullscript",
+    "count": 20
+  },
+  {
+    "slug": "kogan",
+    "count": 20
+  },
+  {
+    "slug": "linkedin",
+    "count": 20
+  },
+  {
+    "slug": "longwall",
+    "count": 20
+  },
+  {
+    "slug": "osedea",
+    "count": 20
+  },
+  {
+    "slug": "peakgames",
+    "count": 20
+  },
+  {
+    "slug": "placemakr",
+    "count": 20
+  },
+  {
+    "slug": "secureframe",
+    "count": 20
+  },
+  {
+    "slug": "actian",
+    "count": 19
+  },
+  {
+    "slug": "brevo",
+    "count": 19
+  },
+  {
+    "slug": "goodleap",
+    "count": 19
+  },
+  {
+    "slug": "metabase",
+    "count": 19
+  },
+  {
+    "slug": "picklerobot",
+    "count": 19
+  },
+  {
+    "slug": "porter",
+    "count": 19
+  },
+  {
+    "slug": "snappr",
+    "count": 19
+  },
+  {
+    "slug": "theblacktux",
+    "count": 19
+  },
+  {
+    "slug": "velo3d",
+    "count": 19
+  },
+  {
+    "slug": "blablacar",
+    "count": 18
+  },
+  {
+    "slug": "coalfire",
+    "count": 18
+  },
+  {
+    "slug": "endpointclinical",
+    "count": 18
+  },
+  {
+    "slug": "moo",
+    "count": 18
+  },
+  {
+    "slug": "toptal",
+    "count": 18
+  },
+  {
+    "slug": "until",
+    "count": 18
+  },
+  {
+    "slug": "appzen",
+    "count": 17
+  },
+  {
+    "slug": "avalanchestudios",
+    "count": 17
+  },
+  {
+    "slug": "cority",
+    "count": 17
+  },
+  {
+    "slug": "fampay",
+    "count": 17
+  },
+  {
+    "slug": "get-vocal-pbc",
+    "count": 17
+  },
+  {
+    "slug": "jumpcloud",
+    "count": 17
+  },
+  {
+    "slug": "kabam",
+    "count": 17
+  },
+  {
+    "slug": "mashgin",
+    "count": 17
+  },
+  {
+    "slug": "sonatype",
+    "count": 17
+  },
+  {
+    "slug": "sugarcrm",
+    "count": 17
+  },
+  {
+    "slug": "windfalldata",
+    "count": 17
+  },
+  {
+    "slug": "zeta",
+    "count": 17
+  },
+  {
+    "slug": "anybotics",
+    "count": 16
+  },
+  {
+    "slug": "blackbirdinteractive",
+    "count": 16
+  },
+  {
+    "slug": "brafton",
+    "count": 16
+  },
+  {
+    "slug": "curai",
+    "count": 16
+  },
+  {
+    "slug": "doxel",
+    "count": 16
+  },
+  {
+    "slug": "fieldnation",
+    "count": 16
+  },
+  {
+    "slug": "finquery",
+    "count": 16
+  },
+  {
+    "slug": "tri",
+    "count": 16
+  },
+  {
+    "slug": "veo",
+    "count": 16
+  },
+  {
+    "slug": "versapay",
+    "count": 16
+  },
+  {
+    "slug": "zensurance",
+    "count": 16
+  },
+  {
+    "slug": "azul",
+    "count": 15
+  },
+  {
+    "slug": "dreamgames",
+    "count": 15
+  },
+  {
+    "slug": "kitware",
+    "count": 15
+  },
+  {
+    "slug": "nimblerx",
+    "count": 15
+  },
+  {
+    "slug": "offchainlabs",
+    "count": 15
+  },
+  {
+    "slug": "prosper",
+    "count": 15
+  },
+  {
+    "slug": "sandboxvr",
+    "count": 15
+  },
+  {
+    "slug": "activecampaign",
+    "count": 14
+  },
+  {
+    "slug": "greenlight",
+    "count": 14
+  },
+  {
+    "slug": "lumafield",
+    "count": 14
+  },
+  {
+    "slug": "microventures",
+    "count": 14
+  },
+  {
+    "slug": "proper",
+    "count": 14
+  },
+  {
+    "slug": "restaurant365",
+    "count": 14
+  },
+  {
+    "slug": "super",
+    "count": 14
+  },
+  {
+    "slug": "voltus",
+    "count": 14
+  },
+  {
+    "slug": "zimperium",
+    "count": 14
+  },
+  {
+    "slug": "zurichinstruments",
+    "count": 14
+  },
+  {
+    "slug": "arcadia",
+    "count": 13
+  },
+  {
+    "slug": "esrtreit",
+    "count": 13
+  },
+  {
+    "slug": "findigs",
+    "count": 13
+  },
+  {
+    "slug": "handoff",
+    "count": 13
+  },
+  {
+    "slug": "justwatch",
+    "count": 13
+  },
+  {
+    "slug": "pyka",
+    "count": 13
+  },
+  {
+    "slug": "shakudo",
+    "count": 13
+  },
+  {
+    "slug": "snaplogic",
+    "count": 13
+  },
+  {
+    "slug": "theathletic",
+    "count": 13
+  },
+  {
+    "slug": "trueml",
+    "count": 13
+  },
+  {
+    "slug": "upguard",
+    "count": 13
+  },
+  {
+    "slug": "wealthfront",
+    "count": 13
+  },
+  {
+    "slug": "airslate",
+    "count": 12
+  },
+  {
+    "slug": "atmosera",
+    "count": 12
+  },
+  {
+    "slug": "avante",
+    "count": 12
+  },
+  {
+    "slug": "bloom",
+    "count": 12
+  },
+  {
+    "slug": "cic",
+    "count": 12
+  },
+  {
+    "slug": "microvision",
+    "count": 12
+  },
+  {
+    "slug": "moonpay",
+    "count": 12
+  },
+  {
+    "slug": "objective",
+    "count": 12
+  },
+  {
+    "slug": "rigetti",
+    "count": 12
+  },
+  {
+    "slug": "safe",
+    "count": 12
+  },
+  {
+    "slug": "tenna",
+    "count": 12
+  },
+  {
+    "slug": "valdera",
+    "count": 12
+  },
+  {
+    "slug": "balbix",
+    "count": 11
+  },
+  {
+    "slug": "cyngn",
+    "count": 11
+  },
+  {
+    "slug": "dronedeploy",
+    "count": 11
+  },
+  {
+    "slug": "factor",
+    "count": 11
+  },
+  {
+    "slug": "florence",
+    "count": 11
+  },
+  {
+    "slug": "go-cloudforce",
+    "count": 11
+  },
+  {
+    "slug": "grand",
+    "count": 11
+  },
+  {
+    "slug": "hush",
+    "count": 11
+  },
+  {
+    "slug": "mirego",
+    "count": 11
+  },
+  {
+    "slug": "neighbor",
+    "count": 11
+  },
+  {
+    "slug": "neon",
+    "count": 11
+  },
+  {
+    "slug": "olo",
+    "count": 11
+  },
+  {
+    "slug": "purple-technology",
+    "count": 11
+  },
+  {
+    "slug": "quantummetric",
+    "count": 11
+  },
+  {
+    "slug": "retro",
+    "count": 11
+  },
+  {
+    "slug": "rhombus-systems",
+    "count": 11
+  },
+  {
+    "slug": "scale3c",
+    "count": 11
+  },
+  {
+    "slug": "tala",
+    "count": 11
+  },
+  {
+    "slug": "tekton",
+    "count": 11
+  },
+  {
+    "slug": "tovala",
+    "count": 11
+  },
+  {
+    "slug": "unusual",
+    "count": 11
+  },
+  {
+    "slug": "vida",
+    "count": 11
+  },
+  {
+    "slug": "artera",
+    "count": 10
+  },
+  {
+    "slug": "belvederetrading",
+    "count": 10
+  },
+  {
+    "slug": "cobaltrobotics",
+    "count": 10
+  },
+  {
+    "slug": "deepsky",
+    "count": 10
+  },
+  {
+    "slug": "deputy",
+    "count": 10
+  },
+  {
+    "slug": "disqo",
+    "count": 10
+  },
+  {
+    "slug": "dodmg",
+    "count": 10
+  },
+  {
+    "slug": "editorialist",
+    "count": 10
+  },
+  {
+    "slug": "educative",
+    "count": 10
+  },
+  {
+    "slug": "everbridge",
+    "count": 10
+  },
+  {
+    "slug": "people-ai",
+    "count": 10
+  },
+  {
+    "slug": "pipedrive",
+    "count": 10
+  },
+  {
+    "slug": "procreate",
+    "count": 10
+  },
+  {
+    "slug": "seerinteractive",
+    "count": 10
+  },
+  {
+    "slug": "siepe",
+    "count": 10
+  },
+  {
+    "slug": "tendo",
+    "count": 10
+  },
+  {
+    "slug": "alluxio",
+    "count": 9
+  },
+  {
+    "slug": "duffel",
+    "count": 9
+  },
+  {
+    "slug": "finch",
+    "count": 9
+  },
+  {
+    "slug": "finix",
+    "count": 9
+  },
+  {
+    "slug": "gettyimages",
+    "count": 9
+  },
+  {
+    "slug": "harmony",
+    "count": 9
+  },
+  {
+    "slug": "immuta",
+    "count": 9
+  },
+  {
+    "slug": "inkitt",
+    "count": 9
+  },
+  {
+    "slug": "leadershipconnect",
+    "count": 9
+  },
+  {
+    "slug": "mechanicalorchard",
+    "count": 9
+  },
+  {
+    "slug": "mytos",
+    "count": 9
+  },
+  {
+    "slug": "nextech",
+    "count": 9
+  },
+  {
+    "slug": "osaro",
+    "count": 9
+  },
+  {
+    "slug": "pointb",
+    "count": 9
+  },
+  {
+    "slug": "sfgiants",
+    "count": 9
+  },
+  {
+    "slug": "softworld",
+    "count": 9
+  },
+  {
+    "slug": "solopulseco",
+    "count": 9
+  },
+  {
+    "slug": "starkbank",
+    "count": 9
+  },
+  {
+    "slug": "suger",
+    "count": 9
+  },
+  {
+    "slug": "teleo",
+    "count": 9
+  },
+  {
+    "slug": "unify",
+    "count": 9
+  },
+  {
+    "slug": "vrchat",
+    "count": 9
+  },
+  {
+    "slug": "agiloft",
+    "count": 8
+  },
+  {
+    "slug": "alloy",
+    "count": 8
+  },
+  {
+    "slug": "animocabrands",
+    "count": 8
+  },
+  {
+    "slug": "anomali",
+    "count": 8
+  },
+  {
+    "slug": "avertium",
+    "count": 8
+  },
+  {
+    "slug": "crytek",
+    "count": 8
+  },
+  {
+    "slug": "didomi",
+    "count": 8
+  },
+  {
+    "slug": "doola",
+    "count": 8
+  },
+  {
+    "slug": "enveda",
+    "count": 8
+  },
+  {
+    "slug": "epoch-ai",
+    "count": 8
+  },
+  {
+    "slug": "evry-health",
+    "count": 8
+  },
+  {
+    "slug": "fleetzero",
+    "count": 8
+  },
+  {
+    "slug": "gauntlet",
+    "count": 8
+  },
+  {
+    "slug": "gmo",
+    "count": 8
+  },
+  {
+    "slug": "incorta",
+    "count": 8
+  },
+  {
+    "slug": "jamcity",
+    "count": 8
+  },
+  {
+    "slug": "kavak",
+    "count": 8
+  },
+  {
+    "slug": "multiplylabs",
+    "count": 8
+  },
+  {
+    "slug": "onit",
+    "count": 8
+  },
+  {
+    "slug": "paradigm-health",
+    "count": 8
+  },
+  {
+    "slug": "project-healthy-minds",
+    "count": 8
+  },
+  {
+    "slug": "revefi",
+    "count": 8
+  },
+  {
+    "slug": "revi",
+    "count": 8
+  },
+  {
+    "slug": "rylo",
+    "count": 8
+  },
+  {
+    "slug": "system1",
+    "count": 8
+  },
+  {
+    "slug": "verygoodsecurity",
+    "count": 8
+  },
+  {
+    "slug": "vidsy",
+    "count": 8
+  },
+  {
+    "slug": "1inch",
+    "count": 7
+  },
+  {
+    "slug": "aisafety",
+    "count": 7
+  },
+  {
+    "slug": "aquabyte",
+    "count": 7
+  },
+  {
+    "slug": "blinkux",
+    "count": 7
+  },
+  {
+    "slug": "blue",
+    "count": 7
+  },
+  {
+    "slug": "chownow",
+    "count": 7
+  },
+  {
+    "slug": "copia",
+    "count": 7
+  },
+  {
+    "slug": "delfidiagnostics",
+    "count": 7
+  },
+  {
+    "slug": "firemon",
+    "count": 7
+  },
+  {
+    "slug": "gr0",
+    "count": 7
+  },
+  {
+    "slug": "lexeotx",
+    "count": 7
+  },
+  {
+    "slug": "maverickx",
+    "count": 7
+  },
+  {
+    "slug": "okendo",
+    "count": 7
+  },
+  {
+    "slug": "openx",
+    "count": 7
+  },
+  {
+    "slug": "younited",
+    "count": 7
+  },
+  {
+    "slug": "zippi",
+    "count": 7
+  },
+  {
+    "slug": "zushealth",
+    "count": 7
+  },
+  {
+    "slug": "advocate",
+    "count": 6
+  },
+  {
+    "slug": "bluesight",
+    "count": 6
+  },
+  {
+    "slug": "canvasmedical",
+    "count": 6
+  },
+  {
+    "slug": "cents",
+    "count": 6
+  },
+  {
+    "slug": "corner-health",
+    "count": 6
+  },
+  {
+    "slug": "diversified-automation",
+    "count": 6
+  },
+  {
+    "slug": "electric-twin",
+    "count": 6
+  },
+  {
+    "slug": "enable",
+    "count": 6
+  },
+  {
+    "slug": "epsilon3",
+    "count": 6
+  },
+  {
+    "slug": "kapta-space",
+    "count": 6
+  },
+  {
+    "slug": "logrocket",
+    "count": 6
+  },
+  {
+    "slug": "lovepop",
+    "count": 6
+  },
+  {
+    "slug": "oci",
+    "count": 6
+  },
+  {
+    "slug": "paralleldomain",
+    "count": 6
+  },
+  {
+    "slug": "prismic",
+    "count": 6
+  },
+  {
+    "slug": "rapidai",
+    "count": 6
+  },
+  {
+    "slug": "seattleartmuseum",
+    "count": 6
+  },
+  {
+    "slug": "sep",
+    "count": 6
+  },
+  {
+    "slug": "skio",
+    "count": 6
+  },
+  {
+    "slug": "teikametrics",
+    "count": 6
+  },
+  {
+    "slug": "voltalabs",
+    "count": 6
+  },
+  {
+    "slug": "zerotier",
+    "count": 6
+  },
+  {
+    "slug": "basis",
+    "count": 5
+  },
+  {
+    "slug": "cambiumnetworks",
+    "count": 5
+  },
+  {
+    "slug": "cef",
+    "count": 5
+  },
+  {
+    "slug": "d2l",
+    "count": 5
+  },
+  {
+    "slug": "fantasy",
+    "count": 5
+  },
+  {
+    "slug": "houzz",
+    "count": 5
+  },
+  {
+    "slug": "instrument",
+    "count": 5
+  },
+  {
+    "slug": "kixie",
+    "count": 5
+  },
+  {
+    "slug": "koalahealth",
+    "count": 5
+  },
+  {
+    "slug": "levelup",
+    "count": 5
+  },
+  {
+    "slug": "maya",
+    "count": 5
+  },
+  {
+    "slug": "minted",
+    "count": 5
+  },
+  {
+    "slug": "niagenbioscience",
+    "count": 5
+  },
+  {
+    "slug": "payactiv",
+    "count": 5
+  },
+  {
+    "slug": "pendulum",
+    "count": 5
+  },
+  {
+    "slug": "reviverx",
+    "count": 5
+  },
+  {
+    "slug": "securecodewarrior",
+    "count": 5
+  },
+  {
+    "slug": "siteground",
+    "count": 5
+  },
+  {
+    "slug": "source",
+    "count": 5
+  },
+  {
+    "slug": "sysdig",
+    "count": 5
+  },
+  {
+    "slug": "text",
+    "count": 5
+  },
+  {
+    "slug": "trellis",
+    "count": 5
+  },
+  {
+    "slug": "zerorisc",
+    "count": 5
+  },
+  {
+    "slug": "activetheory",
+    "count": 4
+  },
+  {
+    "slug": "agtonomy",
+    "count": 4
+  },
+  {
+    "slug": "bosonai",
+    "count": 4
+  },
+  {
+    "slug": "brilliant",
+    "count": 4
+  },
+  {
+    "slug": "callan",
+    "count": 4
+  },
+  {
+    "slug": "caremessage",
+    "count": 4
+  },
+  {
+    "slug": "catalist",
+    "count": 4
+  },
+  {
+    "slug": "collabora",
+    "count": 4
+  },
+  {
+    "slug": "cred",
+    "count": 4
+  },
+  {
+    "slug": "crossing-minds",
+    "count": 4
+  },
+  {
+    "slug": "distru",
+    "count": 4
+  },
+  {
+    "slug": "dollskill",
+    "count": 4
+  },
+  {
+    "slug": "eternal",
+    "count": 4
+  },
+  {
+    "slug": "fatetherapeutics",
+    "count": 4
+  },
+  {
+    "slug": "fenwaysports",
+    "count": 4
+  },
+  {
+    "slug": "genesis",
+    "count": 4
+  },
+  {
+    "slug": "idealistconsulting",
+    "count": 4
+  },
+  {
+    "slug": "ideasunited",
+    "count": 4
+  },
+  {
+    "slug": "jobvite",
+    "count": 4
+  },
+  {
+    "slug": "juneshine",
+    "count": 4
+  },
+  {
+    "slug": "kolibrigames",
+    "count": 4
+  },
+  {
+    "slug": "ladders",
+    "count": 4
+  },
+  {
+    "slug": "leantaas",
+    "count": 4
+  },
+  {
+    "slug": "pinkoi",
+    "count": 4
+  },
+  {
+    "slug": "prometheanworld",
+    "count": 4
+  },
+  {
+    "slug": "proof",
+    "count": 4
+  },
+  {
+    "slug": "ranger",
+    "count": 4
+  },
+  {
+    "slug": "robust-ai",
+    "count": 4
+  },
+  {
+    "slug": "shopreli",
+    "count": 4
+  },
+  {
+    "slug": "softheon",
+    "count": 4
+  },
+  {
+    "slug": "thunkable",
+    "count": 4
+  },
+  {
+    "slug": "torchdental",
+    "count": 4
+  },
+  {
+    "slug": "twodots",
+    "count": 4
+  },
+  {
+    "slug": "valkyrietrading",
+    "count": 4
+  },
+  {
+    "slug": "verdigris",
+    "count": 4
+  },
+  {
+    "slug": "verifiable",
+    "count": 4
+  },
+  {
+    "slug": "voltai",
+    "count": 4
+  },
+  {
+    "slug": "adora",
+    "count": 3
+  },
+  {
+    "slug": "biodigital",
+    "count": 3
+  },
+  {
+    "slug": "businesswire",
+    "count": 3
+  },
+  {
+    "slug": "clicktime",
+    "count": 3
+  },
+  {
+    "slug": "conversica",
+    "count": 3
+  },
+  {
+    "slug": "deepgenomics",
+    "count": 3
+  },
+  {
+    "slug": "dnagenotek",
+    "count": 3
+  },
+  {
+    "slug": "earthspecies",
+    "count": 3
+  },
+  {
+    "slug": "enforceconsulting",
+    "count": 3
+  },
+  {
+    "slug": "futo",
+    "count": 3
+  },
+  {
+    "slug": "futo-org",
+    "count": 3
+  },
+  {
+    "slug": "innodata",
+    "count": 3
+  },
+  {
+    "slug": "krypton",
+    "count": 3
+  },
+  {
+    "slug": "logz",
+    "count": 3
+  },
+  {
+    "slug": "mutares",
+    "count": 3
+  },
+  {
+    "slug": "nevados",
+    "count": 3
+  },
+  {
+    "slug": "newton",
+    "count": 3
+  },
+  {
+    "slug": "optionmetrics",
+    "count": 3
+  },
+  {
+    "slug": "peerspace",
+    "count": 3
+  },
+  {
+    "slug": "plume",
+    "count": 3
+  },
+  {
+    "slug": "quartzy",
+    "count": 3
+  },
+  {
+    "slug": "questanalytics",
+    "count": 3
+  },
+  {
+    "slug": "quiq",
+    "count": 3
+  },
+  {
+    "slug": "relay",
+    "count": 3
+  },
+  {
+    "slug": "renofi",
+    "count": 3
+  },
+  {
+    "slug": "researchgate",
+    "count": 3
+  },
+  {
+    "slug": "scality",
+    "count": 3
+  },
+  {
+    "slug": "simpleventures",
+    "count": 3
+  },
+  {
+    "slug": "softdocs",
+    "count": 3
+  },
+  {
+    "slug": "sonrai-security",
+    "count": 3
+  },
+  {
+    "slug": "swissborg",
+    "count": 3
+  },
+  {
+    "slug": "synapticure",
+    "count": 3
+  },
+  {
+    "slug": "tact",
+    "count": 3
+  },
+  {
+    "slug": "teller",
+    "count": 3
+  },
+  {
+    "slug": "unifyconsulting",
+    "count": 3
+  },
+  {
+    "slug": "zeiss",
+    "count": 3
+  },
+  {
+    "slug": "adhoclabs",
+    "count": 2
+  },
+  {
+    "slug": "aerostrat",
+    "count": 2
+  },
+  {
+    "slug": "altarum",
+    "count": 2
+  },
+  {
+    "slug": "autonomous",
+    "count": 2
+  },
+  {
+    "slug": "backerkit",
+    "count": 2
+  },
+  {
+    "slug": "bolster",
+    "count": 2
+  },
+  {
+    "slug": "buildingswell",
+    "count": 2
+  },
+  {
+    "slug": "checker",
+    "count": 2
+  },
+  {
+    "slug": "copilotkit",
+    "count": 2
+  },
+  {
+    "slug": "demiurgestudios",
+    "count": 2
+  },
+  {
+    "slug": "ellevationeducation",
+    "count": 2
+  },
+  {
+    "slug": "engine",
+    "count": 2
+  },
+  {
+    "slug": "findhelp",
+    "count": 2
+  },
+  {
+    "slug": "fintual",
+    "count": 2
+  },
+  {
+    "slug": "galatea",
+    "count": 2
+  },
+  {
+    "slug": "galatea-associates",
+    "count": 2
+  },
+  {
+    "slug": "gynger",
+    "count": 2
+  },
+  {
+    "slug": "healthcare",
+    "count": 2
+  },
+  {
+    "slug": "healx",
+    "count": 2
+  },
+  {
+    "slug": "jupe",
+    "count": 2
+  },
+  {
+    "slug": "keboola",
+    "count": 2
+  },
+  {
+    "slug": "lucidworks",
+    "count": 2
+  },
+  {
+    "slug": "mulliganfunding",
+    "count": 2
+  },
+  {
+    "slug": "nimbus",
+    "count": 2
+  },
+  {
+    "slug": "picktrace",
+    "count": 2
+  },
+  {
+    "slug": "plexus",
+    "count": 2
+  },
+  {
+    "slug": "poki",
+    "count": 2
+  },
+  {
+    "slug": "postera",
+    "count": 2
+  },
+  {
+    "slug": "shakacode",
+    "count": 2
+  },
+  {
+    "slug": "silverbackstrategies",
+    "count": 2
+  },
+  {
+    "slug": "smartcuts",
+    "count": 2
+  },
+  {
+    "slug": "synthego",
+    "count": 2
+  },
+  {
+    "slug": "theculinistas",
+    "count": 2
+  },
+  {
+    "slug": "toku",
+    "count": 2
+  },
+  {
+    "slug": "viget",
+    "count": 2
+  },
+  {
+    "slug": "wisdomtree",
+    "count": 2
+  },
+  {
+    "slug": "xtb",
+    "count": 2
+  },
+  {
+    "slug": "alector",
+    "count": 1
+  },
+  {
+    "slug": "anyroad",
+    "count": 1
+  },
+  {
+    "slug": "anyscale",
+    "count": 1
+  },
+  {
+    "slug": "apolloagriculture",
+    "count": 1
+  },
+  {
+    "slug": "articulate",
+    "count": 1
+  },
+  {
+    "slug": "benchsci",
+    "count": 1
+  },
+  {
+    "slug": "biorender",
+    "count": 1
+  },
+  {
+    "slug": "catalyze",
+    "count": 1
+  },
+  {
+    "slug": "culdesac",
+    "count": 1
+  },
+  {
+    "slug": "dwolla",
+    "count": 1
+  },
+  {
+    "slug": "energeticcapital",
+    "count": 1
+  },
+  {
+    "slug": "fuellabs",
+    "count": 1
+  },
+  {
+    "slug": "fundrise",
+    "count": 1
+  },
+  {
+    "slug": "goodeggs",
+    "count": 1
+  },
+  {
+    "slug": "guardsquare",
+    "count": 1
+  },
+  {
+    "slug": "horizon",
+    "count": 1
+  },
+  {
+    "slug": "kinter",
+    "count": 1
+  },
+  {
+    "slug": "ledger",
+    "count": 1
+  },
+  {
+    "slug": "livingcarbon",
+    "count": 1
+  },
+  {
+    "slug": "marquetteassociates",
+    "count": 1
+  },
+  {
+    "slug": "marqvision",
+    "count": 1
+  },
+  {
+    "slug": "matrixpartners",
+    "count": 1
+  },
+  {
+    "slug": "moneytree",
+    "count": 1
+  },
+  {
+    "slug": "polleverywhere",
+    "count": 1
+  },
+  {
+    "slug": "powerex",
+    "count": 1
+  },
+  {
+    "slug": "provi",
+    "count": 1
+  },
+  {
+    "slug": "quantcast",
+    "count": 1
+  },
+  {
+    "slug": "raine",
+    "count": 1
+  },
+  {
+    "slug": "retired",
+    "count": 1
+  },
+  {
+    "slug": "rupa",
+    "count": 1
+  },
+  {
+    "slug": "sapling",
+    "count": 1
+  },
+  {
+    "slug": "sesame",
+    "count": 1
+  },
+  {
+    "slug": "shiru",
+    "count": 1
+  },
+  {
+    "slug": "skyboxlabs",
+    "count": 1
+  },
+  {
+    "slug": "stackblitz",
+    "count": 1
+  },
+  {
+    "slug": "stockpile",
+    "count": 1
+  },
+  {
+    "slug": "stradaeducation",
+    "count": 1
+  },
+  {
+    "slug": "straighterline",
+    "count": 1
+  },
+  {
+    "slug": "symplicity",
+    "count": 1
+  },
+  {
+    "slug": "theorycraftgames",
+    "count": 1
+  },
+  {
+    "slug": "thimble",
+    "count": 1
+  },
+  {
+    "slug": "trio",
+    "count": 1
+  },
+  {
+    "slug": "ucsf",
+    "count": 1
+  },
+  {
+    "slug": "viaseparations",
+    "count": 1
+  },
+  {
+    "slug": "viome",
+    "count": 1
+  },
+  {
+    "slug": "visby",
+    "count": 1
+  },
+  {
+    "slug": "visotrust",
+    "count": 1
+  },
+  {
+    "slug": "whereby",
+    "count": 1
+  },
+  {
+    "slug": "adtech",
+    "count": 0
+  },
+  {
+    "slug": "aechelon",
+    "count": 0
+  },
+  {
+    "slug": "agolo",
+    "count": 0
+  },
+  {
+    "slug": "airtasker",
+    "count": 0
+  },
+  {
+    "slug": "aiwyn",
+    "count": 0
+  },
+  {
+    "slug": "alliance",
+    "count": 0
+  },
+  {
+    "slug": "alltrails",
+    "count": 0
+  },
+  {
+    "slug": "angel",
+    "count": 0
+  },
+  {
+    "slug": "anjuna",
+    "count": 0
+  },
+  {
+    "slug": "aofl",
+    "count": 0
+  },
+  {
+    "slug": "aquarium",
+    "count": 0
+  },
+  {
+    "slug": "aragon",
+    "count": 0
+  },
+  {
+    "slug": "asendia",
+    "count": 0
+  },
+  {
+    "slug": "atlassian",
+    "count": 0
+  },
+  {
+    "slug": "attabotics",
+    "count": 0
+  },
+  {
+    "slug": "autonomys",
+    "count": 0
+  },
+  {
+    "slug": "axl",
+    "count": 0
+  },
+  {
+    "slug": "beam",
+    "count": 0
+  },
+  {
+    "slug": "bearflagrobotics",
+    "count": 0
+  },
+  {
+    "slug": "beta",
+    "count": 0
+  },
+  {
+    "slug": "better",
+    "count": 0
+  },
+  {
+    "slug": "bighealth",
+    "count": 0
+  },
+  {
+    "slug": "blueorigin",
+    "count": 0
+  },
+  {
+    "slug": "brighthire",
+    "count": 0
+  },
+  {
+    "slug": "brightwheel",
+    "count": 0
+  },
+  {
+    "slug": "buildium",
+    "count": 0
+  },
+  {
+    "slug": "butcherbox",
+    "count": 0
+  },
+  {
+    "slug": "certifid",
+    "count": 0
+  },
+  {
+    "slug": "clerky",
+    "count": 0
+  },
+  {
+    "slug": "color",
+    "count": 0
+  },
+  {
+    "slug": "conduit",
+    "count": 0
+  },
+  {
+    "slug": "constellation",
+    "count": 0
+  },
+  {
+    "slug": "cornerstone",
+    "count": 0
+  },
+  {
+    "slug": "crypticstudios",
+    "count": 0
+  },
+  {
+    "slug": "curri",
+    "count": 0
+  },
+  {
+    "slug": "dealerware",
+    "count": 0
+  },
+  {
+    "slug": "delphix",
+    "count": 0
+  },
+  {
+    "slug": "demo",
+    "count": 0
+  },
+  {
+    "slug": "dermalogica",
+    "count": 0
+  },
+  {
+    "slug": "devcycle",
+    "count": 0
+  },
+  {
+    "slug": "developers",
+    "count": 0
+  },
+  {
+    "slug": "edera",
+    "count": 0
+  },
+  {
+    "slug": "end",
+    "count": 0
+  },
+  {
+    "slug": "ezcater",
+    "count": 0
+  },
+  {
+    "slug": "falcon",
+    "count": 0
+  },
+  {
+    "slug": "fevo",
+    "count": 0
+  },
+  {
+    "slug": "flare",
+    "count": 0
+  },
+  {
+    "slug": "flatfile",
+    "count": 0
+  },
+  {
+    "slug": "fond",
+    "count": 0
+  },
+  {
+    "slug": "form",
+    "count": 0
+  },
+  {
+    "slug": "forterra",
+    "count": 0
+  },
+  {
+    "slug": "fortress",
+    "count": 0
+  },
+  {
+    "slug": "freshworks",
+    "count": 0
+  },
+  {
+    "slug": "gamma",
+    "count": 0
+  },
+  {
+    "slug": "gearset",
+    "count": 0
+  },
+  {
+    "slug": "genome-medical",
+    "count": 0
+  },
+  {
+    "slug": "givewell",
+    "count": 0
+  },
+  {
+    "slug": "graylog",
+    "count": 0
+  },
+  {
+    "slug": "gridmatic",
+    "count": 0
+  },
+  {
+    "slug": "heard",
+    "count": 0
+  },
+  {
+    "slug": "hexa",
+    "count": 0
+  },
+  {
+    "slug": "hint",
+    "count": 0
+  },
+  {
+    "slug": "hostinger",
+    "count": 0
+  },
+  {
+    "slug": "humaans",
+    "count": 0
+  },
+  {
+    "slug": "idfusion",
+    "count": 0
+  },
+  {
+    "slug": "illumix",
+    "count": 0
+  },
+  {
+    "slug": "imbue",
+    "count": 0
+  },
+  {
+    "slug": "increase",
+    "count": 0
+  },
+  {
+    "slug": "inductiveautomation",
+    "count": 0
+  },
+  {
+    "slug": "instructure",
+    "count": 0
+  },
+  {
+    "slug": "issuu",
+    "count": 0
+  },
+  {
+    "slug": "itrex",
+    "count": 0
+  },
+  {
+    "slug": "ivo",
+    "count": 0
+  },
+  {
+    "slug": "jagex",
+    "count": 0
+  },
+  {
+    "slug": "jetbrains",
+    "count": 0
+  },
+  {
+    "slug": "joinformal",
+    "count": 0
+  },
+  {
+    "slug": "keepsafe",
+    "count": 0
+  },
+  {
+    "slug": "kekstcnc",
+    "count": 0
+  },
+  {
+    "slug": "kpmg",
+    "count": 0
+  },
+  {
+    "slug": "kraken",
+    "count": 0
+  },
+  {
+    "slug": "labelbox",
+    "count": 0
+  },
+  {
+    "slug": "leadspace",
+    "count": 0
+  },
+  {
+    "slug": "lever",
+    "count": 0
+  },
+  {
+    "slug": "logically",
+    "count": 0
+  },
+  {
+    "slug": "lumin",
+    "count": 0
+  },
+  {
+    "slug": "manifest",
+    "count": 0
+  },
+  {
+    "slug": "marcopolo",
+    "count": 0
+  },
+  {
+    "slug": "matterworks",
+    "count": 0
+  },
+  {
+    "slug": "maxmind",
+    "count": 0
+  },
+  {
+    "slug": "medium",
+    "count": 0
+  },
+  {
+    "slug": "metaview",
+    "count": 0
+  },
+  {
+    "slug": "mimic",
+    "count": 0
+  },
+  {
+    "slug": "mirror",
+    "count": 0
+  },
+  {
+    "slug": "mistral",
+    "count": 0
+  },
+  {
+    "slug": "mit",
+    "count": 0
+  },
+  {
+    "slug": "mitratech",
+    "count": 0
+  },
+  {
+    "slug": "morningconsult",
+    "count": 0
+  },
+  {
+    "slug": "mosaic-2",
+    "count": 0
+  },
+  {
+    "slug": "moxxi-digital",
+    "count": 0
+  },
+  {
+    "slug": "myvest",
+    "count": 0
+  },
+  {
+    "slug": "nango",
+    "count": 0
+  },
+  {
+    "slug": "narmi",
+    "count": 0
+  },
+  {
+    "slug": "nationaljournal",
+    "count": 0
+  },
+  {
+    "slug": "nava",
+    "count": 0
+  },
+  {
+    "slug": "netflix",
+    "count": 0
+  },
+  {
+    "slug": "nielsen",
+    "count": 0
+  },
+  {
+    "slug": "nominal",
+    "count": 0
+  },
+  {
+    "slug": "nrwl",
+    "count": 0
+  },
+  {
+    "slug": "observablehq",
+    "count": 0
+  },
+  {
+    "slug": "pachama",
+    "count": 0
+  },
+  {
+    "slug": "pillar",
+    "count": 0
+  },
+  {
+    "slug": "pillarbiosciences",
+    "count": 0
+  },
+  {
+    "slug": "pip",
+    "count": 0
+  },
+  {
+    "slug": "pipedream",
+    "count": 0
+  },
+  {
+    "slug": "plaid",
+    "count": 0
+  },
+  {
+    "slug": "playco",
+    "count": 0
+  },
+  {
+    "slug": "plivo",
+    "count": 0
+  },
+  {
+    "slug": "prelim",
+    "count": 0
+  },
+  {
+    "slug": "proximafusion",
+    "count": 0
+  },
+  {
+    "slug": "purchasingplatform",
+    "count": 0
+  },
+  {
+    "slug": "pushsecurity",
+    "count": 0
+  },
+  {
+    "slug": "rackspace",
+    "count": 0
+  },
+  {
+    "slug": "raiclabs",
+    "count": 0
+  },
+  {
+    "slug": "ramenvr",
+    "count": 0
+  },
+  {
+    "slug": "recess",
+    "count": 0
+  },
+  {
+    "slug": "recurrency",
+    "count": 0
+  },
+  {
+    "slug": "reliable",
+    "count": 0
+  },
+  {
+    "slug": "revel",
+    "count": 0
+  },
+  {
+    "slug": "sanctuary",
+    "count": 0
+  },
+  {
+    "slug": "saronic",
+    "count": 0
+  },
+  {
+    "slug": "semble",
+    "count": 0
+  },
+  {
+    "slug": "sensortower",
+    "count": 0
+  },
+  {
+    "slug": "sibros",
+    "count": 0
+  },
+  {
+    "slug": "signal",
+    "count": 0
+  },
+  {
+    "slug": "simplybusiness",
+    "count": 0
+  },
+  {
+    "slug": "skysafe",
+    "count": 0
+  },
+  {
+    "slug": "slate",
+    "count": 0
+  },
+  {
+    "slug": "solvhealth",
+    "count": 0
+  },
+  {
+    "slug": "souffle-therapeutics",
+    "count": 0
+  },
+  {
+    "slug": "spectrum",
+    "count": 0
+  },
+  {
+    "slug": "stackhawk",
+    "count": 0
+  },
+  {
+    "slug": "stardog",
+    "count": 0
+  },
+  {
+    "slug": "strongcompute",
+    "count": 0
+  },
+  {
+    "slug": "sumo-digital",
+    "count": 0
+  },
+  {
+    "slug": "superpedestrian",
+    "count": 0
+  },
+  {
+    "slug": "sure",
+    "count": 0
+  },
+  {
+    "slug": "symmetryinvestments",
+    "count": 0
+  },
+  {
+    "slug": "tag",
+    "count": 0
+  },
+  {
+    "slug": "tecton",
+    "count": 0
+  },
+  {
+    "slug": "teleport",
+    "count": 0
+  },
+  {
+    "slug": "tesorio",
+    "count": 0
+  },
+  {
+    "slug": "textnow",
+    "count": 0
+  },
+  {
+    "slug": "transcarent",
+    "count": 0
+  },
+  {
+    "slug": "trela",
+    "count": 0
+  },
+  {
+    "slug": "unico",
+    "count": 0
+  },
+  {
+    "slug": "valence",
+    "count": 0
+  },
+  {
+    "slug": "vergegenomics",
+    "count": 0
+  },
+  {
+    "slug": "vergesense",
+    "count": 0
+  },
+  {
+    "slug": "vidrovr",
+    "count": 0
+  },
+  {
+    "slug": "voleon",
+    "count": 0
+  },
+  {
+    "slug": "warmly",
+    "count": 0
+  },
+  {
+    "slug": "wealthsimple",
+    "count": 0
+  },
+  {
+    "slug": "wisdomai",
+    "count": 0
+  },
+  {
+    "slug": "worldover",
+    "count": 0
+  },
+  {
+    "slug": "wristcheck",
+    "count": 0
+  },
+  {
+    "slug": "xilis",
+    "count": 0
+  }
+]

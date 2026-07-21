@@ -78,7 +78,19 @@ describe('lever adapter', () => {
       expect(first.salaryCurrency).toBe('USD');
       expect(first.postedAt).toBeDefined();
       expect(first.description.length).toBeGreaterThan(0);
-      expect(first.rawSourceData).toBeDefined();
+    });
+    it('applies the accept predicate: reject-all yields [], accept-all keeps jobs', async () => {
+      const fixture = loadFixture();
+      const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+        new Response(JSON.stringify(fixture), { status: 200 }),
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const rejected = await lever.fetch(makeConfig(['examplecorp']), { accept: () => false });
+      expect(rejected).toEqual([]);
+
+      const accepted = await lever.fetch(makeConfig(['examplecorp']), { accept: () => true });
+      expect(accepted.length).toBeGreaterThan(0);
     });
     it('detects hybrid workplaceType', async () => {
       const fixture = loadFixture();

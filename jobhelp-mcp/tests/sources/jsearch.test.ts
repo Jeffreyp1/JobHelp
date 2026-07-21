@@ -86,7 +86,17 @@ describe('jsearch adapter', () => {
       expect(first.salaryMax).toBe(160000);
       expect(first.salaryCurrency).toBe('USD');
       expect(first.postedAt).toBeDefined();
-      expect(first.rawSourceData).toBeDefined();
+    });
+
+    it('applies accept predicate to filter normalized jobs', async () => {
+      const fetchMock = vi.fn(async () => okResponse([job('a1', 'Software Engineer')]));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const rejected = await jsearch.fetch(makeConfig(['software engineer']), { accept: () => false });
+      expect(rejected).toEqual([]);
+
+      const accepted = await jsearch.fetch(makeConfig(['software engineer']), { accept: () => true });
+      expect(accepted.length).toBeGreaterThan(0);
     });
 
     it('requests num_pages=20 in a single call (M4)', async () => {

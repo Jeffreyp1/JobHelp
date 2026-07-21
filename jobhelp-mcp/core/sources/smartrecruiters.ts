@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -62,7 +63,7 @@ function parsePosting(slug: string, raw: unknown): SmartRecruitersPosting | unde
   };
 }
 
-function normalize(slug: string, p: SmartRecruitersPosting, raw: unknown): NormalizedJob {
+function normalize(slug: string, p: SmartRecruitersPosting): NormalizedJob {
   const remote = detectRemoteMode(`${p.title} ${p.location} ${p.description}`);
   const norm: NormalizedJob = {
     id: `smartrecruiters:${p.id}`,
@@ -73,7 +74,6 @@ function normalize(slug: string, p: SmartRecruitersPosting, raw: unknown): Norma
     location: p.location,
     remote,
     description: p.description,
-    rawSourceData: raw,
     ...((): { postedAt: string } | object => {
       const iso = asIsoString(p.publishedAt);
       return iso !== undefined ? { postedAt: iso } : {};
@@ -82,11 +82,11 @@ function normalize(slug: string, p: SmartRecruitersPosting, raw: unknown): Norma
   return norm;
 }
 
-async function fetchBoard(slug: string): Promise<{ totalFound: number; content: unknown[] }> {
+async function fetchBoard(slug: string, http?: SharedHttpOptions): Promise<{ totalFound: number; content: unknown[] }> {
   const url = `https://api.smartrecruiters.com/v1/companies/${encodeURIComponent(slug)}/postings?limit=100`;
-  let response: Response;
+  let response: HttpTextResult;
   try {
-    response = await fetch(url);
+    response = await httpGetText(url, { ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `smartrecruiters network error: ${msg}`);
@@ -94,10 +94,9 @@ async function fetchBoard(slug: string): Promise<{ totalFound: number; content: 
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `smartrecruiters HTTP ${response.status}`);
   }
-  const text = await response.text();
   let body: unknown;
   try {
-    body = JSON.parse(text) as unknown;
+    body = JSON.parse(response.bodyText) as unknown;
   } catch {
     throw new SourceFetchError('parse', 'smartrecruiters response was not valid JSON');
   }
@@ -116,12 +115,19 @@ async function fetchBoard(slug: string): Promise<{ totalFound: number; content: 
   return { totalFound, content };
 }
 
-async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void> {
-  const { content } = await fetchBoard(slug);
+async function fetchAndCollect(
+  slug: string,
+  out: NormalizedJob[],
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<void> {
+  const { content } = await fetchBoard(slug, http);
   for (const raw of content) {
     const parsed = parsePosting(slug, raw);
     if (parsed === undefined) continue;
-    out.push(normalize(slug, parsed, raw));
+    const job = normalize(slug, parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
 }
 
@@ -131,15 +137,17 @@ export const smartrecruiters: SourceAdapter = {
     const c = config.sources.smartrecruiters;
     return c !== undefined && c.tokens.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.smartrecruiters;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'smartrecruiters config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const results = await Promise.allSettled(
       c.tokens.map(async (slug: string): Promise<{ slug: string; jobs: NormalizedJob[] }> => {
         const local: NormalizedJob[] = [];
-        await fetchAndCollect(slug, local);
+        await fetchAndCollect(slug, local, accept, http);
         return { slug, jobs: local };
       }),
     );

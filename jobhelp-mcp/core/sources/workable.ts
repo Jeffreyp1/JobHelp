@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob, RemoteMode } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -72,7 +73,7 @@ function parseWorkableJob(raw: unknown): WorkableJob | undefined {
   return { id, title, location, description, telecommuting, createdAt };
 }
 
-function normalize(slug: string, company: string, job: WorkableJob, raw: unknown): NormalizedJob {
+function normalize(slug: string, company: string, job: WorkableJob): NormalizedJob {
   const remote = detectWorkableRemote(job.telecommuting, `${job.title} ${job.location} ${job.description}`);
   const norm: NormalizedJob = {
     id: `workable:${job.id}`,
@@ -83,7 +84,6 @@ function normalize(slug: string, company: string, job: WorkableJob, raw: unknown
     location: job.location,
     remote,
     description: job.description,
-    rawSourceData: raw,
     ...((): { postedAt: string } | object => {
       const iso = asIsoString(job.createdAt);
       return iso !== undefined ? { postedAt: iso } : {};
@@ -92,11 +92,11 @@ function normalize(slug: string, company: string, job: WorkableJob, raw: unknown
   return norm;
 }
 
-async function fetchAccount(slug: string): Promise<unknown> {
+async function fetchAccount(slug: string, http?: SharedHttpOptions): Promise<unknown> {
   const url = `https://apply.workable.com/api/v1/widget/accounts/${encodeURIComponent(slug)}?details=true`;
-  let response: Response;
+  let response: HttpTextResult;
   try {
-    response = await fetch(url);
+    response = await httpGetText(url, { ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `workable network error: ${msg}`);
@@ -104,16 +104,20 @@ async function fetchAccount(slug: string): Promise<unknown> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `workable HTTP ${response.status}`);
   }
-  const text = await response.text();
   try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(response.bodyText) as unknown;
   } catch {
     throw new SourceFetchError('parse', 'workable response was not valid JSON');
   }
 }
 
-async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void> {
-  const body = await fetchAccount(slug);
+async function fetchAndCollect(
+  slug: string,
+  out: NormalizedJob[],
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<void> {
+  const body = await fetchAccount(slug, http);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'workable response was not an object');
   }
@@ -134,7 +138,9 @@ async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void
   for (const raw of jobs) {
     const parsed = parseWorkableJob(raw);
     if (parsed === undefined) continue;
-    out.push(normalize(slug, accountName, parsed, raw));
+    const job = normalize(slug, accountName, parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
 }
 
@@ -144,14 +150,16 @@ export const workable: SourceAdapter = {
     const c = config.sources.workable;
     return c !== undefined && c.tokens.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.workable;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'workable config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const tasks = c.tokens.map((slug) => async (): Promise<{ slug: string; jobs: NormalizedJob[] }> => {
       const local: NormalizedJob[] = [];
-      await fetchAndCollect(slug, local);
+      await fetchAndCollect(slug, local, accept, http);
       return { slug, jobs: local };
     });
     const results = await runWithConcurrency(tasks, { limit: MAX_CONCURRENT, throttleMs: THROTTLE_MS });

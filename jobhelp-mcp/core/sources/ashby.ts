@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob, RemoteMode } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -13,7 +14,8 @@ import {
 } from './_shared.js';
 
 // Ashby has no observed rate limit; fetch boards aggressively in parallel.
-const ASHBY_CONCURRENCY = 35;
+// No observed rate limit; 50 measured marginally faster than 35 with zero errors (2026-06-12).
+const ASHBY_CONCURRENCY = 50;
 
 export { SourceFetchError };
 
@@ -92,7 +94,7 @@ function parseAshbyJob(raw: unknown): AshbyJob | undefined {
   };
 }
 
-function normalize(token: string, job: AshbyJob, raw: Record<string, unknown>): NormalizedJob {
+function normalize(token: string, job: AshbyJob): NormalizedJob {
   const remote = detectRemoteMode(job.workplaceType, `${job.title} ${job.location} ${job.description}`);
   const norm: NormalizedJob = {
     id: `ashby:${job.id}`,
@@ -103,7 +105,6 @@ function normalize(token: string, job: AshbyJob, raw: Record<string, unknown>): 
     location: job.location,
     remote,
     description: job.description,
-    rawSourceData: raw,
     ...(job.salaryMin !== undefined ? { salaryMin: job.salaryMin } : {}),
     ...(job.salaryMax !== undefined ? { salaryMax: job.salaryMax } : {}),
     ...(job.salaryCurrency !== undefined ? { salaryCurrency: job.salaryCurrency } : {}),
@@ -115,11 +116,11 @@ function normalize(token: string, job: AshbyJob, raw: Record<string, unknown>): 
   return norm;
 }
 
-async function fetchBoard(token: string): Promise<unknown> {
+async function fetchBoard(token: string, http?: SharedHttpOptions): Promise<unknown> {
   const url = `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(token)}?includeCompensation=true`;
-  let response: Response;
+  let response: HttpTextResult;
   try {
-    response = await fetch(url);
+    response = await httpGetText(url, { ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `ashby network error: ${msg}`);
@@ -127,16 +128,19 @@ async function fetchBoard(token: string): Promise<unknown> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `ashby HTTP ${response.status}`);
   }
-  const text = await response.text();
   try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(response.bodyText) as unknown;
   } catch {
     throw new SourceFetchError('parse', 'ashby response was not valid JSON');
   }
 }
 
-async function fetchTokenJobs(token: string): Promise<NormalizedJob[]> {
-  const body = await fetchBoard(token);
+async function fetchTokenJobs(
+  token: string,
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<NormalizedJob[]> {
+  const body = await fetchBoard(token, http);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'ashby response was not an object');
   }
@@ -148,7 +152,9 @@ async function fetchTokenJobs(token: string): Promise<NormalizedJob[]> {
   for (const rawJob of jobs) {
     const parsed = parseAshbyJob(rawJob);
     if (parsed === undefined) continue;
-    out.push(normalize(token, parsed, rawJob));
+    const job = normalize(token, parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
   return out;
 }
@@ -159,13 +165,15 @@ export const ashby: SourceAdapter = {
     const c = config.sources.ashby;
     return c !== undefined && c.tokens.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.ashby;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'ashby config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const tokens = c.tokens;
-    const tasks = tokens.map((token) => (): Promise<NormalizedJob[]> => fetchTokenJobs(token));
+    const tasks = tokens.map((token) => (): Promise<NormalizedJob[]> => fetchTokenJobs(token, accept, http));
     const settled = await runWithConcurrency(tasks, { limit: ASHBY_CONCURRENCY });
     const all: NormalizedJob[] = [];
     let lastError: unknown;

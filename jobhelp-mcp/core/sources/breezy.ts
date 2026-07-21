@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob, RemoteMode } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -14,7 +15,8 @@ import {
 export { SourceFetchError };
 
 // Breezy documents 100 req/60s; keep a conservative parallel cap.
-const MAX_CONCURRENT = 2;
+// Each slug is its own *.breezy.hr tenant, so cross-slug parallelism is rate-limit safe.
+const MAX_CONCURRENT = 8;
 
 function stripHtml(html: string): string {
   return html
@@ -111,7 +113,7 @@ function parsePosting(slug: string, raw: unknown): BreezyPosting | undefined {
   };
 }
 
-function normalize(slug: string, p: BreezyPosting, raw: unknown): NormalizedJob {
+function normalize(slug: string, p: BreezyPosting): NormalizedJob {
   const norm: NormalizedJob = {
     id: `breezy:${p.id}`,
     source: 'breezy',
@@ -121,7 +123,6 @@ function normalize(slug: string, p: BreezyPosting, raw: unknown): NormalizedJob 
     location: p.location,
     remote: p.remote,
     description: p.description,
-    rawSourceData: raw,
     ...((): { postedAt: string } | object => {
       const iso = asIsoString(p.publishedAt);
       return iso !== undefined ? { postedAt: iso } : {};
@@ -130,11 +131,11 @@ function normalize(slug: string, p: BreezyPosting, raw: unknown): NormalizedJob 
   return norm;
 }
 
-async function fetchBoard(slug: string): Promise<unknown[]> {
+async function fetchBoard(slug: string, http?: SharedHttpOptions): Promise<unknown[]> {
   const url = `https://${encodeURIComponent(slug)}.breezy.hr/json`;
-  let response: Response;
+  let response: HttpTextResult;
   try {
-    response = await fetch(url, { redirect: 'manual' });
+    response = await httpGetText(url, { redirect: 'manual', ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `breezy network error: ${msg}`);
@@ -145,7 +146,7 @@ async function fetchBoard(slug: string): Promise<unknown[]> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `breezy HTTP ${response.status}`);
   }
-  const text = await response.text();
+  const text = response.bodyText;
   const trimmed = text.trimStart();
   if (!trimmed.startsWith('[')) {
     throw new SourceFetchError('not_found', 'breezy: body did not start with JSON array — likely invalid slug');
@@ -162,12 +163,19 @@ async function fetchBoard(slug: string): Promise<unknown[]> {
   return body;
 }
 
-async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void> {
-  const postings = await fetchBoard(slug);
+async function fetchAndCollect(
+  slug: string,
+  out: NormalizedJob[],
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<void> {
+  const postings = await fetchBoard(slug, http);
   for (const raw of postings) {
     const parsed = parsePosting(slug, raw);
     if (parsed === undefined) continue;
-    out.push(normalize(slug, parsed, raw));
+    const job = normalize(slug, parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
 }
 
@@ -177,14 +185,16 @@ export const breezy: SourceAdapter = {
     const c = config.sources.breezy;
     return c !== undefined && c.tokens.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.breezy;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'breezy config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const tasks = c.tokens.map((slug) => async (): Promise<{ slug: string; jobs: NormalizedJob[] }> => {
       const local: NormalizedJob[] = [];
-      await fetchAndCollect(slug, local);
+      await fetchAndCollect(slug, local, accept, http);
       return { slug, jobs: local };
     });
     const results = await runWithConcurrency(tasks, { limit: MAX_CONCURRENT });

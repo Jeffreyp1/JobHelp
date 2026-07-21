@@ -82,6 +82,28 @@ describe('smartrecruiters adapter', () => {
       expect(first.postedAt).toBe('2026-05-01T12:00:00.000Z');
     });
 
+    it('drops every job when accept returns false', async () => {
+      const fetchMock = vi.fn().mockImplementation(() =>
+        Promise.resolve(new Response(JSON.stringify(srPostingFixture()), { status: 200 })),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const jobs = await smartrecruiters.fetch(makeConfig(['visa']), { accept: () => false });
+
+      expect(jobs).toEqual([]);
+    });
+
+    it('keeps jobs when accept returns true', async () => {
+      const fetchMock = vi.fn().mockImplementation(() =>
+        Promise.resolve(new Response(JSON.stringify(srPostingFixture()), { status: 200 })),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const jobs = await smartrecruiters.fetch(makeConfig(['visa']), { accept: () => true });
+
+      expect(jobs.length).toBeGreaterThan(0);
+    });
+
     it('throws when slug returns totalFound=0 and content=[]', async () => {
       const fetchMock = vi.fn().mockImplementation(() =>
         Promise.resolve(new Response(JSON.stringify({ totalFound: 0, content: [] }), { status: 200 })),

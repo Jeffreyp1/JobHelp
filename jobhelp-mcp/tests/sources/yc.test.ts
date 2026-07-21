@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
 import { yc } from '../../core/sources/yc.js';
+import { isGhostJob } from '../../core/pipeline/classify.js';
 import type { JobDigestConfig } from '../../core/types/config.js';
 
 function makeConfig(queries?: readonly string[]): JobDigestConfig {
@@ -75,7 +76,20 @@ describe('yc adapter', () => {
       expect(first.salaryMin).toBe(150000);
       expect(first.salaryMax).toBe(220000);
       expect(first.salaryCurrency).toBe('USD');
-      expect(first.rawSourceData).toBeDefined();
+    });
+
+    it('drops every job when accept returns false', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jobsResponse([ycJob(42, 'Software Engineer')]));
+      vi.stubGlobal('fetch', fetchMock);
+      const jobs = await yc.fetch(makeConfig(['software engineer']), { accept: () => false });
+      expect(jobs).toEqual([]);
+    });
+
+    it('keeps jobs when accept returns true', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jobsResponse([ycJob(42, 'Software Engineer')]));
+      vi.stubGlobal('fetch', fetchMock);
+      const jobs = await yc.fetch(makeConfig(['software engineer']), { accept: () => true });
+      expect(jobs.length).toBeGreaterThan(0);
     });
 
     it('deduplicates jobs that appear under multiple queries', async () => {
@@ -111,6 +125,19 @@ describe('yc adapter', () => {
       const jobs = await yc.fetch(makeConfig(['broken', 'backend engineer']));
       expect(jobs.length).toBeGreaterThan(0);
       expect(jobs.some((j) => j.id === 'yc:99')).toBe(true);
+    });
+
+    // The WaaS feed only carries roleType/jobType/one-liner, so every normalized
+    // description is <200 chars; this pins the emitted source string to the
+    // ghost-filter short-feed exemption so a rename on either side fails here.
+    it('normalized jobs survive isGhostJob despite the short WaaS description', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jobsResponse([ycJob(42, 'Software Engineer')]));
+      vi.stubGlobal('fetch', fetchMock);
+      const jobs = await yc.fetch(makeConfig(['software engineer']));
+      const first = jobs[0];
+      if (!first) throw new Error('expected job');
+      expect(first.description.length).toBeLessThan(200);
+      expect(isGhostJob(first)).toBe(false);
     });
 
     it('throws when ALL queries fail', async () => {

@@ -98,7 +98,20 @@ describe('weworkremotely adapter', () => {
       expect(first.description).not.toContain('<p>');
       expect(first.description).not.toContain('<strong>');
       expect(first.postedAt).toBeDefined();
-      expect(first.rawSourceData).toBeDefined();
+    });
+
+    it('drops every job when accept returns false', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(rssResponse(HAPPY_FEED));
+      vi.stubGlobal('fetch', fetchMock);
+      const jobs = await weworkremotely.fetch(makeConfig(), { accept: () => false });
+      expect(jobs).toEqual([]);
+    });
+
+    it('keeps jobs when accept returns true', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(rssResponse(HAPPY_FEED));
+      vi.stubGlobal('fetch', fetchMock);
+      const jobs = await weworkremotely.fetch(makeConfig(), { accept: () => true });
+      expect(jobs.length).toBeGreaterThan(0);
     });
 
     it('falls back to location="Remote" when the region tag is empty/absent', async () => {

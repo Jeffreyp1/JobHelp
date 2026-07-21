@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -67,7 +68,7 @@ function parseAdzunaResult(raw: unknown): AdzunaResult | undefined {
   };
 }
 
-function normalize(result: AdzunaResult, raw: unknown, country: string): NormalizedJob {
+function normalize(result: AdzunaResult, country: string): NormalizedJob {
   const remoteText = `${result.title} ${result.description} ${result.location}`;
   const remote = detectRemoteMode(remoteText);
   const hasSalary = result.salaryMin !== undefined || result.salaryMax !== undefined;
@@ -81,7 +82,6 @@ function normalize(result: AdzunaResult, raw: unknown, country: string): Normali
     location: result.location,
     remote,
     description: result.description,
-    rawSourceData: raw,
     ...(result.salaryMin !== undefined ? { salaryMin: result.salaryMin } : {}),
     ...(result.salaryMax !== undefined ? { salaryMax: result.salaryMax } : {}),
     ...(currency !== undefined ? { salaryCurrency: currency } : {}),
@@ -103,10 +103,10 @@ function buildUrl(country: string, query: string, appId: string, appKey: string)
   return `https://api.adzuna.com/v1/api/jobs/${encodeURIComponent(country)}/search/1?${params.toString()}`;
 }
 
-async function fetchOnePage(url: string): Promise<unknown> {
-  let response: Response;
+async function fetchOnePage(url: string, http?: SharedHttpOptions): Promise<unknown> {
+  let response: HttpTextResult;
   try {
-    response = await fetch(url);
+    response = await httpGetText(url, { ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `adzuna network error: ${msg}`);
@@ -114,22 +114,20 @@ async function fetchOnePage(url: string): Promise<unknown> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `adzuna HTTP ${response.status}`);
   }
-  let bodyText: string;
   try {
-    bodyText = await response.text();
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'read failed';
-    throw new SourceFetchError('network', `adzuna body read error: ${msg}`);
-  }
-  try {
-    return JSON.parse(bodyText) as unknown;
+    return JSON.parse(response.bodyText) as unknown;
   } catch {
     throw new SourceFetchError('parse', 'adzuna response was not valid JSON');
   }
 }
 
-async function fetchQueryJobs(url: string, country: string): Promise<NormalizedJob[]> {
-  const body = await fetchOnePage(url);
+async function fetchQueryJobs(
+  url: string,
+  country: string,
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<NormalizedJob[]> {
+  const body = await fetchOnePage(url, http);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'adzuna response was not an object');
   }
@@ -141,7 +139,9 @@ async function fetchQueryJobs(url: string, country: string): Promise<NormalizedJ
   for (const rawResult of results) {
     const parsed = parseAdzunaResult(rawResult);
     if (parsed === undefined) continue;
-    out.push(normalize(parsed, rawResult, country));
+    const job = normalize(parsed, country);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
   return out;
 }
@@ -152,14 +152,16 @@ export const adzuna: SourceAdapter = {
     const c = config.sources.adzuna;
     return c !== undefined && c.appId.length > 0 && c.appKey.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.adzuna;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'adzuna config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const queries = c.queries;
     const tasks = queries.map((query) => (): Promise<NormalizedJob[]> =>
-      fetchQueryJobs(buildUrl(c.country, query, c.appId, c.appKey), c.country));
+      fetchQueryJobs(buildUrl(c.country, query, c.appId, c.appKey), c.country, accept, http));
     const settled = await runWithConcurrency(tasks, { limit: ADZUNA_CONCURRENCY });
     const all: NormalizedJob[] = [];
     let lastError: unknown;

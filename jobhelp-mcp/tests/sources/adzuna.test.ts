@@ -97,7 +97,19 @@ describe('adzuna adapter', () => {
       expect(first.salaryCurrency).toBe('USD');
       expect(first.postedAt).toBe('2026-05-12T14:32:00.000Z');
       expect(first.description.length).toBeGreaterThan(0);
-      expect(first.rawSourceData).toBeDefined();
+    });
+    it('applies the accept predicate: reject-all yields [], accept-all keeps results', async () => {
+      const fixture = loadFixture();
+      const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+        new Response(JSON.stringify(fixture), { status: 200 }),
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const rejected = await adzuna.fetch(makeConfig(), { accept: () => false });
+      expect(rejected).toEqual([]);
+
+      const accepted = await adzuna.fetch(makeConfig(), { accept: () => true });
+      expect(accepted.length).toBeGreaterThan(0);
     });
     it('detects hybrid remote-mode from description', async () => {
       const fixture = loadFixture();
