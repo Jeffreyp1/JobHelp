@@ -46,7 +46,23 @@ export async function formScope(surface: Surface, cfg: AtsConfig): Promise<Locat
   const forms = surface.locator(cfg.formSelector);
   if ((await forms.count()) > 0) return forms.first();
   const bare = surface.locator('form');
-  if ((await bare.count()) > 0) return bare.first();
+  const n = await bare.count();
+  if (n === 1) return bare.first();
+  if (n > 1) {
+    // Multiple bare forms and no configured match: pick the one with the most
+    // fillable controls so a decoy (site search, newsletter) ahead of the real
+    // application form isn't the one we measure and fill.
+    let best = 0;
+    let bestControls = -1;
+    for (let i = 0; i < n; i++) {
+      const controls = await bare.nth(i).locator('input, select, textarea').count().catch(() => 0);
+      if (controls > bestControls) {
+        bestControls = controls;
+        best = i;
+      }
+    }
+    return bare.nth(best);
+  }
   return surface.locator('body').first();
 }
 

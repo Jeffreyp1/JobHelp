@@ -35,6 +35,29 @@ afterAll(async () => {
   await browser?.close();
 });
 
+const MISS_CFG: AtsConfig = { name: 'fake', urlRe: /fake/, formSelector: '#no-such-form', submitSelector: 'button', detect: async () => [] };
+
+describe('formScope fallback to the most-fillable form', () => {
+  it('picks the form with the most fillable controls, not the first', async () => {
+    const page = await openFixture(
+      '<form class="decoy"><input name="q" /></form>' +
+        '<form class="real"><input name="a" /><input name="b" /><textarea name="c"></textarea></form>',
+    );
+    if (page === null) return;
+    const form = await formScope(page, MISS_CFG);
+    expect(await form.getAttribute('class')).toBe('real');
+    await page.close();
+  });
+
+  it('returns the single form when only one exists', async () => {
+    const page = await openFixture('<form class="only"><input name="a" /></form>');
+    if (page === null) return;
+    const form = await formScope(page, MISS_CFG);
+    expect(await form.getAttribute('class')).toBe('only');
+    await page.close();
+  });
+});
+
 describe('resolveSubmitButton', () => {
   it('prefers the configured selector when it matches', async () => {
     const page = await openFixture('<form><button id="go" type="submit">Go</button><button type="submit">Other</button></form>');
