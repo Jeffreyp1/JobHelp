@@ -7,6 +7,7 @@ import type {
   RecencyConfig,
 } from '../types/index.js';
 import { DEFAULT_MAX_AGE, DEFAULT_RECENCY } from '../lib/config-ranking.js';
+import type { ApplicationEntry } from '../state/index.js';
 import { log } from '../lib/log.js';
 import { normalize } from './normalize.js';
 import { dedupe } from './dedupe.js';
@@ -21,6 +22,8 @@ export interface PipelineOverrides {
   readonly recencyEnabled?: boolean;
   // Clock injection for deterministic tests. Defaults to `new Date()`.
   readonly now?: Date;
+  // Applied-history entries forwarded to rank(); only consulted when ranking.history is enabled.
+  readonly applications?: readonly ApplicationEntry[];
 }
 
 function applyOverrides(
@@ -63,7 +66,13 @@ export async function runPipeline(
   const t3 = Date.now();
   const precomputed = buildRankPrecomputed(filtered, effectiveConfig);
   const t4 = Date.now();
-  const ranked = await rank(filtered, effectiveConfig, precomputed, now);
+  const ranked = await rank(
+    filtered,
+    effectiveConfig,
+    precomputed,
+    now,
+    overrides.applications !== undefined ? { applications: overrides.applications } : undefined,
+  );
   const t5 = Date.now();
   log('info', 'pipeline.timing', {
     inputJobs: jobs.length,

@@ -10,6 +10,8 @@ import { merge, type RuleFile as RuleFileShape } from '../../core/rules/merger.j
 import type { JobDigestConfig } from '../../core/types/config.js';
 import type { NormalizedJob } from '../../core/types/job.js';
 import { ALL_ADAPTERS } from '../../core/sources/index.js';
+import { SourceFetchError } from '../../core/sources/_shared.js';
+import { resolveHttpOptions } from '../../core/digest/generate.js';
 import type { ReadRulesResult, ToolError, RulesMode as ToolRulesMode } from './tools-types.js';
 import type { ResourceError, RuleFileContent } from './resources.js';
 
@@ -166,11 +168,12 @@ export async function runAdapterIsolated(
     };
   }
   try {
-    const jobs = await adapter.fetch(config);
+    const jobs = await adapter.fetch(config, { http: resolveHttpOptions() });
     return { source: adapter.name, jobs };
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    return { source: adapter.name, jobs: [], error: { type: 'network', message } };
+    const type = e instanceof SourceFetchError ? e.type : 'network';
+    return { source: adapter.name, jobs: [], error: { type, message } };
   }
 }
 

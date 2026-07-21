@@ -1,5 +1,6 @@
 import type { Result } from '../../core/types/result.js';
 import type {
+  AnalyzeFitArgs,
   ApplicationKind,
   ApplyConfigAnswersArgs,
   FindMatchingJobsArgs,
@@ -132,6 +133,17 @@ export function parseGetJob(
   return { ok: true, value: { id: obj['id'] } };
 }
 
+export function parseGetTriageList(
+  obj: Record<string, unknown>,
+): Result<{ triageK?: number }, ToolError> {
+  const raw = obj['triageK'];
+  if (raw === undefined) return { ok: true, value: {} };
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1) {
+    return bad('triageK must be an integer >= 1');
+  }
+  return { ok: true, value: { triageK: raw } };
+}
+
 export function parseReadRules(
   obj: Record<string, unknown>,
 ): Result<{ mode: RulesMode }, ToolError> {
@@ -152,6 +164,13 @@ export function parseScoreKeywordMatch(
     ok: true,
     value: { resumeMarkdown: obj['resumeMarkdown'], jobId: obj['jobId'] },
   };
+}
+
+export function parseAnalyzeFit(
+  obj: Record<string, unknown>,
+): Result<AnalyzeFitArgs, ToolError> {
+  if (!isString(obj['jobId']) || obj['jobId'].length === 0) return bad('jobId is required');
+  return { ok: true, value: { jobId: obj['jobId'] } };
 }
 
 export function parseStartApplication(
@@ -232,6 +251,7 @@ export function parseDoctor(
 }
 
 const RERANK_MAX_TOP_K = 50;
+const RERANK_MAX_JOB_IDS = 100;
 const RERANK_MAX_INSTRUCTIONS_CHARS = 1000;
 
 export function parseRerankTopJobs(
@@ -240,7 +260,7 @@ export function parseRerankTopJobs(
   if ('fetchFullJDs' in obj && obj['fetchFullJDs'] !== undefined) {
     return bad('fetchFullJDs is not a valid parameter');
   }
-  const out: { topK?: number; instructions?: string } = {};
+  const out: { topK?: number; instructions?: string; jobIds?: readonly string[] } = {};
   if ('topK' in obj) {
     const raw = obj['topK'];
     if (raw !== undefined) {
@@ -248,6 +268,18 @@ export function parseRerankTopJobs(
       if (raw < 1) return bad('topK must be >= 1');
       if (raw > RERANK_MAX_TOP_K) return bad(`topK must be <= ${RERANK_MAX_TOP_K}`);
       out.topK = raw;
+    }
+  }
+  if ('jobIds' in obj) {
+    const raw = obj['jobIds'];
+    if (raw !== undefined) {
+      if (!isStringArray(raw) || raw.length === 0) {
+        return bad('jobIds must be a non-empty array of strings');
+      }
+      if (raw.length > RERANK_MAX_JOB_IDS) {
+        return bad(`jobIds must contain <= ${RERANK_MAX_JOB_IDS} ids`);
+      }
+      out.jobIds = raw;
     }
   }
   if ('instructions' in obj) {

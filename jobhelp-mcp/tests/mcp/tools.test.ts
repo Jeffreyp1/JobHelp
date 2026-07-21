@@ -16,6 +16,7 @@ describe('createTools — surface', () => {
         'get_job',
         'get_latest_digest',
         'get_resume_outline',
+        'get_triage_list',
         'init_config',
         'apply_scoped_resume_edits',
         'apply_validator_resume_edits',
@@ -27,6 +28,7 @@ describe('createTools — surface', () => {
         'read_rules',
         'register_resume',
         'rerank_top_jobs',
+        'analyze_fit',
         'score_keyword_match',
         'set_active_resume',
         'start_application',
@@ -246,6 +248,22 @@ describe('score_keyword_match', () => {
     const tool = getTool(createTools(deps), 'score_keyword_match');
     await tool.invoke({ resumeMarkdown: '# r', jobId: 'a:1' });
     expect(calls.scoreKeywordMatch).toEqual([{ resumeMarkdown: '# r', jobId: 'a:1' }]);
+  });
+});
+
+describe('analyze_fit', () => {
+  it('requires jobId', async () => {
+    const { deps } = makeDeps();
+    const tool = getTool(createTools(deps), 'analyze_fit');
+    const res = await tool.invoke({});
+    expect(res.isError).toBe(true);
+  });
+
+  it('forwards jobId to deps.analyzeFit', async () => {
+    const { deps, calls } = makeDeps();
+    const tool = getTool(createTools(deps), 'analyze_fit');
+    await tool.invoke({ jobId: 'a:1' });
+    expect(calls.analyzeFit).toEqual([{ jobId: 'a:1' }]);
   });
 });
 

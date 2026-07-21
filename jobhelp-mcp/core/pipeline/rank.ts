@@ -8,27 +8,28 @@ import type {
 } from '../types/index.js';
 import { log } from '../lib/log.js';
 import { escapeRegExp } from '../lib/regexp.js';
-import { DEFAULT_FUSION, DEFAULT_RECENCY, DEFAULT_SOURCE_TRUST } from '../lib/config-ranking.js';
 import {
-  buildCorpus,
-  scoreBM25F,
-  DEFAULT_BM25_PARAMS,
-  type BM25Params,
-  type Corpus,
-  type FieldName,
-} from './bm25.js';
-import { tokenize as defaultTokenize } from './tokenize.js';
-import {
-  getAliasMap,
-  canonicalizeAll,
-  type AliasMap,
-} from './skill-aliases.js';
+  DEFAULT_BLEND_WEIGHTS,
+  DEFAULT_FUSION,
+  DEFAULT_RECENCY,
+  DEFAULT_SOURCE_TRUST,
+} from '../lib/config-ranking.js';
+import { scoreBM25F } from './bm25.js';
+import { buildRankPrecomputed, type RankPrecomputed } from './rankQuery.js';
 import {
   buildBm25Rank,
+  buildLevelFitRank,
   buildRecencyRank,
   buildRoleFitRank,
+  buildSemanticRank,
   computeRrf,
 } from './rrf.js';
+import type { Embedder } from './embed.js';
+import { computeBlendScores, seniorityPenaltiesFor } from './blend.js';
+import { computeSemanticSimilarities } from './semanticStage.js';
+import { applyRerank, type Reranker } from './rerank.js';
+import { historyBoostsFor } from './history.js';
+import type { ApplicationEntry } from '../state/index.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -95,81 +96,22 @@ export function computeSourceTrustMultiplier(
   return raw;
 }
 
-function resolveBM25Params(config: JobDigestConfig): BM25Params {
-  const cfg = config.ranking.bm25;
-  if (cfg === undefined) return DEFAULT_BM25_PARAMS;
-  const fw: Record<FieldName, number> = { ...DEFAULT_BM25_PARAMS.fieldWeights };
-  if (cfg.fieldWeights !== undefined) {
-    for (const f of ['title', 'description', 'company', 'location'] as const) {
-      const v = cfg.fieldWeights[f];
-      if (typeof v === 'number') fw[f] = v;
-    }
-  }
-  return {
-    k1: cfg.k1 ?? DEFAULT_BM25_PARAMS.k1,
-    b: cfg.b ?? DEFAULT_BM25_PARAMS.b,
-    fieldWeights: fw,
-    minIdfFloor: cfg.minIdfFloor ?? DEFAULT_BM25_PARAMS.minIdfFloor,
-  };
+export { buildRankPrecomputed, type RankPrecomputed } from './rankQuery.js';
+
+export interface RankDeps {
+  readonly embedder?: Embedder;
+  readonly reranker?: Reranker;
+  readonly applications?: readonly ApplicationEntry[];
 }
 
-function buildQueryTerms(skills: readonly string[], aliases: AliasMap): readonly string[] {
-  const rawTokens: string[] = [];
-  for (const skill of skills) {
-    const toks = defaultTokenize(skill, aliases.multiWordPhrases);
-    for (const t of toks) rawTokens.push(t);
-  }
-  return canonicalizeAll(rawTokens, aliases);
-}
-
-function makeCanonicalTokenizer(aliases: AliasMap): (s: string) => readonly string[] {
-  const phrases = aliases.multiWordPhrases;
-  return (s: string): readonly string[] => {
-    const toks = defaultTokenize(s, phrases);
-    const out: string[] = [];
-    for (const t of toks) {
-      out.push(canonicalizeAll([t], aliases)[0] ?? t.toLowerCase());
-    }
-    return out;
-  };
-}
-
-export interface RankPrecomputed {
-  readonly aliases: AliasMap;
-  readonly tokenize: (s: string) => readonly string[];
-  readonly corpus: Corpus;
-  readonly queryTerms: readonly string[];
-  readonly params: BM25Params;
-}
-
-// Once-per-pipeline-run state shared across all jobs: alias map, tokenizer, corpus, query terms, params.
-export function buildRankPrecomputed(
-  jobs: readonly NormalizedJob[],
-  config: JobDigestConfig,
-): RankPrecomputed {
-  const aliases = getAliasMap();
-  const tokenize = makeCanonicalTokenizer(aliases);
-  const params = resolveBM25Params(config);
-  const queryTerms = buildQueryTerms(config.profile.skills, aliases);
-  const corpus = buildCorpus(
-    jobs.map((j) => ({
-      title: j.title,
-      description: j.description,
-      company: j.company,
-      location: j.location,
-    })),
-    tokenize,
-    queryTerms,
-  );
-  return { aliases, tokenize, corpus, queryTerms, params };
-}
-
-// BM25F × recency half-life × source-trust, optionally fused with RRF. Pure deterministic, no LLM.
+// BM25F × recency half-life × source-trust, optionally fused. Fusion is either RRF (rank-based, +recency/role-fit/semantic lists)
+// or 'blend' (convex score-magnitude mix of normalized BM25 + semantic × seniority penalty). Pure deterministic, no LLM.
 export async function rank(
   jobs: readonly NormalizedJob[],
   config: JobDigestConfig,
   precomputed?: RankPrecomputed,
   now: Date = new Date(),
+  deps?: RankDeps,
 ): Promise<readonly RankedJob[]> {
   if (jobs.length === 0) return [];
 
@@ -195,22 +137,70 @@ export async function rank(
 
   let scored: RankedJob[];
   if (fusionCfg.enabled) {
-    const lists = [
-      buildBm25Rank(jobs, bm25Scores),
-      buildRecencyRank(jobs),
-    ];
-    if (config.profile.roleFamily.length > 0) {
-      lists.push(buildRoleFitRank(jobs, config.profile.roleFamily));
+    const semanticById = await computeSemanticSimilarities(
+      jobs,
+      config,
+      deps?.embedder,
+      bm25Scores,
+    );
+    if ((fusionCfg.mode ?? 'rrf') === 'blend') {
+      const weights = fusionCfg.weights ?? DEFAULT_BLEND_WEIGHTS;
+      const blendById = computeBlendScores(jobs, bm25Scores, semanticById, {
+        wBm25: weights.bm25,
+        wSemantic: weights.semantic,
+        seniorityPenalty: fusionCfg.seniorityPenalty ?? true,
+        candidateLevel: config.profile.seniority,
+      });
+      scored = baseScored.map(({ job, breakdown }) => {
+        const res = blendById.get(job.id);
+        const semanticMaybe = semanticById?.get(job.id);
+        const merged: ScoreBreakdown = {
+          ...breakdown,
+          ...(res !== undefined ? { blend: res.blend, seniorityPenalty: res.penalty } : {}),
+          ...(semanticMaybe !== undefined ? { semantic: semanticMaybe } : {}),
+        };
+        return { job, rank: 0, score: res?.blend ?? 0, breakdown: merged };
+      });
+    } else {
+      const lists = [buildBm25Rank(jobs, bm25Scores), buildRecencyRank(jobs)];
+      if (pc.coreQueryTerms.length > 0) {
+        const coreScores = new Map<string, number>();
+        jobs.forEach((job, i) =>
+          coreScores.set(job.id, scoreBM25F(pc.corpus, i, pc.coreQueryTerms, pc.params)),
+        );
+        lists.push(buildBm25Rank(jobs, coreScores));
+      }
+      if (config.profile.roleFamily.length > 0) {
+        lists.push(buildRoleFitRank(jobs, config.profile.roleFamily));
+      }
+      if (fusionCfg.seniorityPenalty ?? true) {
+        lists.push(buildLevelFitRank(jobs, config.profile.seniority));
+      }
+      if (semanticById !== undefined) {
+        lists.push(buildSemanticRank(jobs, semanticById));
+      }
+      const rrfScores = computeRrf(lists, (j: NormalizedJob) => j.id, fusionCfg.k);
+      const penalties =
+        (fusionCfg.seniorityPenalty ?? true)
+          ? seniorityPenaltiesFor(jobs, config.profile.seniority)
+          : undefined;
+      scored = baseScored.map(({ job, breakdown }) => {
+        const rrfMaybe = rrfScores.get(job.id);
+        const semanticMaybe = semanticById?.get(job.id);
+        const penalty = penalties?.get(job.id);
+        const merged: ScoreBreakdown = {
+          ...breakdown,
+          ...(rrfMaybe !== undefined ? { rrf: rrfMaybe } : {}),
+          ...(semanticMaybe !== undefined ? { semantic: semanticMaybe } : {}),
+          ...(penalty !== undefined ? { seniorityPenalty: penalty } : {}),
+        };
+        return { job, rank: 0, score: (rrfMaybe ?? 0) * (penalty ?? 1), breakdown: merged };
+      });
     }
-    const rrfScores = computeRrf(lists, (j: NormalizedJob) => j.id, fusionCfg.k);
-    scored = baseScored.map(({ job, breakdown }) => {
-      const rrfMaybe = rrfScores.get(job.id);
-      const merged: ScoreBreakdown = rrfMaybe !== undefined
-        ? { ...breakdown, rrf: rrfMaybe }
-        : breakdown;
-      return { job, rank: 0, score: rrfMaybe ?? 0, breakdown: merged };
-    });
   } else {
+    if (config.ranking.semantic?.enabled === true) {
+      log('warn', 'rank.semantic.requires_fusion', {});
+    }
     scored = baseScored.map(({ job, productScore, breakdown }) => ({
       job,
       rank: 0,
@@ -219,6 +209,23 @@ export async function rank(
     }));
   }
 
+  const historyCfg = config.ranking.history;
+  if (historyCfg?.enabled === true) {
+    const boosts = historyBoostsFor(
+      jobs,
+      deps?.applications ?? [],
+      historyCfg.boostCap !== undefined ? { cap: historyCfg.boostCap } : {},
+    );
+    if (boosts.size > 0) {
+      scored = scored.map((r) => {
+        const boost = boosts.get(r.job.id);
+        if (boost === undefined || boost === 1) return r;
+        return { ...r, score: r.score * boost, breakdown: { ...r.breakdown, historyBoost: boost } };
+      });
+    }
+  }
+
   scored.sort((a, b) => b.score - a.score);
-  return scored.map((r, idx) => ({ ...r, rank: idx + 1 }));
+  const ordered = await applyRerank(scored, config, deps?.reranker);
+  return ordered.map((r, idx) => ({ ...r, rank: idx + 1 }));
 }

@@ -31,6 +31,8 @@ describe('digest to application output workflow', () => {
           path: '/home/u/jobhelp/digests/digest-2026-05-15.md',
           generatedAt: '2026-05-15T00:00:00Z',
           jobs: [rankedJob],
+          totalPersisted: 1,
+          nextRequiredStep: 'rerank',
         }),
       getJob: async (id) => ok({ job: { ...job, id } }),
       startApplication: async (args) => {

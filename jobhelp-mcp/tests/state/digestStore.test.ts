@@ -152,6 +152,24 @@ describe('readDigest', () => {
     }
   });
 
+  it('round-trips breakdown.rerank and breakdown.historyBoost', async () => {
+    const base = FIXTURE_DIGEST.jobs[0];
+    if (base === undefined) throw new Error('fixture missing job');
+    const digest: PersistedDigest = {
+      ...FIXTURE_DIGEST,
+      jobs: [
+        { ...base, breakdown: { ...base.breakdown, rerank: 0.93, historyBoost: 1.1 } },
+      ],
+    };
+    await persistDigest(digest);
+    const result = await readDigest(digest.date);
+    expect(isOk(result)).toBe(true);
+    if (isOk(result)) {
+      expect(result.value.jobs[0]?.breakdown.rerank).toBe(0.93);
+      expect(result.value.jobs[0]?.breakdown.historyBoost).toBe(1.1);
+    }
+  });
+
   it('returns not_found when date has no digest', async () => {
     const result = await readDigest('2099-12-31');
     expect(isErr(result)).toBe(true);

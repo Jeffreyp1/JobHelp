@@ -86,6 +86,41 @@ describe('loadConfig', () => {
     expect(c.sources.lever?.slugs).toEqual(['plaid', 'anthropic']);
   });
 
+  it('passes profile.allowedCountries through when present', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jobhelp-cfg-test-'));
+    try {
+      const p = join(dir, 'allowed-countries.json');
+      writeFileSync(
+        p,
+        JSON.stringify({
+          profile: {
+            resumeDumpPath: '/tmp/r.md',
+            skills: ['ts'],
+            location: 'X',
+            remoteOk: true,
+            salaryFloor: 1,
+            seniority: 'entry',
+            roleFamily: ['backend'],
+            allowedCountries: ['US'],
+          },
+          ranking: { topN: 1, digestK: 1 },
+          output: { dir: '/tmp' },
+        }),
+      );
+      const result = await loadConfig(p);
+      if (!isOk(result)) throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
+      expect(result.value.profile.allowedCountries).toEqual(['US']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves profile.allowedCountries undefined when omitted', async () => {
+    const result = await loadConfig(join(FIXTURES, 'config-valid.json'));
+    if (!isOk(result)) throw new Error('expected ok');
+    expect(result.value.profile.allowedCountries).toBeUndefined();
+  });
+
   it('loads rules block with mode and userRulesDir', async () => {
     const result = await loadConfig(join(FIXTURES, 'config-valid.json'));
     if (!isOk(result)) throw new Error('expected ok');

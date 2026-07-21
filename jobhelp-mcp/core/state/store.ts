@@ -39,15 +39,19 @@ function parseState(raw: unknown): Result<JobHelpState, StateError> {
   if (!isPlainObject(raw)) {
     return err({ type: 'validation', message: 'state root must be an object' });
   }
-  if (raw['version'] !== STATE_SCHEMA_VERSION) {
+  const rawVersion = raw['version'];
+  if (rawVersion !== undefined && rawVersion !== STATE_SCHEMA_VERSION) {
     return err({
       type: 'validation',
-      message: `unsupported state version: ${String(raw['version'])}`,
+      message: `unsupported state version: ${String(rawVersion)}`,
     });
   }
-  const resumesRaw = raw['resumes'];
-  const applicationsRaw = raw['applications'];
-  const digestsRaw = raw['digests'];
+  // Legacy migration: state.json files written before the version field existed have
+  // version === undefined and may omit resumes/digests. Default missing arrays to [];
+  // a present-but-non-array value is still corrupt and rejected below.
+  const resumesRaw = raw['resumes'] ?? [];
+  const applicationsRaw = raw['applications'] ?? [];
+  const digestsRaw = raw['digests'] ?? [];
   if (!Array.isArray(resumesRaw)) {
     return err({ type: 'validation', message: 'state.resumes must be an array' });
   }

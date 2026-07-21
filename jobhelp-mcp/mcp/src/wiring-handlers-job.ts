@@ -12,6 +12,8 @@ import {
 import { ALL_ADAPTERS } from '../../core/sources/index.js';
 import { runPipeline, type PipelineOverrides } from '../../core/pipeline/index.js';
 import type {
+  AnalyzeFitArgs,
+  AnalyzeFitResult,
   FindMatchingJobsArgs,
   FindMatchingJobsResult,
   GetJobResult,
@@ -20,6 +22,8 @@ import type {
   ScoreKeywordMatchResult,
   ToolError,
 } from './tools-types.js';
+import type { Registry } from '../../core/resumes/registry.js';
+import { analyzeFit } from '../../core/pipeline/fit.js';
 import {
   extractSkillsFromMarkdown,
   runAdapterIsolated,
@@ -27,6 +31,12 @@ import {
   todayIsoDate,
   toToolError,
 } from './wiring-helpers.js';
+
+export const RERANK_DIRECTIVE =
+  'These jobs are a RAW DETERMINISTIC ranking (BM25 keyword overlap + recency), NOT recommendations. ' +
+  'Before presenting any of them to the user, you MUST rerank them against the user\'s actual resume and ' +
+  'profile constraints: in Claude Code invoke the job-rerank skill; otherwise call rerank_top_jobs and ' +
+  'apply its rubric. Present Strong/Solid/Borderline/Drop tiers with reasons, never the raw score order.';
 
 export async function findJobInLatestDigest(
   id: string,
@@ -74,21 +84,25 @@ export async function handleFindMatchingJobs(
   };
   const ranked = await runPipeline(pool, config, overrides);
   const topK = ranked.slice(0, args.count ?? config.ranking.digestK);
+  const persistK = Math.max(config.ranking.persistK ?? 1000, topK.length);
   const date = todayIsoDate(now);
-  const persisted = await persistDigest({
-    date,
-    generatedAt: now.toISOString(),
-    totalDurationMs: 0,
-    sourceResults: outcomes.map((o) => ({
-      source: o.source,
-      jobCount: o.jobs.length,
-      durationMs: 0,
-      ...(o.error !== undefined
-        ? { error: { type: 'unknown' as const, message: o.error.message } }
-        : {}),
-    })),
-    jobs: topK,
-  });
+  const persisted = await persistDigest(
+    {
+      date,
+      generatedAt: now.toISOString(),
+      totalDurationMs: 0,
+      sourceResults: outcomes.map((o) => ({
+        source: o.source,
+        jobCount: o.jobs.length,
+        durationMs: 0,
+        ...(o.error !== undefined
+          ? { error: { type: 'unknown' as const, message: o.error.message } }
+          : {}),
+      })),
+      jobs: ranked.slice(0, persistK),
+    },
+    { displayCount: topK.length },
+  );
   if (!persisted.ok) return err(toToolError(persisted.error));
   return ok({
     digestPath: persisted.value.path,
@@ -96,6 +110,7 @@ export async function handleFindMatchingJobs(
     csvPath: persisted.value.csvPath,
     jobs: topK,
     warnings,
+    nextRequiredStep: RERANK_DIRECTIVE,
   });
 }
 
@@ -109,12 +124,15 @@ export async function handleGetLatestDigest(): Promise<
     }
     return err(toToolError(r.error));
   }
+  const displayK = r.value.displayK;
   return ok({
     path: getLatestPointerPath(),
     markdownPath: getDigestMarkdownPath(r.value.date),
     csvPath: getDigestCsvPath(r.value.date),
-    jobs: r.value.jobs,
+    jobs: displayK !== undefined ? r.value.jobs.slice(0, displayK) : r.value.jobs,
+    totalPersisted: r.value.jobs.length,
     generatedAt: r.value.generatedAt,
+    nextRequiredStep: RERANK_DIRECTIVE,
   });
 }
 
@@ -133,4 +151,16 @@ export async function handleScoreKeywordMatch(
   const jobText = `${job.value.title} ${job.value.description}`;
   const { score, matched, missing } = scoreOverlap(jobText, skills);
   return ok({ score, matched, missing });
+}
+
+export async function handleAnalyzeFit(
+  registry: Registry,
+  args: AnalyzeFitArgs,
+): Promise<Result<AnalyzeFitResult, ToolError>> {
+  const job = await findJobInLatestDigest(args.jobId);
+  if (!job.ok) return err(job.error);
+  const resume = await registry.readResume({});
+  if (!resume.ok) return err(toToolError(resume.error));
+  const jobText = `${job.value.title} ${job.value.description}`;
+  return ok(analyzeFit(jobText, resume.value));
 }

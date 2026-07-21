@@ -8,6 +8,8 @@ import { createBatchTools } from './tools-batch.js';
 import { createMetaTools } from './tools-meta.js';
 
 export type {
+  AnalyzeFitArgs,
+  AnalyzeFitResult,
   ApplicationKind,
   ApplicationVersion,
   ApplyConfigAnswersArgs,

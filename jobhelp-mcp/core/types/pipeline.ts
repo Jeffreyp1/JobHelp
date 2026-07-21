@@ -28,8 +28,18 @@ export interface ScoreBreakdown {
   readonly bm25f: number;
   /** Source-trust multiplier in [0, ∞). 1.0 when disabled or source key missing. Optional for back-compat with pre-Phase-3 fixtures. */
   readonly sourceTrust?: number;
-  /** Reciprocal Rank Fusion score (Cormack 2009). Present only when ranking.fusion.enabled. Raw RRF score (sum of `1/(k+rank_i)` across input lists); not in [0,1]. */
+  /** Reciprocal Rank Fusion score (Cormack 2009). Present only when ranking.fusion.enabled with mode 'rrf'. Raw pre-penalty RRF score (sum of `1/(k+rank_i)` across input lists); the final score is rrf x seniorityPenalty. Not in [0,1]. */
   readonly rrf?: number;
+  /** Cosine similarity between the profile query and the job text, roughly [-1, 1]. Present only when ranking.semantic.enabled and the embedder was available. */
+  readonly semantic?: number;
+  /** Convex blend score in [0, 1]: weighted mix of min-max-normalized BM25 and semantic, times the seniority penalty. Present only when ranking.fusion.mode === 'blend'. */
+  readonly blend?: number;
+  /** Seniority penalty multiplier in (0, 1]. 1.0 = no penalty; < 1 when the job's detected level exceeds the profile's target. Present in both fusion modes when fusion.seniorityPenalty is on. */
+  readonly seniorityPenalty?: number;
+  /** Cross-encoder relevance in [0, 1] (sigmoid of the model logit). Present only on the top-K jobs reordered by ranking.rerank. */
+  readonly rerank?: number;
+  /** Reserved multiplier from the applied-history signal; not yet produced by rank(). */
+  readonly historyBoost?: number;
   /** LLM fit-score in [0, 1]. Unused in Design B (no LLM scoring); always undefined. */
   readonly llmFitScore?: number;
 }

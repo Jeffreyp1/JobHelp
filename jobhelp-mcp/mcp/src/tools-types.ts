@@ -89,6 +89,8 @@ export interface FindMatchingJobsResult {
   readonly csvPath?: string;
   readonly jobs: readonly RankedJob[];
   readonly warnings: readonly SourceWarning[];
+  /** Steers the client AI: raw scores must be reranked before being shown to the user. */
+  readonly nextRequiredStep: string;
 }
 
 export interface GetLatestDigestResult {
@@ -96,11 +98,30 @@ export interface GetLatestDigestResult {
   readonly markdownPath?: string;
   readonly csvPath?: string;
   readonly jobs: readonly RankedJob[];
+  /** Full persisted depth; jobs above is only the display slice. Skim the rest via get_triage_list. */
+  readonly totalPersisted: number;
   readonly generatedAt: string;
+  /** Steers the client AI: raw scores must be reranked before being shown to the user. */
+  readonly nextRequiredStep: string;
 }
 
 export interface GetJobResult {
   readonly job: NormalizedJob;
+}
+
+export interface GetTriageListArgs {
+  readonly triageK?: number;
+}
+
+export interface GetTriageListResult {
+  readonly total: number;
+  readonly returned: number;
+  readonly truncated: boolean;
+  readonly triage: { readonly model: string; readonly chunkSize: number };
+  readonly profileCard: string;
+  readonly lines: readonly string[];
+  /** Steers the client AI: skim via subagents, then deep-rerank survivors by jobIds. */
+  readonly nextRequiredStep: string;
 }
 
 export type RulesMode = 'defaults' | 'user' | 'merged';
@@ -133,6 +154,21 @@ export interface ScoreKeywordMatchResult {
   readonly score: number;
   readonly matched: readonly string[];
   readonly missing: readonly string[];
+}
+
+export interface AnalyzeFitArgs {
+  readonly jobId: string;
+}
+
+export interface AnalyzeFitResult {
+  /** Recognized job skills the active resume also has. */
+  readonly matched: readonly string[];
+  /** Recognized job skills absent from the active resume. */
+  readonly missing: readonly string[];
+  /** matched.length — every recognized skill is weighted equally; this is not a must-have count. */
+  readonly matchedCount: number;
+  /** Total recognized skills detected in the job (matched.length + missing.length). */
+  readonly jobSkillCount: number;
 }
 
 export interface StartApplicationArgs {
@@ -229,11 +265,17 @@ export interface CoreDeps {
   ) => Promise<Result<FindMatchingJobsResult, ToolError>>;
   readonly getLatestDigest: () => Promise<Result<GetLatestDigestResult, ToolError>>;
   readonly getJob: (id: JobId) => Promise<Result<GetJobResult, ToolError>>;
+  readonly getTriageList: (
+    args: GetTriageListArgs,
+  ) => Promise<Result<GetTriageListResult, ToolError>>;
   readonly readRules: (mode: RulesMode) => Promise<Result<ReadRulesResult, ToolError>>;
   readonly readResume: () => Promise<Result<ReadResumeResult, ToolError>>;
   readonly scoreKeywordMatch: (
     args: ScoreKeywordMatchArgs,
   ) => Promise<Result<ScoreKeywordMatchResult, ToolError>>;
+  readonly analyzeFit: (
+    args: AnalyzeFitArgs,
+  ) => Promise<Result<AnalyzeFitResult, ToolError>>;
   readonly startApplication: (
     args: StartApplicationArgs,
   ) => Promise<Result<StartApplicationResult, ToolError>>;

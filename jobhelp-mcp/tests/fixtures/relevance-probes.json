@@ -1,0 +1,382 @@
+[
+  {
+    "id": "T1-A",
+    "intendedTier": 1,
+    "finalTier": 1,
+    "relabeled": false,
+    "verifierTiers": [
+      1,
+      1
+    ],
+    "verifierNotes": [
+      "1/high: Note: the resume text arrived as \"undefined\", so I judged from the rubric's candidate profile (early-career, TS/Python/Node, AWS, PostgreSQL/Redis/Kafka/Docker, agentic-AI focus). This posting is a near-perfect T1 archetype: explicitly new-grad/0-2-yrs friendly, role family is agentic AI infrastructure (tool-call routing, agent runtime, LLM tool calling, structured output validation), and the stack — TypeScript/Node.js, PostgreSQL, Redis, AWS (ECS/SQS/S3) — maps one-to-one onto the candidate's core stack. Seniority, role family, and stack all align; the candidate should apply today.",
+      "1/high: The posting is an explicitly new-grad/0-2-yrs (internships count) software engineering role centered on agentic AI — an agent runtime with tool-call routing, LLM function/tool calling, and multi-agent orchestration — which is exactly the T1 role family. The stack (TypeScript/Node.js, PostgreSQL, Redis, AWS ECS/SQS/S3, SQL, strong test coverage) is drawn almost entirely from the candidate's core stack, with no reliance on secondary experience. Seniority alignment is perfect for a recent B.S. (2024) / current M.S. candidate with internships and LLM/agent side projects. Note: the resume text itself arrived as \"undefined\" in the prompt, so this judgment relies on the candidate profile embedded in the rubric and seniority context; against that profile, this is a should-apply-today match."
+    ],
+    "tiebreakNote": null,
+    "title": "Software Engineer, Agent Runtime (New Grad / Early Career)",
+    "company": "Loomway AI",
+    "description": "Loomway AI builds an orchestration platform that lets product teams deploy fleets of autonomous agents for back-office work: invoice processing, vendor onboarding, and support triage. We're hiring an early-career engineer for our Agent Runtime team, which owns the execution layer — tool-call routing, state persistence, retries, and human-in-the-loop checkpoints.\n\nWhat you'll do:\n- Build and ship features in our TypeScript/Node.js agent runtime, including tool registries and structured-output validation\n- Design PostgreSQL schemas and Redis-backed queues that keep long-running agent sessions durable and resumable\n- Instrument agent traces so customers can debug multi-step runs\n- Deploy to AWS (ECS, SQS, S3) behind CI with strong test coverage\n\nWhat we're looking for:\n- 0-2 years of professional experience (internships count) or a recent CS degree\n- Solid TypeScript or Python fundamentals and comfort with SQL\n- Hands-on exposure to LLM APIs, function/tool calling, or agent frameworks through work, coursework, or side projects\n- Curiosity about evaluating and hardening nondeterministic systems\n\nRemote (US). Competitive salary and equity, a learning budget, and a team that ships weekly.",
+    "rationale": "Agentic-AI platform role explicitly open to new grads with 0-2 years, built on the candidate's exact core stack (TypeScript/Node.js, PostgreSQL, Redis, AWS) and centered on multi-agent/LLM tooling — the T1 archetype where the candidate should apply today."
+  },
+  {
+    "id": "T1-B",
+    "intendedTier": 1,
+    "finalTier": 1,
+    "relabeled": false,
+    "verifierTiers": [
+      1,
+      1
+    ],
+    "verifierNotes": [
+      "1/high: Entry-level (0-2 yrs, new grads explicitly encouraged) backend role centered on RAG infrastructure — squarely the AI/LLM role family in T1. Stack is nearly a perfect subset of the candidate's core stack: Python, PostgreSQL (pgvector), Kafka pipelines, Docker, AWS (EKS/S3/Lambda). Requirements (B.S./M.S. CS, embeddings/vector-search familiarity from projects or internships) match the candidate's recent B.S. + current M.S. + RAG/LLM project experience. Seniority alignment is exact. The candidate should apply today.",
+      "1/high: This is an entry-level (0-2 yrs, explicitly new-grad friendly) backend role centered on RAG infrastructure — embeddings, vector search (pgvector on PostgreSQL), retrieval eval — which sits squarely in the candidate's primary AI/LLM/RAG target role family. The stack (Python, PostgreSQL, Kafka, Docker, AWS) is drawn almost entirely from the candidate's core toolset, with Kafka reinforced by fintech backend experience. Seniority alignment is exact for a 2024 B.S. + current M.S. candidate with internships and projects. Role family, stack, and seniority all align: the candidate should apply today."
+    ],
+    "tiebreakNote": null,
+    "title": "Backend Engineer, RAG Infrastructure (Entry Level)",
+    "company": "Pagefield Labs",
+    "description": "Pagefield Labs powers question answering over enterprise document sets — contracts, policies, and engineering wikis — for mid-market customers. Our retrieval stack decides what the model sees, so its quality is the product. We're adding an entry-level backend engineer to the RAG Infrastructure team.\n\nResponsibilities:\n- Build ingestion pipelines in Python that chunk, embed, and index millions of documents\n- Operate our hybrid search layer (pgvector on PostgreSQL plus keyword scoring) and improve recall and precision with offline eval suites\n- Maintain Kafka-based pipelines that keep indexes fresh as source documents change\n- Containerize services with Docker and deploy to AWS (EKS, S3, Lambda)\n\nRequirements:\n- B.S. or M.S. in Computer Science or equivalent experience; 0-2 years in industry\n- Strong Python; working SQL knowledge\n- Familiarity with embeddings, vector search, or information-retrieval concepts from projects, research, or internships\n- You care about measuring quality, not just shipping\n\nNew graduates are strongly encouraged to apply — two of the last three hires on this team started here right out of school. Remote (US).",
+    "rationale": "Entry-level RAG infrastructure role squarely in the rubric's T1 center: retrieval/embeddings focus with Python, PostgreSQL/pgvector, Kafka, Docker, and AWS, and explicit new-grad encouragement, so seniority and stack both align perfectly."
+  },
+  {
+    "id": "T1-C",
+    "intendedTier": 1,
+    "finalTier": 1,
+    "relabeled": false,
+    "verifierTiers": [
+      1,
+      1
+    ],
+    "verifierNotes": [
+      "1/high: Explicitly New Grad / 0-2 yrs (internships and side projects count), role family is LLM developer tooling (traces, evals, prompt experiments — squarely agentic-AI/LLM tooling), and the stack is a near-perfect superset of the candidate's core: TypeScript, Python, Go, Node.js, PostgreSQL, Redis, Docker, AWS. Seniority, role family, and stack all align with the rubric's T1 definition; the candidate should apply today. (Note: the resume text arrived as \"undefined\", so judgment relies on the rubric's stated candidate profile.)",
+      "1/high: Explicitly new-grad/0-2 yrs role centered on LLM developer tooling (SDKs for LLM/agent frameworks, evals, prompt experiments) with a stack drawn almost entirely from the candidate's core set: TypeScript, Python, Go, Node.js, PostgreSQL, Redis, Docker, AWS. Role family (AI/LLM tooling + backend), stack, and seniority all align with the T1 definition; the candidate's internships-plus-LLM-projects profile matches the posting's stated fit criteria directly. Note: the resume text was passed as \"undefined\", so judgment relies on the candidate profile described in the rubric and seniority context."
+    ],
+    "tiebreakNote": null,
+    "title": "Software Engineer, LLM Developer Tools (New Grad / Early Career)",
+    "company": "Spanline",
+    "description": "Spanline makes observability and testing tools for teams shipping LLM features: trace viewers, prompt diffing, regression evals, and cost dashboards. Engineers at companies of every size use our SDK daily, so polish and reliability matter.\n\nWe're hiring a Software Engineer (New Grad / Early Career) on the SDK & Platform team.\n\nYou will:\n- Extend our open-source TypeScript and Python SDKs that capture traces from popular LLM and agent frameworks\n- Build backend services in Go and Node.js that ingest high-volume trace events into PostgreSQL and Redis\n- Design APIs for eval runs, dataset versioning, and prompt experiments\n- Own features end to end, from short RFC through Docker-based deploys on AWS\n\nYou might be a fit if:\n- You have 0-2 years of experience, including internships and substantial side projects\n- You have production-minded instincts in TypeScript, Go, or Python\n- You've built something against an LLM API, hit the sharp edges — nondeterminism, token limits, flaky tool calls — and wished for better tooling\n- You care about developer experience and API design\n\nRemote (US). Remote (US) team; we run a two-week structured onboarding and pair every new engineer with a mentor for their first quarter.",
+    "rationale": "LLM developer-tooling role that is explicitly new-grad friendly and spans TypeScript, Python, Go, Node.js, PostgreSQL, Redis, Docker, and AWS — full overlap with the candidate's primary stack plus a direct LLM/agent-framework focus, making it unambiguous T1."
+  },
+  {
+    "id": "T1-D",
+    "intendedTier": 1,
+    "finalTier": 1,
+    "relabeled": false,
+    "verifierTiers": [
+      1,
+      1
+    ],
+    "verifierNotes": [
+      "1/high: The posting is an explicitly entry-level (recent grad / 0-2 yrs) Applied AI Engineer role centered on multi-agent orchestration, agent workflows, RAG/prompting experience, and evaluation harnesses — the exact agentic-AI role family in the candidate's primary target. The stack is a near-perfect overlap with the candidate's core tools: Python/Go, Kafka, Redis, PostgreSQL, Docker, AWS. Seniority aligns exactly with a 2024 B.S. + current M.S. candidate, and the company states it grows new grads. Role family, stack, and seniority all align at the top tier; the candidate should apply today. Note: the resume text arrived as \"undefined\" in my input, so I judged against the candidate profile embedded in the rubric (early-career AI/LLM backend, TS/Python/Go/Node, AWS, PostgreSQL/Redis/Kafka/Docker, internships + projects).",
+      "1/high: Note: the resume text arrived as \"undefined\", so I judged against the candidate profile embedded in the rubric and seniority context. The posting is an explicitly entry-level (recent grad / 0-2 yrs) Applied AI Engineer role centered on multi-agent orchestration (planner/executor patterns, agent handoffs, evaluation harnesses) — squarely the agentic-AI/LLM role family the candidate targets. Stack is a near-perfect hit on the candidate's core tools: Python/Go, Kafka, Redis, PostgreSQL, Docker, AWS. Seniority alignment is exact (new-grad friendly with a stated track record of growing new grads), remote-US, and the \"experimented with prompting, RAG, or agent orchestration\" bar matches the candidate's project experience. Role family, stack, and seniority all align at the top of the rubric: the candidate should apply today."
+    ],
+    "tiebreakNote": null,
+    "title": "Applied AI Engineer, Backend (Entry Level)",
+    "company": "Nimbrell",
+    "description": "Nimbrell automates tier-1 customer support for subscription businesses using a coordinated set of specialized agents: one classifies intent, one retrieves account context, one drafts the response, and a reviewer agent scores it before anything reaches a human queue. We're hiring an entry-level Applied AI Engineer to grow that backend.\n\nDay to day:\n- Implement and refine multi-agent workflows in Python, including planner/executor patterns and structured handoffs between agents\n- Build the surrounding backend: event streams on Kafka, session state in Redis, durable records in PostgreSQL\n- Write evaluation harnesses that catch quality regressions before deploys\n- Run services in Docker on AWS with a light, weekday-only on-call rotation\n\nAbout you:\n- Recent graduate or up to 2 years of experience; we have a track record of growing new grads into senior engineers\n- Comfortable in Python or Go; you write tests without being asked\n- You've experimented with prompting, RAG, or agent orchestration and can talk about what broke\n- Clear written communication in an async-first remote team\n\nRemote (US). Benefits include health coverage, 401(k) match, and an annual conference budget.",
+    "rationale": "Applied AI backend role built around multi-agent orchestration with Python/Go, Kafka, Redis, PostgreSQL, Docker, and AWS, explicitly open to recent graduates — combining the candidate's agentic-AI focus and fintech-grade backend stack at exactly the right seniority for T1."
+  },
+  {
+    "id": "T2-A",
+    "intendedTier": 2,
+    "finalTier": 2,
+    "relabeled": false,
+    "verifierTiers": [
+      2,
+      2
+    ],
+    "verifierNotes": [
+      "2/high: Entry-level full-stack role (1-3 yrs or strong internship/project background explicitly welcomed) with heavy overlap in the candidate's core stack: TypeScript, Node.js, PostgreSQL, Redis, AWS, Docker, REST APIs, testing habits. Seniority alignment is excellent for an early-career candidate. However, there is no AI/LLM, agentic, RAG, or multi-agent component whatsoever — the product is ticketing/box-office software — which caps it below T1. This is the textbook T2 case: entry-to-mid full-stack SWE, core-stack match, no AI component. A good application the candidate should reasonably make. (Note: the resume text was missing from the input; judgment relies on the rubric's stated candidate profile.)",
+      "2/high: Entry-level full-stack SWE role with near-total core-stack overlap (TypeScript, Node.js, PostgreSQL, Redis, AWS, Docker, CI/CD) and explicitly seniority-aligned (\"1-3 years or a strong internship and project background\" fits a 2024 B.S. + current M.S. with internships and projects). However, the role has zero AI/LLM/agentic component — it is ticketing/box-office product work — so it cannot be T1, which requires an AI/LLM-centered role. Heavy core-stack overlap without an AI component is the textbook T2 case: a good application the candidate should plausibly make, but not a top-priority dream fit. Note: the resume text arrived as \"undefined\"; judgment relies on the candidate profile embedded in the rubric and seniority context."
+    ],
+    "tiebreakNote": null,
+    "title": "Full Stack Engineer (TypeScript/React/Node)",
+    "company": "Harborlight Software",
+    "description": "Harborlight builds ticketing and box-office software for independent music venues, theaters, and festival organizers. We're hiring a Full Stack Engineer to join our core product team and ship features end to end: interactive seat maps, promo-code and pricing logic, organizer payout reporting, and the fan-facing checkout flow. Our stack is TypeScript throughout - React on the front end, Node.js services on the back end - with PostgreSQL and Redis on AWS (ECS, S3, CloudFront), deployed continuously via Docker and GitHub Actions. You'll design REST endpoints, write migrations, tune queries against event-day traffic spikes, and own small projects from spec to launch with support from senior engineers. We're looking for 1-3 years of professional experience or a strong internship and project background, solid TypeScript or JavaScript, comfort with SQL, and the habit of writing tests before shipping. This role is Remote (US); the team works core-overlap hours across US time zones and communicates heavily in writing.",
+    "rationale": "Heavy overlap with the candidate's core stack (TypeScript, Node, React, Postgres, Redis, AWS, Docker) at an explicitly entry-to-mid level, but the product has no AI/LLM component, which caps it at T2 rather than T1."
+  },
+  {
+    "id": "T2-B",
+    "intendedTier": 2,
+    "finalTier": 2,
+    "relabeled": false,
+    "verifierTiers": [
+      2,
+      2
+    ],
+    "verifierNotes": [
+      "2/high: Entry-to-mid backend role (1-3 yrs, internships explicitly count) with heavy overlap in the candidate's core stack — Go/typed-language, Kafka, PostgreSQL, Redis, AWS, Docker — and seniority aligned with an early-career candidate. However, there is no AI/LLM/agentic component, which per the rubric caps a core-stack backend role at T2 rather than T1. A strong, sensible application but not the candidate's ideal AI-focused target.",
+      "2/high: Entry-to-mid backend role (1-3 yrs, internships explicitly count) with heavy overlap in the candidate's core stack — Go/typed languages, Kafka, PostgreSQL, Redis, AWS, Docker — and the candidate's fintech/Kafka backend experience maps directly to the event-streaming dispatch work. However, there is no AI/LLM, agentic, or RAG component, which is what the rubric requires for T1. Seniority alignment is excellent for an early-career candidate, so this is a strong application but not an excellent-fit one: T2."
+    ],
+    "tiebreakNote": null,
+    "title": "Backend Engineer, Dispatch Platform (Go)",
+    "company": "Routewell",
+    "description": "Routewell powers last-mile delivery for regional grocers and pharmacies, orchestrating driver routing, dispatch, and real-time order tracking. We're adding a Backend Engineer to our dispatch platform team. The platform is a set of Go services communicating over Kafka, with PostgreSQL as the system of record and Redis for live vehicle-location state; everything runs on AWS with Docker and Terraform. Day to day you'll build and operate services that assign orders to routes, handle webhook integrations with partner point-of-sale systems, and keep p99 latency low while order volume doubles every peak season. You'll participate in design reviews, write integration tests against real Kafka topics, and join a light on-call rotation once ramped. We want 1-3 years of backend experience (internships count if you shipped real systems), working knowledge of Go or another typed language with willingness to learn Go quickly, strong SQL fundamentals, and familiarity with message queues or event streams. Remote (US), with quarterly optional team onsites.",
+    "rationale": "Go/Kafka/Redis/Postgres/AWS mirrors the candidate's backend experience almost exactly and the seniority bar is 1-3 years, but it is a pure logistics backend role with zero AI/LLM work - a strong application, not the target profile."
+  },
+  {
+    "id": "T2-C",
+    "intendedTier": 2,
+    "finalTier": 2,
+    "relabeled": false,
+    "verifierTiers": [
+      2,
+      2
+    ],
+    "verifierNotes": [
+      "2/high: Role family and seniority are an excellent fit: an explicitly new-grad/0-2-yrs AI platform role centered on RAG, retrieval/chunking, LLM API integration, and eval harnesses — squarely the candidate's agentic-AI/LLM interest area, with PostgreSQL overlap. However, the primary stack is Java 21/Spring Boot on Kubernetes with OpenSearch, which only partially overlaps the candidate's core TypeScript/Python/Go/Node stack. This is the canonical strong-but-not-perfect case: an AI/LLM role whose primary stack partially overlaps (Java/Spring). The posting's \"Java helpful but not required, we'll train you\" and its ask for any typed backend language make it a genuinely good application, but the ecosystem gap keeps it below the top tier.",
+      "2/high: Role family is a strong fit: an explicitly new-grad/0-2yr AI platform role centered on RAG-style retrieval, prompt orchestration, LLM API integration, and eval harnesses — squarely the candidate's agentic-AI/LLM interest area, with PostgreSQL overlap and seniority perfectly aligned. However, the primary stack is Java 21/Spring Boot on Kubernetes with OpenSearch, which only partially overlaps the candidate's core TypeScript/Python/Go/Node.js stack. An AI/LLM role whose primary stack is Java/Spring is a strong-but-not-excellent match; the posting's \"Java not required, any typed backend language\" softens this but does not make it a core-stack role. Tier 2: a good application worth submitting, one notch below the dream-fit profile."
+    ],
+    "tiebreakNote": null,
+    "title": "Associate Software Engineer, AI Platform (Java)",
+    "company": "Claridocs",
+    "description": "Claridocs automates document-heavy workflows for insurance operations teams - claims intake, policy review, and audit prep. Our AI Platform team owns the pipeline that turns unstructured documents into structured, verifiable answers: retrieval-augmented extraction, prompt orchestration, model-output validation, and human-review routing. We're hiring an Associate Software Engineer to grow with this team. The platform is built in Java 21 with Spring Boot, backed by PostgreSQL and OpenSearch, and deployed on Kubernetes; you'll implement retrieval and chunking strategies, build evaluation harnesses that score extraction accuracy against labeled sets, and integrate hosted LLM APIs behind clean service boundaries. This is an early-career role: new grads and engineers with up to 2 years of experience are encouraged to apply. We look for strong CS fundamentals, experience with at least one typed backend language (Java experience helpful but not required - we'll train you), genuine curiosity about LLM behavior and failure modes, and clear written communication. Remote (US).",
+    "rationale": "The role family (early-career AI/LLM engineering with RAG and eval harnesses) fits the candidate perfectly, but the primary stack is Java/Spring/Kubernetes, which only partially overlaps the candidate's TypeScript/Python/Go core - exactly the T2 partial-stack AI case."
+  },
+  {
+    "id": "T2-D",
+    "intendedTier": 2,
+    "finalTier": 2,
+    "relabeled": false,
+    "verifierTiers": [
+      2,
+      2
+    ],
+    "verifierNotes": [
+      "2/high: This is an AI/LLM-centered role (RAG grounding, LLM provider calls, prompt management, guardrails) explicitly pitched at 0-2 years with strong-internship candidates welcome, which fits the candidate's seniority and AI project experience well. However, the primary stack is a Ruby on Rails monolith with Sidekiq — outside the candidate's core TypeScript/Python/Go/Node.js ecosystem, with only PostgreSQL and general backend/LLM-API experience overlapping. The posting mitigates this (\"Ruby not required, onboarding assumes you're new to Rails\"), making it a good application, but the partial stack overlap keeps it a strong rather than excellent match: an AI/LLM role on a Ruby stack is the textbook strong-but-not-ideal case.",
+      "2/high: Strong role-family and seniority fit: an AI-features SWE I role (RAG/retrieval grounding, LLM provider pipelines, prompt management) explicitly targeting 0-2 years or strong internships, which matches the candidate's early-career AI/LLM profile and project experience directly. The limiting factor is the primary stack — a Ruby on Rails monolith with Sidekiq — which only partially overlaps the candidate's TypeScript/Python/Go/Node core (shared PostgreSQL, background-job patterns, LLM/embeddings experience). The posting mitigates this (\"Ruby not required, onboarding assumes you're new to Rails\", any dynamic or typed backend language accepted), making it a good application, but the stack mismatch keeps it below an excellent apply-today fit."
+    ],
+    "tiebreakNote": null,
+    "title": "Software Engineer I, AI Features (Ruby on Rails)",
+    "company": "Nimbriq",
+    "description": "Nimbriq is a customer-support platform for mid-market SaaS companies, and AI features are now the fastest-growing part of our product: drafted replies grounded in each customer's help-center content, automatic ticket summarization, and intent-based routing. We're hiring a Software Engineer I to join the AI Features squad. The product is a Ruby on Rails monolith with Sidekiq for background jobs and PostgreSQL for storage; the AI layer adds a retrieval index over customer knowledge bases and a prompt-management system with versioning and offline evaluation. You'll build Rails endpoints and background pipelines that call LLM providers, improve retrieval quality for grounding, add guardrails that keep drafted replies inside a customer's approved policies, and instrument everything so we can measure deflection and agent-acceptance rates. Ideal candidates have 0-2 years of experience or strong internships, proficiency in at least one dynamic or typed backend language (Ruby not required - our onboarding assumes you're new to Rails), and hands-on exposure to LLM APIs, embeddings, or RAG through work or personal projects. Remote (US).",
+    "rationale": "An explicitly 0-2-years LLM/RAG product role that matches the candidate's AI experience, but the codebase is Ruby on Rails with Sidekiq - outside the candidate's primary languages, so the stack overlap is only partial and the fit is strong rather than excellent."
+  },
+  {
+    "id": "T3-A",
+    "intendedTier": 3,
+    "finalTier": 3,
+    "relabeled": false,
+    "verifierTiers": [
+      3,
+      3
+    ],
+    "verifierNotes": [
+      "3/high: This is a data engineering role — an adjacent role family to the candidate's backend/AI focus, which the rubric explicitly caps at T3 even with shared tooling. The overlap is real and substantial (Python, SQL, Kafka, PostgreSQL, AWS, Docker, and the 1-3 yrs/internships-count bar fits an early-career candidate), and the candidate's fintech/Kafka backend exposure helps, but the day-to-day work (warehouse modeling, Airflow orchestration, dbt, data-quality/backfill tooling, Snowflake) sits outside the candidate's primary application-backend/AI role family. Strong seniority and stack alignment keep it solidly arguable rather than weak, so T3 rather than T2 (not a backend/full-stack SWE role) or T4 (overlap is far more than incidental).",
+      "3/high: Data engineering is an adjacent role family to the candidate's backend/AI focus, not a core target, which caps this at moderate despite substantial tool overlap (Python, SQL/PostgreSQL, Kafka, AWS, Docker all appear in the candidate's stack). The seniority ask (1-3 years, internships count) is a genuine fit for an early-career candidate, and the fintech/Kafka backend exposure helps, but the day-to-day work — warehouse modeling, Airflow orchestration, Snowflake, dbt, data-quality/backfill tooling — sits outside the candidate's demonstrated AI/LLM and backend service-building experience. A recruiter could plausibly shortlist, but it is an arguable stretch rather than a strong application: classic tier 3."
+    ],
+    "tiebreakNote": null,
+    "title": "Data Engineer",
+    "company": "Northloop Analytics",
+    "description": "Northloop Analytics helps consumer subscription companies understand churn and lifetime value. Our platform ingests billions of behavioral events a month, and the pipelines that shape that data are the product. We are hiring a Data Engineer to build and operate them.\n\nWhat you'll do:\n- Develop batch and streaming pipelines in Python and SQL, orchestrated with Airflow and Kafka\n- Model warehouse tables in PostgreSQL and Snowflake and keep them documented and tested\n- Add data-quality checks, alerting, and backfill tooling so downstream dashboards stay trustworthy\n- Containerize and deploy jobs on AWS (ECS, S3, Lambda) using Docker and Terraform\n\nWhat we're looking for:\n- 1-3 years of experience (internships count) writing production Python\n- Solid SQL and comfort reasoning about schemas, partitions, and idempotent jobs\n- Exposure to Kafka or another event-streaming system\n- Familiarity with AWS and Docker; Airflow or dbt experience is a plus\n\nRemote (US). We offer health coverage, a 401(k) match, and a home-office stipend.",
+    "rationale": "Adjacent role family: data engineering shares several of the candidate's core tools (Python, Kafka, PostgreSQL, AWS, Docker) but pipeline/warehouse work sits outside his backend/AI focus, making it a genuinely arguable moderate fit."
+  },
+  {
+    "id": "T3-B",
+    "intendedTier": 3,
+    "finalTier": 3,
+    "relabeled": false,
+    "verifierTiers": [
+      3,
+      3
+    ],
+    "verifierNotes": [
+      "3/high: Early-career (0-2 yrs) fit is perfect, but the role is embedded C/C++ firmware for robotics — squarely the candidate's secondary experience (embedded C/C++/robotics), not the core AI/LLM/backend TypeScript/Python/AWS stack. No overlap with the primary stack (no cloud, web, or LLM component; ARM Cortex-M, FreeRTOS, SPI/I2C/CAN are a different ecosystem). A role matching only secondary experience caps at T3; the ideal seniority alignment and explicit welcome of personal robotics projects keep it solidly at T3 rather than T4.",
+      "3/high: The role is an early-career embedded C/C++/robotics firmware position (ARM Cortex-M, FreeRTOS, SPI/I2C/CAN, sensor drivers). Seniority is a perfect fit (0-2 yrs, internships/projects count), but the role family matches only the candidate's secondary experience (embedded C/C++ and robotics), not the primary AI/LLM/backend TypeScript-Python-Go stack. Per the rubric, a role matching only secondary experience caps at T3 regardless of seniority alignment. Note: the resume text was passed as \"undefined\", so this judgment relies on the candidate profile embedded in the rubric."
+    ],
+    "tiebreakNote": null,
+    "title": "Embedded Software Engineer",
+    "company": "Halcyon Dynamics",
+    "description": "Halcyon Dynamics builds autonomous mobile robots for greenhouse and nursery operations. Our fleet navigates tight aisles, handles delicate plants, and runs sixteen-hour shifts, so the firmware has to be efficient, predictable, and observable. We are adding an early-career Embedded Software Engineer to the platform team.\n\nResponsibilities:\n- Write and maintain C/C++ firmware for motor control, sensor fusion, and safety interlocks on ARM Cortex-M targets\n- Develop drivers for IMU, lidar, and encoder peripherals over SPI, I2C, and CAN\n- Build hardware-in-the-loop test rigs and board bring-up scripts for new hardware revisions\n- Work with the controls team to tune real-time behavior under FreeRTOS\n\nRequirements:\n- B.S. in CS, CE, or EE and 0-2 years of experience; co-ops, internships, and substantial personal robotics projects all count\n- Strong C or C++ fundamentals and comfort reading datasheets and schematics\n- Hands-on experience with microcontrollers (STM32, Arduino-class boards, or similar)\n- Bonus: ROS 2, motor control, or CAN tooling experience\n\nRemote (US).",
+    "rationale": "Matches only the candidate's secondary embedded C/C++/Arduino robotics experience; his primary AI/LLM and backend profile is irrelevant here, so it lands squarely at moderate."
+  },
+  {
+    "id": "T3-C",
+    "intendedTier": 3,
+    "finalTier": 3,
+    "relabeled": false,
+    "verifierTiers": [
+      3,
+      3
+    ],
+    "verifierNotes": [
+      "3/high: QA automation is explicitly an adjacent role family under the rubric, which caps it at T3 despite otherwise favorable signals. Stack overlap is strong (TypeScript, Node.js, Playwright-style tooling within the candidate's core ecosystem) and seniority is a clean fit (1-3 yrs, internships considered, entry-friendly). But the role's center of gravity is test engineering, not backend or AI/LLM product work, so a recruiter would see the candidate as plausible-but-lateral rather than a direct hit. Note: the resume text was passed as \"undefined\"; judgment relies on the candidate profile embedded in the rubric (early-career TS/Python/Node engineer, 2024 B.S., current M.S.).",
+      "3/high: QA automation is an adjacent role family, which the rubric places squarely at T3 even with tool overlap. The stack fit is genuinely good — TypeScript, Node.js, GitHub Actions CI are core to the candidate — and the seniority is ideal (1-3 yrs, strong internships explicitly considered), which is why this is not lower. But there is no AI/LLM component and the day-to-day work is test-suite ownership (Playwright/Cypress/Selenium, flake quarantine, coverage metrics) rather than backend or agentic-AI engineering; the posting also asks for hands-on browser-automation-testing experience the candidate's profile does not center on. Arguable-but-adjacent: a moderate match, T3."
+    ],
+    "tiebreakNote": null,
+    "title": "QA Automation Engineer",
+    "company": "Brightgate Software",
+    "description": "Brightgate Software makes scheduling and dispatch tools for field-service companies. Releases ship weekly, and our customers run their entire day through the product, so regressions are expensive. We are hiring a QA Automation Engineer to own end-to-end test coverage across our web app and public API.\n\nYou will:\n- Design and maintain Playwright suites in TypeScript covering critical customer flows\n- Build API and contract tests against our Node.js services\n- Wire suites into GitHub Actions with parallel sharding, flake quarantine, and clear failure reporting\n- Partner with product engineers to make features testable and to triage regressions before release\n- Track coverage and escape metrics and push the team to close the gaps\n\nYou have:\n- 1-3 years in QA automation or software engineering; strong internship experience considered\n- Solid TypeScript or JavaScript and comfort in the Node.js toolchain\n- Experience with Playwright, Cypress, or Selenium\n- A habit of treating test code like production code: typed, reviewed, and refactored\n\nRemote (US).",
+    "rationale": "QA/test-automation in TypeScript and Node.js overlaps the candidate's tooling heavily, but the role family is testing rather than backend or AI engineering — adjacent, not core."
+  },
+  {
+    "id": "T3-D",
+    "intendedTier": 3,
+    "finalTier": 3,
+    "relabeled": false,
+    "verifierTiers": [
+      3,
+      3
+    ],
+    "verifierNotes": [
+      "3/high: Stack overlap is near-perfect (TypeScript/Node.js, PostgreSQL, Redis, Kafka, AWS, Docker — all in the candidate's core toolkit), but the role is pitched solidly senior: 5+ years of professional backend experience, expert-level fluency, mentoring mid-level engineers, and a track record of leading multi-quarter, multi-engineer projects. The candidate is early-career (2024 B.S., current M.S., internships), so a recruiter would see a clear seniority mismatch despite the ideal technology fit. Per the rubric, a core-stack role requiring 5+ years is at most moderate — a genuinely arguable long shot, not a strong application.",
+      "3/high: Stack overlap is near-perfect with the candidate's core toolkit (TypeScript/Node.js microservices, PostgreSQL, Redis, Kafka, AWS, Docker), but the role is pitched solidly senior: 5+ years of professional backend experience, significant production ownership of high-throughput systems, mentoring mid-level engineers, and leading multi-quarter cross-engineer projects. An early-career candidate (B.S. 2024, current M.S., internships) cannot credibly meet the seniority and leadership bar, and there is no AI/LLM component to offset it. Per the rubric, a core-stack role requiring 5+ years lands at T3 — arguable stack fit, wrong seniority."
+    ],
+    "tiebreakNote": null,
+    "title": "Senior Backend Engineer, Fulfillment Core",
+    "company": "Trellisworks",
+    "description": "Trellisworks builds the order-orchestration platform behind several hundred e-commerce brands. We are hiring a Senior Backend Engineer for the fulfillment core team, which owns the services that route every order from checkout to carrier handoff.\n\nThe work:\n- Design and evolve TypeScript/Node.js microservices that process millions of orders a day\n- Own data models in PostgreSQL and caching strategies in Redis under strict latency budgets\n- Extend our Kafka event backbone and the contracts a dozen other teams build on\n- Lead design reviews, mentor mid-level engineers, and set the reliability bar for the team\n- Operate what you ship on AWS (ECS, RDS, MSK) with Docker and Terraform\n\nRequirements:\n- 5+ years of professional backend experience, including significant ownership of a high-throughput distributed system in production\n- Expert-level Node.js/TypeScript and deep SQL fluency, including query planning and migration strategy at scale\n- A track record of leading multi-quarter projects across several engineers\n\nRemote (US).",
+    "rationale": "Near-perfect core-stack overlap (TypeScript/Node.js, PostgreSQL, Redis, Kafka, AWS, Docker), but the explicit 5+ years plus mentoring and multi-quarter leadership scope make seniority the sole mismatch, which caps an early-career candidate at moderate."
+  },
+  {
+    "id": "T4-A",
+    "intendedTier": 4,
+    "finalTier": 4,
+    "relabeled": false,
+    "verifierTiers": [
+      4,
+      4
+    ],
+    "verifierNotes": [
+      "4/high: Salesforce Administrator is a CRM-admin role family with only incidental technical overlap for this early-career AI/LLM/backend engineer. The work is declarative platform administration (Flows, permission sets, reports, end-user support) in the Salesforce ecosystem, with no use of the candidate's core stack (TypeScript/Python/Go, AWS, PostgreSQL/Redis/Kafka) and no software-engineering component (Apex explicitly optional). It also matches none of the candidate's secondary experience areas. A recruiter would not shortlist this candidate; seniority (1-3 yrs admin) is irrelevant given the ecosystem/role mismatch. Not T5 because it is still a technical role, but clearly weak: T4.",
+      "4/high: Salesforce Administrator is a CRM-admin role family centered on declarative tooling (Flows, permission sets, reports, ADM-201 certification) with no software engineering, no AI/LLM component, and no overlap with the candidate's core stack (TypeScript/Python/Go, AWS, PostgreSQL/Kafka) or secondary experience (SAP/ABAP, embedded C++, appsec, healthcare-sim). Seniority (1-3 yrs) fits, but overlap is only incidentally technical — the rubric explicitly lists Salesforce/CRM admin as a T4 example; a recruiter would not shortlist this candidate."
+    ],
+    "tiebreakNote": null,
+    "title": "Salesforce Administrator",
+    "company": "MeridianReach",
+    "description": "MeridianReach is a donor-engagement consultancy supporting nonprofit and higher-education clients nationwide. We are hiring a Salesforce Administrator to own the day-to-day health of our internal Sales Cloud and Nonprofit Success Pack orgs. This is a Remote (US) position reporting to the Director of Revenue Operations.\n\nWhat you'll do:\n- Manage users, profiles, permission sets, and license assignments across two orgs\n- Build and maintain Flows, validation rules, approval processes, and page layouts\n- Create reports and dashboards for fundraising, pipeline, and campaign teams\n- Triage support tickets, document solutions, and train end users on new features\n- Coordinate sandbox testing and release management for seasonal Salesforce updates\n- Evaluate AppExchange packages and manage integrations with our email marketing platform\n\nWhat we're looking for:\n- 1-3 years administering a Salesforce org (Sales Cloud or NPSP preferred)\n- Salesforce Administrator certification (ADM-201) or willingness to earn it within six months\n- Strong grasp of declarative automation; Apex is a plus but not required\n- Clear written communication and patience for end-user support\n\nWe offer medical/dental/vision, a 401(k) match, and a development stipend that covers Trailhead Superbadges and certification exams.",
+    "rationale": "Salesforce administration is a declarative CRM-platform role family with no overlap with the candidate's AI/backend engineering profile beyond generic 'works with software' — a recruiter would not shortlist a backend/LLM engineer for an admin seat. Ecosystem (Salesforce/Apex/Flows) and role family (ops/admin) are both foreign, and it touches none of the candidate's hidden-overlap domains."
+  },
+  {
+    "id": "T4-B",
+    "intendedTier": 4,
+    "finalTier": 4,
+    "relabeled": false,
+    "verifierTiers": [
+      4,
+      4
+    ],
+    "verifierNotes": [
+      "4/high: Junior Unity Game Developer is a different ecosystem and role family from the candidate's core profile (AI/LLM and backend work in TypeScript/Python/Go/Node.js with AWS/PostgreSQL/Kafka). The role requires Unity/C# specifics — a shipped Unity project, coroutines, ScriptableObjects, uGUI/prefabs, mobile profiling — none of which appear in the candidate's primary or secondary experience; embedded C/C++ is only incidental language adjacency, not game-engine experience. Seniority is junior-friendly, but a recruiter would not shortlist this candidate without a Unity portfolio piece. Technical-but-incidental overlap places it at T4.",
+      "4/high: Junior Unity Game Developer is a different ecosystem (C#/Unity, mobile game dev) and a different role family from the candidate's backend/AI-LLM profile (TypeScript/Python/Go, AWS, PostgreSQL/Redis/Kafka). Overlap is only incidental — general programming ability and version control; the candidate has no shipped Unity project, no C#/Unity lifecycle experience, and none of the listed requirements. The junior seniority fits, but a recruiter would not shortlist this candidate. It does not match secondary experience (SAP/ABAP, embedded C/C++, appsec) either, so it does not rise to T3, and it is clearly technical, so not T5."
+    ],
+    "tiebreakNote": null,
+    "title": "Junior Unity Game Developer",
+    "company": "Pixelbloom Studios",
+    "description": "Pixelbloom Studios makes cozy mobile puzzle and simulation games enjoyed by millions of players. We're looking for a Junior Unity Developer to join our live-games team and help ship new content, features, and events for our flagship title. The role is Remote (US) with a distributed team across four time zones.\n\nResponsibilities:\n- Implement gameplay features, UI screens, and live-event mechanics in Unity using C#\n- Work from designer specs and artist assets to bring polished experiences to device\n- Profile and optimize scenes for low-end Android and iOS hardware\n- Integrate third-party SDKs for analytics, ads, and in-app purchases\n- Fix bugs reported by QA and players, and participate in weekly build reviews\n\nRequirements:\n- A shipped Unity project — commercial, student, or a polished portfolio piece\n- Solid C# fundamentals: coroutines, ScriptableObjects, the component lifecycle\n- Familiarity with Unity UI (uGUI or UI Toolkit), prefabs, and animation basics\n- Comfort with version control and working in a shared project\n- Bonus: experience with Addressables, shaders, or mobile performance profiling\n\nWe offer competitive pay, full benefits, a home-office budget, and quarterly playtest weeks where the whole studio plays what we're building.",
+    "rationale": "Mobile game development in Unity/C# is a different ecosystem and role family (gameplay/UI/graphics for entertainment) with only the incidental overlap of general programming ability; the candidate has no Unity, C#, or game-dev background. It deliberately stays clear of embedded C++/robotics by centering C#, mobile SDKs, and asset pipelines rather than low-level systems work."
+  },
+  {
+    "id": "T4-C",
+    "intendedTier": 4,
+    "finalTier": 4,
+    "relabeled": false,
+    "verifierTiers": [
+      4,
+      4
+    ],
+    "verifierNotes": [
+      "4/high: This is a .NET line-of-business role (C#, ASP.NET/WinForms, SQL Server, Entity Framework, Crystal Reports/SSRS) in property-management software — a different ecosystem and role family from the candidate's core TypeScript/Python/Go/Node.js, AWS, PostgreSQL/Redis/Kafka stack and AI/LLM focus. Overlap is only incidental (general SQL/relational-database familiarity and generic web-dev skills); the candidate has no C#/.NET experience in either core or secondary areas (SAP/ABAP, embedded C/C++, appsec, healthcare-sim, fintech/Kafka), so it does not even reach the secondary-experience T3 bar. Seniority fits (1-3 yrs, internships count), but stack and domain mismatch mean a recruiter would not shortlist this candidate. Weak match: tier 4.",
+      "4/high: This is a .NET line-of-business role (C#, ASP.NET/WinForms, SQL Server, Entity Framework, Crystal Reports/SSRS) in property-management software — a different ecosystem from the candidate's core TypeScript/Python/Go/Node, AWS, PostgreSQL/Redis/Kafka stack and unrelated to AI/LLM work. Overlap is only incidental (relational SQL, general web-dev fundamentals); the candidate has no C#/.NET experience in either primary or secondary areas. Although the seniority fits (1-3 yrs, internships count), a recruiter screening for professional or academic C# experience would not shortlist this candidate. Weak match: right level, wrong ecosystem and role family."
+    ],
+    "tiebreakNote": null,
+    "title": "Associate Software Developer (.NET)",
+    "company": "Cornerstone Property Systems",
+    "description": "Cornerstone Property Systems builds the software that regional property-management firms run their businesses on — leasing, rent collection, maintenance workflows, and owner statements. We're hiring an Associate Software Developer to join the team that maintains and extends our core .NET product suite. Remote (US).\n\nWhat you'll work on:\n- New features and enhancements in our ASP.NET (C#) web application and WinForms back-office tools\n- SQL Server stored procedures, reporting queries, and schema changes with the DBA team\n- Crystal Reports and SSRS updates for owner and compliance statements\n- Bug fixes across a mature, well-documented codebase with an established release cadence\n- Migrating legacy WebForms screens to modern ASP.NET Core as part of a multi-year roadmap\n\nQualifications:\n- 1-3 years (internships count) writing C# in a professional or academic setting\n- Working knowledge of SQL Server or another relational database\n- Familiarity with Entity Framework, LINQd, and Visual Studio\n- An interest in accounting or property-management domain logic is a plus\n\nYou'll get mentorship from senior developers, a predictable 40-hour week, health/dental/vision coverage, and a clear promotion path to mid-level within 18-24 months.",
+    "rationale": "A .NET/C#/SQL Server line-of-business shop in property management shares only the incidental 'knows a relational database' overlap — the entire toolchain (ASP.NET, WinForms, Entity Framework, SSRS) sits outside the candidate's TypeScript/Python/Go stack and there is no AI component. Property management as a domain avoids fintech/trading, healthcare, and every other hidden-overlap area."
+  },
+  {
+    "id": "T4-D",
+    "intendedTier": 4,
+    "finalTier": 4,
+    "relabeled": false,
+    "verifierTiers": [
+      4,
+      4
+    ],
+    "verifierNotes": [
+      "4/high: WordPress agency work is a different ecosystem (PHP/Timber/Twig, WooCommerce, MySQL, ACF) and a different role family from the candidate's TypeScript/Python/Node backend and AI/LLM profile. Overlap is only incidental — Git, general front-end/JS basics, responsive layouts — with none of the candidate's core stack (AWS, PostgreSQL/Redis/Kafka, Docker) or AI focus, and it matches none of the secondary experience areas either. The 1-3 year requirement fits the candidate's seniority, but the posting explicitly wants professional WordPress site-building experience the candidate lacks, so a recruiter would not shortlist them. Weak/incidental technical overlap: tier 4.",
+      "4/high: WordPress agency work is a different ecosystem (PHP/Timber/Twig/SCSS/WooCommerce/MySQL) and a different role family from the candidate's core TypeScript/Python/Go backend and AI/LLM profile. There is no AI/LLM component, no overlap with the core stack beyond generic web fundamentals and Git, and it does not touch any secondary experience area (SAP/ABAP, embedded C/C++, appsec, healthcare-sim, fintech/Kafka). The 1-3 years requirement even specifies professional WordPress experience the candidate lacks. Overlap is only incidental technical skill; a recruiter would not shortlist this candidate — squarely T4 weak."
+    ],
+    "tiebreakNote": null,
+    "title": "WordPress Developer",
+    "company": "Juniper & Vale",
+    "description": "Juniper & Vale is a twelve-person digital agency crafting websites for boutique hospitality, wellness, and lifestyle brands. We're adding a WordPress Developer to our build team. Remote (US), with core collaboration hours of 10am-3pm Eastern.\n\nThe work:\n- Build custom WordPress themes from Figma designs using PHP, Timber/Twig, SCSS, and vanilla JavaScript\n- Develop and maintain custom plugins and Advanced Custom Fields configurations\n- Set up and customize WooCommerce storefronts, including payment and shipping integrations\n- Handle site migrations, performance tuning (caching, image optimization, Core Web Vitals), and plugin updates across a maintenance portfolio of ~40 client sites\n- Collaborate with designers and project managers in weekly sprint check-ins\n\nYou should have:\n- 1-3 years building WordPress sites professionally (agency experience a plus)\n- Strong PHP and MySQL fundamentals; comfort reading and extending others' theme code\n- Front-end chops: responsive layouts, cross-browser testing, accessibility basics\n- Experience with local dev tooling (Local, DDEV, or similar) and Git\n\nWe offer health benefits, 20 days PTO, summer Fridays, and a paid annual pass to a WordCamp of your choice.",
+    "rationale": "PHP/WordPress agency site-building is a different ecosystem (PHP, MySQL, theming, CMS plugins) and a different role family (client web production) from the candidate's AI/backend engineering; overlap is limited to generic web literacy and Git. No AI, no candidate-stack languages, and no hidden-overlap domain is touched."
+  },
+  {
+    "id": "T5-A",
+    "intendedTier": 5,
+    "finalTier": 5,
+    "relabeled": false,
+    "verifierTiers": [
+      5,
+      5
+    ],
+    "verifierNotes": [
+      "5/high: Family Law Paralegal is a non-software legal-support occupation: drafting pleadings, managing case files, court e-filing, and client communication for a family law firm. It requires a paralegal certificate or law-firm experience and involves zero programming, zero overlap with the candidate's core stack (AI/LLM, TypeScript/Python/Go, AWS, PostgreSQL/Kafka), and no match to any secondary experience (SAP/ABAP, embedded C/C++, appsec, healthcare-sim support, fintech backend). It is not an engineering-titled or healthcare-equipment role, so no T5 exclusions apply. This is a textbook no-match.",
+      "5/high: Family Law Paralegal is a non-software, legal-support occupation with zero technical overlap for an early-career AI/backend software engineer. No engineering title, no stack relevance (drafting pleadings, e-filing, case calendaring), and it does not touch any of the candidate's secondary areas (SAP/ABAP, embedded C/C++, appsec, healthcare-sim support, fintech backend). This squarely matches the T5 definition of non-software roles such as legal/clinical/retail work; a recruiter would never consider this candidate and the candidate should not apply."
+    ],
+    "tiebreakNote": null,
+    "title": "Family Law Paralegal",
+    "company": "Harbor & Vance Family Law Group",
+    "description": "Harbor & Vance Family Law Group is a boutique firm serving clients across a dozen states in divorce, custody, and support matters. We are hiring a full-time Family Law Paralegal to support our attorneys from anywhere in the US.\n\nWhat you'll do:\n- Draft and proofread pleadings, discovery requests, financial disclosures, and correspondence under attorney supervision\n- Maintain case files, calendar hearings and mediations, and track court filing deadlines\n- Prepare exhibits and trial binders and coordinate service of process\n- Communicate with clients to gather documents and provide status updates with empathy and discretion\n- E-file documents with state and county courts and confirm acceptance\n\nWhat we're looking for:\n- Paralegal certificate or associate degree, or equivalent law-firm experience\n- 1-3 years supporting a litigation or family law practice preferred; strong recent graduates considered\n- Excellent grammar, attention to detail, and calendar discipline\n- Ability to handle sensitive family matters with confidentiality and tact\n\nCompensation: $52,000-$64,000 plus benefits. Location: Remote (US).",
+    "rationale": "Family-law legal support has zero overlap with the candidate's software, AI, or any secondary domain (no SAP, embedded, healthcare-sim, or security angle), and it is not an engineering-titled role, making it unambiguously T5."
+  },
+  {
+    "id": "T5-B",
+    "intendedTier": 5,
+    "finalTier": 5,
+    "relabeled": false,
+    "verifierTiers": [
+      5,
+      5
+    ],
+    "verifierNotes": [
+      "5/high: Elementary Reading Tutor is a non-software, education-services occupation with zero overlap with the candidate's software engineering profile (AI/LLM, backend, TypeScript/Python, AWS) or any of the secondary experience areas (SAP/ABAP, embedded C/C++, appsec, healthcare-sim lab, fintech backend). No engineering title, no technical stack, no healthcare-equipment/simulation angle — it squarely fits the T5 definition of no technical overlap.",
+      "5/high: Elementary Reading Tutor is a non-software, education-services occupation with zero overlap with the candidate's software engineering profile (AI/LLM, backend TypeScript/Python, or any secondary area like SAP, embedded, security, or sim-lab support). No engineering title, no technical stack, no adjacency — a recruiter would not consider this candidate's background relevant, and the role's requirements (K-5 literacy instruction, teaching experience) match nothing on the resume. This is a clean T5 per the rubric's non-technical-occupation definition."
+    ],
+    "tiebreakNote": null,
+    "title": "Elementary Reading Tutor (K-5, Virtual)",
+    "company": "BrightSprout Learning",
+    "description": "BrightSprout Learning provides one-on-one and small-group reading instruction to K-5 students nationwide through live video sessions. We are adding Elementary Reading Tutors to our remote instructional team.\n\nThe role: You will deliver structured literacy lessons using our phonics-based curriculum, track each student's progress against grade-level benchmarks, and partner with families to build confident readers. Sessions run afternoons and early evenings, with flexible scheduling between 20 and 35 hours per week.\n\nResponsibilities:\n- Teach engaging, curriculum-aligned reading lessons to students in grades K-5\n- Assess decoding, fluency, and comprehension and adjust lesson pacing accordingly\n- Write brief session notes and monthly progress summaries for parents\n- Attend twice-monthly virtual coaching sessions with your instructional lead\n\nRequirements:\n- Bachelor's degree; elementary education, English, or child development a plus\n- Teaching, tutoring, camp, or classroom-aide experience with young learners\n- Warm, patient communication style and a reliable, quiet home workspace\n- New teachers and recent education graduates encouraged to apply\n\nLocation: Remote (US). Pay: $22-$28 per hour depending on experience.",
+    "rationale": "Elementary literacy instruction is a non-software occupation requiring pedagogy credentials, not technical skills; nothing in the candidate's primary or hidden experience (AI, backend, SAP, embedded, security, sim-lab equipment) applies."
+  },
+  {
+    "id": "T5-C",
+    "intendedTier": 5,
+    "finalTier": 5,
+    "relabeled": false,
+    "verifierTiers": [
+      5,
+      5
+    ],
+    "verifierNotes": [
+      "5/high: Grant Writer at a nonprofit fundraising consultancy is a non-software occupation with zero technical overlap for an early-career AI/LLM backend engineer. The role centers on persuasive writing, funder prospect research, and deadline management, requiring an English/communications/nonprofit background and writing samples — none of the candidate's primary stack (TypeScript/Python/Go, AWS, PostgreSQL/Kafka) or secondary experience (SAP/ABAP, embedded C/C++, appsec, healthcare-sim support, fintech backend) applies. It is not an engineering-titled role and not healthcare-equipment/simulation, so no exclusions from T5 apply. The early-career (0-3 yrs) seniority match is irrelevant given the complete role-family mismatch.",
+      "5/high: Grant Writer at a philanthropy consultancy is a non-software occupation with zero technical overlap for an early-career AI/LLM/backend software engineer. The role centers on persuasive nonprofit writing, prospect research, and deadline management, and asks for an English/communications/nonprofit background with writing samples — none of the candidate's core stack (TypeScript/Python/Go, AWS, PostgreSQL/Kafka, LLM/agentic work) or secondary experience (SAP/ABAP, embedded C/C++, appsec, healthcare-sim support, fintech backend) applies. It is not healthcare-equipment/simulation adjacent and carries no engineering title, so the T5 exclusions do not apply. Per the rubric, non-technical role families with no overlap are T5."
+    ],
+    "tiebreakNote": null,
+    "title": "Grant Writer",
+    "company": "Meadowlark Philanthropy Partners",
+    "description": "Meadowlark Philanthropy Partners helps small and mid-sized nonprofits secure foundation, corporate, and government funding. We are hiring an early-career Grant Writer to join our fully remote consulting team.\n\nAbout the role: You will research funding opportunities, draft compelling proposals and letters of inquiry, and manage submission calendars for a portfolio of 6-8 nonprofit clients working in areas such as food security, arts education, and housing.\n\nResponsibilities:\n- Write clear, persuasive grant narratives, budget justifications, and reports\n- Research foundations and build prospect lists matched to client missions\n- Track deadlines, attachments, and funder requirements across your portfolio\n- Interview client program staff to gather stories, outcomes, and data points\n- Support post-award reporting and stewardship correspondence\n\nQualifications:\n- Bachelor's degree in English, communications, nonprofit management, or similar\n- 0-3 years of grant writing, fundraising, journalism, or professional writing experience; strong writing samples required\n- Organized, deadline-driven, and comfortable juggling multiple clients\n\nSalary: $50,000-$60,000 with benefits and a professional development stipend. Location: Remote (US).",
+    "rationale": "Nonprofit fundraising writing is purely a communications occupation with no software component and no contact with any of the candidate's technical or secondary domains, so a recruiter would never shortlist this engineer — clean T5."
+  },
+  {
+    "id": "T5-D",
+    "intendedTier": 5,
+    "finalTier": 5,
+    "relabeled": false,
+    "verifierTiers": [
+      5,
+      5
+    ],
+    "verifierNotes": [
+      "5/high: Corporate Travel Coordinator is a non-software, guest-services/reservations occupation (booking flights and hotels, invoice reconciliation, traveler profiles) with zero overlap with the candidate's software engineering background — no engineering title, no technical stack, and no connection to the candidate's secondary experience (SAP/ABAP, embedded, security, healthcare-sim, fintech). It also targets hospitality/airline customer-service experience the candidate does not have. This fits the T5 definition of a non-technical role with no engineering component.",
+      "5/high: Corporate Travel Coordinator is a non-software, guest-services occupation (booking flights/hotels, invoice reconciliation, traveler profiles) with zero overlap with the candidate's software engineering background — no programming, no technical stack, no engineering title. It also does not touch the candidate's secondary areas (no healthcare-sim, no security, no embedded work). This is a clear no-match: the candidate would not be shortlisted and the role does not use any of their skills."
+    ],
+    "tiebreakNote": null,
+    "title": "Corporate Travel Coordinator",
+    "company": "Copperleaf Travel Management",
+    "description": "Copperleaf Travel Management arranges business travel for professional services firms and conference groups across North America. We are seeking a Corporate Travel Coordinator to join our remote reservations team.\n\nIn this role you will build itineraries, book air, hotel, and ground transportation, and serve as the calm, resourceful point of contact when plans change. You'll work a set weekday schedule with a rotating on-call weekend once every six weeks.\n\nDay to day:\n- Book and modify flights, hotels, and car service for corporate travelers\n- Monitor schedule changes and disruptions and proactively rebook affected travelers\n- Apply client travel policies and preferred vendor programs to every booking\n- Reconcile invoices against bookings and flag discrepancies for accounting\n- Maintain traveler profiles, loyalty numbers, and documentation requirements\n\nYou bring:\n- 1-3 years in travel booking, hospitality, airline customer service, or another guest-facing role\n- Composure under pressure and excellent phone and email etiquette\n- Willingness to earn industry booking certifications; we provide full training\n\nPay: $21-$26 per hour plus quarterly service bonuses. Location: Remote (US).",
+    "rationale": "Travel reservations and guest services is a hospitality/logistics-service occupation with zero technical overlap — no engineering title, no software work, and no proximity to the candidate's hidden domains — placing it unambiguously at T5."
+  }
+]

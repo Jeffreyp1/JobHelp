@@ -10,6 +10,7 @@ import {
   PROMPT_TAILOR_RESUME_URI,
   PROMPT_TAILOR_RESUMES_URI,
   PROMPT_VALIDATE_RESUME_URI,
+  PROMPT_JOB_DIGEST_TAILOR_URI,
   RECENT_DIGEST_URI,
   RESUME_URI,
   RULES_DEFAULTS_URI,
@@ -26,9 +27,11 @@ const EXPECTED_TOOL_NAMES = [
   'find_matching_jobs',
   'get_latest_digest',
   'get_job',
+  'get_triage_list',
   'read_rules',
   'read_resume',
   'score_keyword_match',
+  'analyze_fit',
   'start_application',
   'write_application_output',
   'list_application_versions',
@@ -154,12 +157,12 @@ describe('bootstrap (wired) — surface', () => {
     expect(typeof resourceDeps.readState).toBe('function');
   });
 
-  it('buildServer accepts wired deps and exposes 21 tools + 9 resources + 3 prompts', async () => {
+  it('buildServer accepts wired deps and exposes 23 tools + 10 resources + 4 prompts', async () => {
     const { coreDeps, resourceDeps } = await bootstrap();
     const handle = buildServer({ coreDeps, resourceDeps });
-    expect(handle.tools.length).toBe(21);
-    expect(handle.resources.length).toBe(9);
-    expect(handle.prompts.length).toBe(3);
+    expect(handle.tools.length).toBe(23);
+    expect(handle.resources.length).toBe(10);
+    expect(handle.prompts.length).toBe(4);
     const toolNames = handle.tools.map((t) => t.definition.name).sort();
     expect(toolNames).toEqual(
       [
@@ -177,6 +180,7 @@ describe('bootstrap (wired) — surface', () => {
         PROMPT_TAILOR_RESUME_URI,
         PROMPT_TAILOR_RESUMES_URI,
         PROMPT_VALIDATE_RESUME_URI,
+        PROMPT_JOB_DIGEST_TAILOR_URI,
         RECENT_DIGEST_URI,
         RESUME_URI,
         RULES_DEFAULTS_URI,

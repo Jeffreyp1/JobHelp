@@ -1,124 +1,193 @@
-import type { JobDigestConfig, MaxAgeConfig, NormalizedJob, ProfileConfig, Seniority } from '../types/index.js';
+import type { JobDigestConfig, NormalizedJob } from '../types/index.js';
 import { log } from '../lib/log.js';
-import { detectCountryFromLocation, detectRoleFamily, detectSeniorityLevel, isGhostJob } from './classify.js';
+import { detectRoleFamily, isGhostJob } from './classify.js';
+import {
+  dropForAge,
+  dropsForCountry,
+  dropsForEngineerLevel,
+  dropsForInternMismatch,
+  dropsForLeadInTitle,
+  dropsForObviousNonSoftware,
+  dropsForRemote,
+  dropsForRoleFamily,
+  dropsForSalary,
+  dropsForSeniorInTitle,
+  dropsForSeniority,
+  dropsForStrictSenior,
+  dropsForUnknownCountry,
+} from './filterRules.js';
 
-const SENIORITY_LADDER: readonly Seniority[] = ['intern', 'entry', 'mid', 'senior', 'staff'];
-const STRICT_SENIOR_PROFILES: ReadonlySet<Seniority> = new Set(['intern', 'entry', 'mid']);
-const STRICT_SENIOR_TITLE_RE = /\b(staff|principal|director|head of)\b/i;
-const ENGINEER_LEVEL_RE = /\b(?:software\s+)?engineer\s+(?:II|III|IV)\b/i;
-const SENIOR_TITLE_RE = /\bsenior\b|\bsr\.?\b/i;
-const LEAD_TITLE_RE = /\blead\b/i;
-const INTERN_TITLE_RE = /\b(intern|internship|new ?grad)\b/i;
-const OBVIOUS_NON_SOFTWARE_TITLE_RE = /\b(?:registered\s+nurse|nurse|rn|lpn|physician|dentist|pharmacist|therapist|medical\s+assistant)\b/i;
-const MS_PER_DAY = 86_400_000;
+export { dropForAge } from './filterRules.js';
 
-function seniorityIndex(level: Seniority): number {
-  return SENIORITY_LADDER.indexOf(level);
+export type DropReason =
+  | 'ghost'
+  | 'non_software'
+  | 'role_family'
+  | 'strict_senior'
+  | 'engineer_level'
+  | 'senior_in_title'
+  | 'intern_mismatch'
+  | 'lead_in_title'
+  | 'remote'
+  | 'country'
+  | 'country_unknown'
+  | 'salary'
+  | 'seniority_distance'
+  | 'age';
+
+interface DropRule {
+  readonly reason: DropReason;
+  readonly drops: (job: NormalizedJob, config: JobDigestConfig, now: Date) => boolean;
+  readonly logDrop?: (job: NormalizedJob, config: JobDigestConfig) => void;
 }
 
-function dropsForRoleFamily(job: NormalizedJob, config: JobDigestConfig): boolean {
-  if (config.profile.roleFamily.length === 0) return false;
-  const detected = detectRoleFamily(job.title, job.description);
-  if (detected === undefined) return false;
-  return !config.profile.roleFamily.includes(detected);
+// Rule order is the drop order: ghost/role-family run before cheaper field checks; age runs
+// LAST so date-shaped drop logs surface only after structural mismatches are already filtered.
+// Invariant: missing data NEVER drops (except when maxAge.requireDate=true or the opt-in
+// strictLocation rule meets a named-but-unclassifiable place).
+// The age rule has no logDrop because dropForAge logs its own detail during evaluation.
+const DROP_RULES: readonly DropRule[] = [
+  {
+    reason: 'ghost',
+    drops: (job) => isGhostJob(job),
+    logDrop: (job) =>
+      log('warn', 'filter.drop_ghost', { id: job.id, source: job.source, reason: 'ghost_or_template' }),
+  },
+  {
+    reason: 'non_software',
+    drops: (job) => dropsForObviousNonSoftware(job),
+    logDrop: (job) =>
+      log('debug', 'filter.drop_obvious_non_software', { id: job.id, source: job.source, title: job.title }),
+  },
+  {
+    reason: 'role_family',
+    drops: dropsForRoleFamily,
+    logDrop: (job, config) =>
+      log('debug', 'filter.drop_role_family', {
+        id: job.id,
+        source: job.source,
+        detected: detectRoleFamily(job.title, job.description),
+        allowed: config.profile.roleFamily,
+      }),
+  },
+  {
+    reason: 'strict_senior',
+    drops: dropsForStrictSenior,
+    logDrop: (job, config) =>
+      log('debug', 'filter.drop_strict_senior', {
+        id: job.id,
+        source: job.source,
+        profileSeniority: config.profile.seniority,
+      }),
+  },
+  {
+    reason: 'engineer_level',
+    drops: dropsForEngineerLevel,
+    logDrop: (job) =>
+      log('debug', 'filter.drop_engineer_level', { id: job.id, source: job.source, title: job.title }),
+  },
+  {
+    reason: 'senior_in_title',
+    drops: dropsForSeniorInTitle,
+    logDrop: (job) =>
+      log('debug', 'filter.drop_senior_in_title', { id: job.id, source: job.source, title: job.title }),
+  },
+  {
+    reason: 'intern_mismatch',
+    drops: dropsForInternMismatch,
+    logDrop: (job, config) =>
+      log('debug', 'filter.drop_intern_mismatch', {
+        id: job.id,
+        source: job.source,
+        profileSeniority: config.profile.seniority,
+      }),
+  },
+  {
+    reason: 'lead_in_title',
+    drops: dropsForLeadInTitle,
+    logDrop: (job) =>
+      log('debug', 'filter.drop_lead_in_title', { id: job.id, source: job.source, title: job.title }),
+  },
+  {
+    reason: 'remote',
+    drops: dropsForRemote,
+    logDrop: (job) => log('debug', 'filter.drop_remote', { id: job.id }),
+  },
+  {
+    reason: 'country',
+    drops: (job, config) => dropsForCountry(job, config.profile),
+    logDrop: (job) =>
+      log('debug', 'filter.drop_country', { id: job.id, source: job.source, location: job.location }),
+  },
+  {
+    reason: 'country_unknown',
+    drops: (job, config) => dropsForUnknownCountry(job, config.profile),
+    logDrop: (job) =>
+      log('debug', 'filter.drop_country_unknown', { id: job.id, source: job.source, location: job.location }),
+  },
+  {
+    reason: 'salary',
+    drops: dropsForSalary,
+    logDrop: (job) => log('debug', 'filter.drop_salary', { id: job.id, salaryMax: job.salaryMax }),
+  },
+  {
+    reason: 'seniority_distance',
+    drops: dropsForSeniority,
+    logDrop: (job) => log('debug', 'filter.drop_seniority', { id: job.id, title: job.title }),
+  },
+  {
+    reason: 'age',
+    drops: (job, config, now) =>
+      config.ranking.maxAge !== undefined && dropForAge(job, config.ranking.maxAge, now),
+  },
+];
+
+function firstDropRule(job: NormalizedJob, config: JobDigestConfig, now: Date): DropRule | undefined {
+  return DROP_RULES.find((rule) => rule.drops(job, config, now));
 }
 
-function dropsForStrictSenior(job: NormalizedJob, config: JobDigestConfig): boolean {
-  if (!STRICT_SENIOR_PROFILES.has(config.profile.seniority)) return false;
-  return STRICT_SENIOR_TITLE_RE.test(job.title);
+export function dropReasonFor(
+  job: NormalizedJob,
+  config: JobDigestConfig,
+  now: Date = new Date(),
+): DropReason | undefined {
+  return firstDropRule(job, config, now)?.reason;
 }
 
-// Closes the gap left by the >=2-step seniority-distance rule (intern vs entry = distance 1).
-function dropsForInternMismatch(job: NormalizedJob, config: JobDigestConfig): boolean {
-  if (config.profile.seniority === 'intern') return false;
-  return INTERN_TITLE_RE.test(job.title);
+// Log-free per-job gate sharing the exact rule table and order used by filter().
+// Adapters apply this at their accumulation site so rejected jobs never pile up in
+// memory; filter() still runs later (idempotent) and keeps the per-drop logging.
+export function makeAcceptPredicate(
+  config: JobDigestConfig,
+  now: Date = new Date(),
+): (job: NormalizedJob) => boolean {
+  return (job: NormalizedJob): boolean => firstDropRule(job, config, now) === undefined;
 }
 
-function dropsForEngineerLevel(job: NormalizedJob, config: JobDigestConfig): boolean {
-  if (config.profile.seniority !== 'entry') return false;
-  return ENGINEER_LEVEL_RE.test(job.title);
+export interface AcceptCounter {
+  accept(job: NormalizedJob): boolean;
+  counts(): Readonly<Record<string, number>>;
+  kept(): number;
 }
 
-function dropsForSeniorInTitle(job: NormalizedJob, config: JobDigestConfig): boolean {
-  if (config.profile.seniority !== 'entry') return false;
-  return SENIOR_TITLE_RE.test(job.title);
-}
-
-function dropsForLeadInTitle(job: NormalizedJob, config: JobDigestConfig): boolean {
-  if (config.profile.seniority !== 'entry') return false;
-  return LEAD_TITLE_RE.test(job.title);
-}
-
-function dropsForRemote(job: NormalizedJob, config: JobDigestConfig): boolean {
-  return job.remote === 'remote' && config.profile.remoteOk === false;
-}
-
-function dropsForObviousNonSoftware(job: NormalizedJob): boolean {
-  return OBVIOUS_NON_SOFTWARE_TITLE_RE.test(job.title);
-}
-
-// allowedCountries matches detectCountryFromLocation output LITERALLY; region buckets
-// ('EU', 'APAC', 'LATAM') do NOT subsume member countries. Bare 'Remote' (undetected) survives.
-// Remote vs non-remote branches collapsed: both returned identical values for every (detected, allowlist) pair.
-function dropsForCountry(job: NormalizedJob, profile: ProfileConfig): boolean {
-  const allowlist = profile.allowedCountries;
-  if (allowlist === undefined || allowlist.length === 0) return false;
-  const detected = detectCountryFromLocation(job.location);
-  if (detected === undefined) return false;
-  return !allowlist.includes(detected);
-}
-
-function dropsForSalary(job: NormalizedJob, config: JobDigestConfig): boolean {
-  return typeof job.salaryMax === 'number' && job.salaryMax < config.profile.salaryFloor;
-}
-
-function dropsForSeniority(job: NormalizedJob, config: JobDigestConfig): boolean {
-  const signal = detectSeniorityLevel(job.title, job.description);
-  if (signal === undefined) return false;
-  const distance = Math.abs(seniorityIndex(signal) - seniorityIndex(config.profile.seniority));
-  return distance >= 2;
-}
-
-// Boundary: ageDays exactly equal to cfg.days is KEPT (strict >).
-export function dropForAge(job: NormalizedJob, cfg: MaxAgeConfig, now: Date): boolean {
-  if (!cfg.enabled) return false;
-  // Empty string treated as absent: some adapters emit '' as a sentinel.
-  if (job.postedAt === undefined || job.postedAt === '') {
-    if (cfg.requireDate) {
-      log('debug', 'filter.drop_age_undated', { id: job.id, source: job.source });
+export function makeAcceptCounter(config: JobDigestConfig, now: Date = new Date()): AcceptCounter {
+  const counts: Record<string, number> = {};
+  let keptCount = 0;
+  return {
+    accept: (job: NormalizedJob): boolean => {
+      const rule = firstDropRule(job, config, now);
+      if (rule !== undefined) {
+        counts[rule.reason] = (counts[rule.reason] ?? 0) + 1;
+        return false;
+      }
+      keptCount += 1;
       return true;
-    }
-    return false;
-  }
-  if (!Number.isFinite(now.getTime())) {
-    log('warn', 'filter.drop_age_invalid_now', { id: job.id, source: job.source });
-    return false;
-  }
-  const posted = Date.parse(job.postedAt);
-  if (!Number.isFinite(posted)) {
-    log('warn', 'filter.drop_age_unparseable', {
-      id: job.id,
-      source: job.source,
-      postedAt: job.postedAt,
-    });
-    return cfg.requireDate;
-  }
-  const ageDays = (now.getTime() - posted) / MS_PER_DAY;
-  if (ageDays > cfg.days) {
-    log('debug', 'filter.drop_age_exceeded', {
-      id: job.id,
-      source: job.source,
-      ageDays: Math.round(ageDays * 10) / 10,
-      maxAgeDays: cfg.days,
-    });
-    return true;
-  }
-  return false;
+    },
+    counts: () => ({ ...counts }),
+    kept: () => keptCount,
+  };
 }
 
-// Drop order: ghost/role-family run before cheaper field checks; age runs LAST so date-shaped
-// drop logs surface only after structural mismatches are already filtered.
-// Invariant: missing data NEVER drops (except when maxAge.requireDate=true).
 export async function filter(
   jobs: readonly NormalizedJob[],
   config: JobDigestConfig,
@@ -126,71 +195,12 @@ export async function filter(
 ): Promise<readonly NormalizedJob[]> {
   const out: NormalizedJob[] = [];
   for (const job of jobs) {
-    if (isGhostJob(job)) {
-      log('warn', 'filter.drop_ghost', { id: job.id, source: job.source, reason: 'ghost_or_template' });
+    const rule = firstDropRule(job, config, now);
+    if (rule === undefined) {
+      out.push(job);
       continue;
     }
-    if (dropsForObviousNonSoftware(job)) {
-      log('debug', 'filter.drop_obvious_non_software', { id: job.id, source: job.source, title: job.title });
-      continue;
-    }
-    if (dropsForRoleFamily(job, config)) {
-      log('debug', 'filter.drop_role_family', {
-        id: job.id,
-        source: job.source,
-        detected: detectRoleFamily(job.title, job.description),
-        allowed: config.profile.roleFamily,
-      });
-      continue;
-    }
-    if (dropsForStrictSenior(job, config)) {
-      log('debug', 'filter.drop_strict_senior', {
-        id: job.id,
-        source: job.source,
-        profileSeniority: config.profile.seniority,
-      });
-      continue;
-    }
-    if (dropsForEngineerLevel(job, config)) {
-      log('debug', 'filter.drop_engineer_level', { id: job.id, source: job.source, title: job.title });
-      continue;
-    }
-    if (dropsForSeniorInTitle(job, config)) {
-      log('debug', 'filter.drop_senior_in_title', { id: job.id, source: job.source, title: job.title });
-      continue;
-    }
-    if (dropsForInternMismatch(job, config)) {
-      log('debug', 'filter.drop_intern_mismatch', {
-        id: job.id,
-        source: job.source,
-        profileSeniority: config.profile.seniority,
-      });
-      continue;
-    }
-    if (dropsForLeadInTitle(job, config)) {
-      log('debug', 'filter.drop_lead_in_title', { id: job.id, source: job.source, title: job.title });
-      continue;
-    }
-    if (dropsForRemote(job, config)) {
-      log('debug', 'filter.drop_remote', { id: job.id });
-      continue;
-    }
-    if (dropsForCountry(job, config.profile)) {
-      log('debug', 'filter.drop_country', { id: job.id, source: job.source, location: job.location });
-      continue;
-    }
-    if (dropsForSalary(job, config)) {
-      log('debug', 'filter.drop_salary', { id: job.id, salaryMax: job.salaryMax });
-      continue;
-    }
-    if (dropsForSeniority(job, config)) {
-      log('debug', 'filter.drop_seniority', { id: job.id, title: job.title });
-      continue;
-    }
-    if (config.ranking.maxAge !== undefined && dropForAge(job, config.ranking.maxAge, now)) {
-      continue;
-    }
-    out.push(job);
+    rule.logDrop?.(job, config);
   }
   return out;
 }

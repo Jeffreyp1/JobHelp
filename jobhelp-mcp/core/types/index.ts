@@ -25,7 +25,7 @@ export type {
 export type { NormalizedJob, RemoteMode, JobId } from './job.js';
 export { asJobId } from './job.js';
 
-export type { SourceAdapter, SourceRunResult, SourceError, SourceErrorType } from './source.js';
+export type { FetchOptions, HttpCacheOptions, SharedHttpOptions, SourceAdapter, SourceRunResult, SourceError, SourceErrorType } from './source.js';
 
 export type { RankedJob, ScoreBreakdown, PipelineStage } from './pipeline.js';
 

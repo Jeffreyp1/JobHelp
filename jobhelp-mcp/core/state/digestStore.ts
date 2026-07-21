@@ -82,7 +82,19 @@ function validateDigestShape(raw: unknown): Result<PersistedDigest, DigestError>
     }
     jobs.push(parsed);
   }
-  return ok({ date, generatedAt, totalDurationMs, sourceResults, jobs });
+  const rawDisplayK = raw['displayK'];
+  const displayK =
+    typeof rawDisplayK === 'number' && Number.isFinite(rawDisplayK) && rawDisplayK > 0
+      ? Math.floor(rawDisplayK)
+      : undefined;
+  return ok({
+    date,
+    generatedAt,
+    totalDurationMs,
+    sourceResults,
+    jobs,
+    ...(displayK !== undefined ? { displayK } : {}),
+  });
 }
 
 async function atomicWriteDigest(
@@ -98,6 +110,7 @@ async function atomicWriteDigest(
 
 export async function persistDigest(
   digest: PersistedDigest,
+  opts?: { readonly displayCount?: number },
 ): Promise<
   Result<
     {
@@ -112,6 +125,13 @@ export async function persistDigest(
   if (!DATE_RE.test(digest.date)) {
     return err({ type: 'validation', message: `digest.date must be YYYY-MM-DD: ${digest.date}` });
   }
+  const displayCount = opts?.displayCount;
+  const record: PersistedDigest =
+    displayCount !== undefined && displayCount > 0 && displayCount < digest.jobs.length
+      ? { ...digest, displayK: displayCount }
+      : digest;
+  const displayJobs =
+    displayCount !== undefined ? record.jobs.slice(0, displayCount) : record.jobs;
   const dir = getDigestsDir();
   try {
     await mkdir(dir, { recursive: true });
@@ -123,7 +143,7 @@ export async function persistDigest(
   const latestPath = getLatestPointerPath();
   const markdownPath = getDigestMarkdownPath(digest.date);
   const csvPath = getDigestCsvPath(digest.date);
-  const contents = `${JSON.stringify(digest, null, 2)}\n`;
+  const contents = `${JSON.stringify(record, null, 2)}\n`;
   // Two-step write invariant: dated digest is the source of truth; latest.json
   // is a derived pointer. A crash between the two writes leaves a stale latest
   // (still valid JSON, just pointing to the prior day); readers must tolerate
@@ -139,10 +159,10 @@ export async function persistDigest(
   };
   const markdownWrite = await atomicWriteDigest(
     markdownPath,
-    formatDigestMarkdown(digest.jobs, meta),
+    formatDigestMarkdown(displayJobs, meta),
   );
   if (!markdownWrite.ok) return err(markdownWrite.error);
-  const csvWrite = await atomicWriteDigest(csvPath, formatDigestCsv(digest.jobs));
+  const csvWrite = await atomicWriteDigest(csvPath, formatDigestCsv(displayJobs));
   if (!csvWrite.ok) return err(csvWrite.error);
   const stateWrite = await updateState((state) => ({
     ...state,

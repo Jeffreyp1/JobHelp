@@ -43,6 +43,8 @@ export interface PersistedDigest {
   readonly totalDurationMs: number;
   readonly sourceResults: ReadonlyArray<SourceRunResult>;
   readonly jobs: ReadonlyArray<RankedJob>;
+  /** Display cut for readers: jobs beyond this index are triage-only depth, not the day's headline list. Absent on legacy digests. */
+  readonly displayK?: number;
 }
 
 export const EMPTY_STATE: JobHelpState = {

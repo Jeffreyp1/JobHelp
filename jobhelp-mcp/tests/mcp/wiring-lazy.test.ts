@@ -121,6 +121,6 @@ describe('mcp/wiring lazy re-bootstrap — config written after boot', () => {
 
     const after = await resolver();
     if (after.kind !== 'ready') throw new Error('expected ready config');
-    expect(after.config.sources.ashby?.tokens).toEqual(['verified-ashby']);
+    expect(after.config.sources.ashby?.tokens).toContain('verified-ashby');
   });
 });

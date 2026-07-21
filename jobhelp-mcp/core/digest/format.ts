@@ -4,6 +4,7 @@ export interface DigestMeta {
   readonly date: string;
   readonly sourceResults: readonly SourceRunResult[];
   readonly totalDurationMs: number;
+  readonly appliedJobIds?: ReadonlySet<string>;
 }
 
 const CSV_COLUMNS = [
@@ -83,10 +84,11 @@ function postedDateLabel(postedAt: string | undefined, now: Date): string | null
   return rel === null ? date : `${date} (${rel})`;
 }
 
-function renderJobBlock(rj: RankedJob, now: Date): string {
+function renderJobBlock(rj: RankedJob, now: Date, applied?: ReadonlySet<string>): string {
   const { job, rank, score, llmRationale } = rj;
   const lines: string[] = [];
   lines.push(`## #${rank} ${job.title} - ${job.company} (score ${formatScore(score)})`);
+  if (applied?.has(job.id) === true) lines.push('- **Status:** already applied');
   lines.push(`- **Source:** ${job.source}`);
 
   const salary = formatSalary(job.salaryMin, job.salaryMax);
@@ -142,7 +144,7 @@ export function formatDigestMarkdown(
   } else {
     parts.push('');
     for (const rj of jobs) {
-      parts.push(renderJobBlock(rj, now));
+      parts.push(renderJobBlock(rj, now, meta.appliedJobIds));
       parts.push('');
     }
   }

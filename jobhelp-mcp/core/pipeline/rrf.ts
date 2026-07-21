@@ -1,5 +1,11 @@
 import type { NormalizedJob } from '../types/index.js';
-import { detectRoleFamily, type RoleFamily } from './classify.js';
+import type { Seniority } from '../types/config.js';
+import {
+  detectRoleFamily,
+  detectSeniorityLevel,
+  type RoleFamily,
+  type SeniorityLevel,
+} from './classify.js';
 import { log } from '../lib/log.js';
 
 export interface RankedListEntry<T> {
@@ -72,6 +78,59 @@ export function buildBm25Rank(
   });
   return {
     items: withScore.map(({ job }, idx) => ({ job, rank: idx + 1 })),
+  };
+}
+
+// Jobs without a similarity sink to the end but still appear (missing -> -Infinity).
+export function buildSemanticRank(
+  jobs: readonly NormalizedJob[],
+  similarityById: ReadonlyMap<string, number>,
+): RankedList<NormalizedJob> {
+  const withSim = jobs.map((job) => ({
+    job,
+    sim: similarityById.get(job.id) ?? Number.NEGATIVE_INFINITY,
+  }));
+  withSim.sort((a, b) => {
+    if (b.sim !== a.sim) return b.sim - a.sim;
+    return a.job.id.localeCompare(b.job.id);
+  });
+  return {
+    items: withSim.map(({ job }, idx) => ({ job, rank: idx + 1 })),
+  };
+}
+
+const SENIORITY_ORDER: Readonly<Record<SeniorityLevel, number>> = {
+  intern: 0,
+  entry: 1,
+  mid: 2,
+  senior: 3,
+  staff: 4,
+};
+
+// Level-fit tiers: 2 = exact level match ("New Grad" posting for an entry profile),
+// 1 = no signal or below level, 0 = above level. A bounded promotion signal: as one RRF
+// list among several it breaks ties toward level-matched roles without letting a level
+// match outrank a better-fitting job (which a score multiplier measurably did).
+export function buildLevelFitRank(
+  jobs: readonly NormalizedJob[],
+  candidateLevel: Seniority,
+): RankedList<NormalizedJob> {
+  const candidate = SENIORITY_ORDER[candidateLevel];
+  const tiered = jobs.map((job) => {
+    const detected = detectSeniorityLevel(job.title, job.description);
+    let tier: number;
+    if (detected === undefined || candidate === undefined) tier = 1;
+    else if (SENIORITY_ORDER[detected] === candidate) tier = 2;
+    else if (SENIORITY_ORDER[detected] > candidate) tier = 0;
+    else tier = 1;
+    return { job, tier };
+  });
+  tiered.sort((a, b) => {
+    if (b.tier !== a.tier) return b.tier - a.tier;
+    return a.job.id.localeCompare(b.job.id);
+  });
+  return {
+    items: tiered.map(({ job }, idx) => ({ job, rank: idx + 1 })),
   };
 }
 

@@ -235,6 +235,8 @@ function latestDigest(count: number): GetLatestDigestResult {
     path: '/digests/latest.json',
     generatedAt: '2026-05-26T12:00:00Z',
     jobs: Array.from({ length: count }, (_, index) => rankedJob(index + 1)),
+    totalPersisted: count,
+    nextRequiredStep: 'rerank',
   };
 }
 

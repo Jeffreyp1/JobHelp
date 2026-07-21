@@ -1,9 +1,12 @@
 import type {
+  BlendWeights,
   BM25ConfigBlock,
   BM25FieldName,
   FusionConfig,
+  HistoryConfig,
   MaxAgeConfig,
   RecencyConfig,
+  RerankConfig,
   SourceTrustConfig,
 } from '../types/config.js';
 import { DEFAULT_BM25_PARAMS } from '../pipeline/bm25.js';
@@ -32,9 +35,30 @@ export const DEFAULT_SOURCE_TRUST: SourceTrustConfig = {
   },
 };
 
+export const DEFAULT_BLEND_WEIGHTS: BlendWeights = { bm25: 0.5, semantic: 0.5 };
+
 export const DEFAULT_FUSION: FusionConfig = {
   enabled: false,
   k: 60,
+  mode: 'rrf',
+  weights: DEFAULT_BLEND_WEIGHTS,
+  seniorityPenalty: true,
+};
+
+export const DEFAULT_SEMANTIC_CANDIDATE_LIMIT = 2000;
+
+export const DEFAULT_RERANK_TOP_K = 50;
+
+export const DEFAULT_RERANK: RerankConfig = {
+  enabled: false,
+  topK: DEFAULT_RERANK_TOP_K,
+};
+
+export const DEFAULT_HISTORY_BOOST_CAP = 1.15;
+
+export const DEFAULT_HISTORY: HistoryConfig = {
+  enabled: false,
+  boostCap: DEFAULT_HISTORY_BOOST_CAP,
 };
 
 const BM25_FIELDS: readonly BM25FieldName[] = ['title', 'description', 'company', 'location'];
@@ -122,7 +146,44 @@ export function validateFusion(raw: unknown): FusionConfig {
   const enabled =
     typeof raw['enabled'] === 'boolean' ? raw['enabled'] : DEFAULT_FUSION.enabled;
   const k = isFinitePositive(raw['k']) ? raw['k'] : DEFAULT_FUSION.k;
-  return { enabled, k };
+  const mode = raw['mode'] === 'blend' ? 'blend' : 'rrf';
+  let weights: BlendWeights = DEFAULT_BLEND_WEIGHTS;
+  const rawWeights = raw['weights'];
+  if (isPlainObject(rawWeights)) {
+    weights = {
+      bm25: isFiniteNonNegative(rawWeights['bm25'])
+        ? rawWeights['bm25']
+        : DEFAULT_BLEND_WEIGHTS.bm25,
+      semantic: isFiniteNonNegative(rawWeights['semantic'])
+        ? rawWeights['semantic']
+        : DEFAULT_BLEND_WEIGHTS.semantic,
+    };
+  }
+  const seniorityPenalty =
+    typeof raw['seniorityPenalty'] === 'boolean' ? raw['seniorityPenalty'] : true;
+  return { enabled, k, mode, weights, seniorityPenalty };
+}
+
+export function validateRerank(raw: unknown): RerankConfig {
+  if (!isPlainObject(raw)) return DEFAULT_RERANK;
+  const enabled =
+    typeof raw['enabled'] === 'boolean' ? raw['enabled'] : DEFAULT_RERANK.enabled;
+  const topK = isFinitePositive(raw['topK']) ? Math.floor(raw['topK']) : DEFAULT_RERANK_TOP_K;
+  const rawModel = raw['model'];
+  const model =
+    typeof rawModel === 'string' && rawModel.trim().length > 0 ? rawModel : undefined;
+  return { enabled, topK, ...(model !== undefined ? { model } : {}) };
+}
+
+export function validateHistory(raw: unknown): HistoryConfig {
+  if (!isPlainObject(raw)) return DEFAULT_HISTORY;
+  const enabled =
+    typeof raw['enabled'] === 'boolean' ? raw['enabled'] : DEFAULT_HISTORY.enabled;
+  const boostCap =
+    isFinitePositive(raw['boostCap']) && raw['boostCap'] >= 1
+      ? raw['boostCap']
+      : DEFAULT_HISTORY_BOOST_CAP;
+  return { enabled, boostCap };
 }
 
 export function validateSourceTrust(raw: unknown): SourceTrustConfig {

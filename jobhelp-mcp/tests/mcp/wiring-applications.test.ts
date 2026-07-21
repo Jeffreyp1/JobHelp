@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { bootstrap } from '../../mcp/src/wiring.js';
 import { buildServer } from '../../mcp/src/index.js';
-import { handleFindMatchingJobs } from '../../mcp/src/wiring-handlers.js';
+import { handleFindMatchingJobs, handleGetLatestDigest } from '../../mcp/src/wiring-handlers.js';
 import { ALL_ADAPTERS } from '../../core/sources/index.js';
 import { getLatestDigest, persistDigest } from '../../core/state/digestStore.js';
 import type { SourceAdapter } from '../../core/types/index.js';
@@ -79,9 +79,14 @@ describe('mcp/wiring application flows — boot real server with temp JOBHELP_HO
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.jobs).toHaveLength(2);
+      expect(result.value.nextRequiredStep).toMatch(/raw deterministic/i);
+      expect(result.value.nextRequiredStep).toMatch(/rerank/i);
       const latest = await getLatestDigest();
       expect(latest.ok).toBe(true);
       if (latest.ok) expect(latest.value.jobs).toHaveLength(2);
+      const latestResult = await handleGetLatestDigest();
+      expect(latestResult.ok).toBe(true);
+      if (latestResult.ok) expect(latestResult.value.nextRequiredStep).toMatch(/rerank/i);
     } finally {
       mutableAdapters.length = 0;
       mutableAdapters.push(...originalAdapters);

@@ -164,6 +164,27 @@ describe('formatDigestMarkdown', () => {
   });
 });
 
+describe('formatDigestMarkdown applied annotation', () => {
+  it('marks a job as already applied when meta.appliedJobIds contains its id', () => {
+    const jobs = [makeRanked(1, 0.87)];
+    const meta: DigestMeta = { ...META, appliedJobIds: new Set(['greenhouse:stripe-swe-i']) };
+    const md = formatDigestMarkdown(jobs, meta);
+    expect(md).toContain('- **Status:** already applied');
+  });
+
+  it('omits the applied marker when the id is not in the set', () => {
+    const jobs = [makeRanked(1, 0.87)];
+    const meta: DigestMeta = { ...META, appliedJobIds: new Set(['other:id']) };
+    const md = formatDigestMarkdown(jobs, meta);
+    expect(md).not.toContain('already applied');
+  });
+
+  it('omits the applied marker when meta has no appliedJobIds', () => {
+    const md = formatDigestMarkdown([makeRanked(1, 0.87)], META);
+    expect(md).not.toContain('already applied');
+  });
+});
+
 describe('formatDigestCsv', () => {
   it('renders RFC4180 with header row', () => {
     const jobs: readonly RankedJob[] = [

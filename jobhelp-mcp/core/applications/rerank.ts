@@ -5,6 +5,7 @@ import { err, ok, type Result } from '../types/result.js';
 
 const DEFAULT_TOP_K = 30;
 const MAX_TOP_K = 50;
+const MAX_JOB_IDS = 100;
 
 export interface RerankBundle {
   readonly jobs: ReadonlyArray<RankedJob>;
@@ -16,12 +17,16 @@ export interface RerankBundle {
     readonly totalJDBytes: number;
     readonly digestDate: string;
     readonly digestPath: string;
+    /** Present only on the jobIds path: requested ids absent from the latest digest. */
+    readonly missingIds?: readonly string[];
   };
 }
 
 export interface RerankOptions {
   readonly topK?: number;
   readonly instructions?: string;
+  /** Explicit selection (triage survivors). Wins over topK; capped at 100; digest rank order preserved. */
+  readonly jobIds?: readonly string[];
 }
 
 export interface RerankError {
@@ -92,11 +97,30 @@ export async function bundleRerank(
     return err({ type: 'io_error', message: resumeRead.error.message });
   }
 
-  const topK = clampTopK(options.topK);
   const allJobs = latest.value.jobs;
-  const jobs = allJobs.slice(0, topK);
-  if (jobs.length === 0) {
-    return err({ type: 'no_digest', message: 'Latest digest contains no ranked jobs.' });
+  let jobs: ReadonlyArray<RankedJob>;
+  let missingIds: readonly string[] | undefined;
+  if (options.jobIds !== undefined) {
+    const wanted = [...new Set(options.jobIds)].slice(0, MAX_JOB_IDS);
+    const byId = new Map(allJobs.map((r) => [r.job.id, r] as const));
+    const found = wanted.flatMap((id) => {
+      const r = byId.get(id);
+      return r === undefined ? [] : [r];
+    });
+    found.sort((a, b) => a.rank - b.rank);
+    missingIds = wanted.filter((id) => !byId.has(id));
+    if (found.length === 0) {
+      return err({
+        type: 'no_digest',
+        message: 'none of the requested jobIds are in the latest digest',
+      });
+    }
+    jobs = found;
+  } else {
+    jobs = allJobs.slice(0, clampTopK(options.topK));
+    if (jobs.length === 0) {
+      return err({ type: 'no_digest', message: 'Latest digest contains no ranked jobs.' });
+    }
   }
 
   const resumeContent = resumeRead.value;
@@ -118,6 +142,7 @@ export async function bundleRerank(
       totalJDBytes,
       digestDate: latest.value.date,
       digestPath: getLatestPointerPath(),
+      ...(missingIds !== undefined ? { missingIds } : {}),
     },
   });
 }

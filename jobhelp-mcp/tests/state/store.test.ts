@@ -118,6 +118,33 @@ describe('readState', () => {
     const result = await readState();
     expect(isErr(result)).toBe(true);
   });
+
+  it('migrates a legacy state.json that has no version field', async () => {
+    writeFileSync(
+      join(sandbox, 'state.json'),
+      JSON.stringify({
+        applications: [
+          {
+            jobId: 'greenhouse:1',
+            company: 'acme',
+            role: 'Backend Engineer',
+            date: '2026-05-27',
+            dir: '/tmp/acme-backend-2026-05-27',
+            createdAt: '2026-05-27T00:00:00.000Z',
+            updatedAt: '2026-05-27T00:00:00.000Z',
+          },
+        ],
+      }),
+    );
+    const result = await readState();
+    expect(isOk(result)).toBe(true);
+    if (isOk(result)) {
+      expect(result.value.version).toBe(STATE_SCHEMA_VERSION);
+      expect(result.value.applications).toHaveLength(1);
+      expect(result.value.resumes).toEqual([]);
+      expect(result.value.digests).toEqual([]);
+    }
+  });
 });
 
 describe('writeState', () => {

@@ -118,25 +118,39 @@ export function parseScoreBreakdown(raw: unknown): ScoreBreakdown | null {
   const sourceTrust = typeof rawSourceTrust === 'number' ? rawSourceTrust : undefined;
   const rawRrf = raw['rrf'];
   const rrf = typeof rawRrf === 'number' && Number.isFinite(rawRrf) ? rawRrf : undefined;
-  const llmFitScore = raw['llmFitScore'];
-  if (llmFitScore === undefined) {
-    return {
-      keywordOverlap,
-      recencyBoost,
-      bm25f,
-      ...(sourceTrust !== undefined && { sourceTrust }),
-      ...(rrf !== undefined && { rrf }),
-    };
-  }
-  if (typeof llmFitScore !== 'number') return null;
-  return {
-    keywordOverlap,
-    recencyBoost,
-    bm25f,
+  const rawSemantic = raw['semantic'];
+  const semantic =
+    typeof rawSemantic === 'number' && Number.isFinite(rawSemantic) ? rawSemantic : undefined;
+  const rawBlend = raw['blend'];
+  const blend = typeof rawBlend === 'number' && Number.isFinite(rawBlend) ? rawBlend : undefined;
+  const rawSeniorityPenalty = raw['seniorityPenalty'];
+  const seniorityPenalty =
+    typeof rawSeniorityPenalty === 'number' && Number.isFinite(rawSeniorityPenalty)
+      ? rawSeniorityPenalty
+      : undefined;
+  const rawRerank = raw['rerank'];
+  const rerank =
+    typeof rawRerank === 'number' && Number.isFinite(rawRerank) ? rawRerank : undefined;
+  const rawHistoryBoost = raw['historyBoost'];
+  const historyBoost =
+    typeof rawHistoryBoost === 'number' && Number.isFinite(rawHistoryBoost)
+      ? rawHistoryBoost
+      : undefined;
+  const optional = {
     ...(sourceTrust !== undefined && { sourceTrust }),
     ...(rrf !== undefined && { rrf }),
-    llmFitScore,
+    ...(semantic !== undefined && { semantic }),
+    ...(blend !== undefined && { blend }),
+    ...(seniorityPenalty !== undefined && { seniorityPenalty }),
+    ...(rerank !== undefined && { rerank }),
+    ...(historyBoost !== undefined && { historyBoost }),
   };
+  const llmFitScore = raw['llmFitScore'];
+  if (llmFitScore === undefined) {
+    return { keywordOverlap, recencyBoost, bm25f, ...optional };
+  }
+  if (typeof llmFitScore !== 'number') return null;
+  return { keywordOverlap, recencyBoost, bm25f, ...optional, llmFitScore };
 }
 
 export function parseRankedJob(raw: unknown): RankedJob | null {
