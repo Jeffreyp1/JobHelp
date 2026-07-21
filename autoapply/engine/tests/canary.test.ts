@@ -105,7 +105,8 @@ describe('runCanary', () => {
         statePath: join(blocker, 'canary.json'), repairRoot: join(dir, 'r'),
         now: () => '2026-07-20T09:00:00.000Z',
       });
-      expect(rows).toEqual([]);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.verdict).toBe('not-exercised');
       // The unwritable state path must not be swallowed silently: a warn surfaces
       // it so the per-batch re-probe cost is visible.
       expect(errSpy.mock.calls.flat().join('\n')).toContain('canary state save failed');
@@ -125,7 +126,42 @@ describe('runCanary', () => {
       statePath: join(stateDir, 's.json'), repairRoot: join(stateDir, 'r'),
       now: () => '2026-07-20T09:00:00.000Z',
     });
-    expect(rows).toEqual([]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.verdict).toBe('not-exercised');
+  });
+
+  it('does not flag drift when a flaky first posting is overruled by a healthy second', async () => {
+    if (browser === null) return;
+    const stateDir = await mkdtemp(join(tmpdir(), 'jobhelp-canaryflaky-'));
+    const statePath = join(stateDir, 'canary.json');
+    const repairRoot = join(stateDir, 'repair');
+    const adapters = new Map([['fixture', makeAts(canaryCfg())]]);
+    const baseline = { fixture: { fields: 3, submitFound: true, url: 'seed', ts: '2026-07-20T00:00:00.000Z' } };
+    const broken = await fixtureUrl(BROKEN);
+    const healthy = await fixtureUrl(HEALTHY);
+    const rows = await runCanary({
+      browser, cdpMode: false, adapters, candidates: { fixture: [broken, healthy] },
+      state: { baselines: baseline }, statePath, repairRoot, now: () => '2026-07-20T10:00:00.000Z',
+    });
+    expect(rows[0]?.verdict).not.toBe('drift');
+    expect((await listRepairArtifacts(repairRoot)).length).toBe(0);
+  });
+
+  it('flags drift when both probed postings look drifted', async () => {
+    if (browser === null) return;
+    const stateDir = await mkdtemp(join(tmpdir(), 'jobhelp-canaryboth-'));
+    const statePath = join(stateDir, 'canary.json');
+    const repairRoot = join(stateDir, 'repair');
+    const adapters = new Map([['fixture', makeAts(canaryCfg())]]);
+    const baseline = { fixture: { fields: 3, submitFound: true, url: 'seed', ts: '2026-07-20T00:00:00.000Z' } };
+    const broken1 = await fixtureUrl(BROKEN);
+    const broken2 = await fixtureUrl(BROKEN);
+    const rows = await runCanary({
+      browser, cdpMode: false, adapters, candidates: { fixture: [broken1, broken2] },
+      state: { baselines: baseline }, statePath, repairRoot, now: () => '2026-07-20T11:00:00.000Z',
+    });
+    expect(rows[0]?.verdict).toBe('drift');
+    expect((await listRepairArtifacts(repairRoot)).length).toBe(1);
   });
 });
 
@@ -134,8 +170,10 @@ describe('formatCanaryTable', () => {
     const table = formatCanaryTable([
       { ats: 'ashby', url: 'https://x/1', fields: 12, submitFound: true, verdict: 'ok', baselineFields: 11, overrideActive: false },
       { ats: 'lever', url: 'https://x/2', fields: 0, submitFound: false, verdict: 'drift', baselineFields: 9, overrideActive: true },
+      { ats: 'greenhouse', url: '', fields: 0, submitFound: false, verdict: 'not-exercised', baselineFields: null, overrideActive: false },
     ]);
     expect(table).toContain('ashby');
+    expect(table).toContain('not exercised');
     expect(table).toContain('DRIFT');
     expect(table).toContain('override active');
     // The probe runs THROUGH the override, so a healthy reading does not mean the

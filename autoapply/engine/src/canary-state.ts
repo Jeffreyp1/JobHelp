@@ -13,7 +13,9 @@ export interface CanaryState {
   readonly baselines: Record<string, CanaryBaseline>;
 }
 
-export type CanaryVerdict = 'first-run' | 'ok' | 'drift';
+// 'not-exercised' is set by runCanary (never by evaluateCanary) for an ATS whose
+// candidate postings all failed to load — surfaced so it isn't silently absent.
+export type CanaryVerdict = 'first-run' | 'ok' | 'drift' | 'not-exercised';
 
 export function evaluateCanary(
   baseline: CanaryBaseline | undefined,
