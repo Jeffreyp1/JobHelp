@@ -48,8 +48,27 @@ jobhelp-mcp/scripts/*-tokens.json
 /experiments/
 /docs/research/
 
+# Auto-apply run artifacts (personal answers, per-job status, location/gap logs)
+/answer-bank.json
+/autoapply-*.json
+/autoapply-*.jsonl
+
+# Root-level images are filled-application screenshots and fixture captures
+# (root-anchored: extension icons under extension-app/ are unaffected)
+/*.png
+/*.jpg
+/*.jpeg
+
+# Dev-session journals (contain bio: school, grad year, skills, target companies)
+/docs/timeline-weeks/
+
+# Local caches and generated graph output
+/cache/
+/graphify-out/
+
 # Scratch dirs used by sub-agents as Write-tool sandbox workaround
 .scratch-*/
+/.scratch/
 
 # Source maps for built bundles (generated, not source of truth)
 extension-app/extension/public/**/*.js.map

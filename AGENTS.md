@@ -1,20 +1,10 @@
-# CLAUDE.md — working agreement for agents on JobHelp
+# AGENTS.md — working agreement for agents on JobHelp
 
 Read this before touching anything. It applies to the main session AND to every dispatched subagent.
 
-## Communication: always be concise
-
-Default to short. Lead with the answer. Use tables/bullets over paragraphs. Cut preamble, hedging, and recaps the user can already see. Only expand when the user asks for depth or the task genuinely needs it. Long walls of text are a failure mode here.
-
 ## What JobHelp is
 
-JobHelp is two related personal-use job-application products in one repo:
-
-1. **Extension app**: a Chrome extension (Manifest V3, side panel, TypeScript, esbuild) plus a Google Apps Script backend (paste-deployed single `Code.gs` bundle). The extension scrapes a job description from the current page (working scrapers for LinkedIn / Indeed / Greenhouse / Lever / Workday / Ashby / generic HTML), the backend calls the Anthropic API with prompt caching + load-bearing rule files to produce a tailored resume in Markdown, writes outputs to a per-job Google Drive folder, can export DOCX/PDF and fill a user-supplied DOCX template, and logs every application to a Google Sheet. Seven optional v2 features layer on top (company research, LinkedIn role benchmark, critique pass, auto-revise, cover letter, verify-CL-hooks, multi-version). Single-file Drive config (`jobhelp-config.json`) is the v2.1 setup model; legacy per-machine `chrome.storage` keys are mirrored from it as a derived cache.
-
-2. **JobHelp MCP**: a local stdio MCP server under `jobhelp-mcp/` for Claude Code, Claude Desktop, Cursor, and other local MCP clients. It makes no LLM calls and needs no Anthropic API key. The server discovers jobs from configured source adapters, normalizes/dedupes/ranks them deterministically, exposes tools/resources/prompts, and writes local state under `~/jobhelp` plus config under `~/.config/jobhelp/config.json`. The client AI does the reasoning, reranking, tailoring, critique, and revision using the MCP-provided context.
-
-The two products share the same rule philosophy and some prompt content, but they are intentionally separated: browser/Drive/Apps Script workflow in `extension-app/`, local MCP/job-discovery workflow in `jobhelp-mcp/`.
+A personal-use job-application tool. Chrome extension (Manifest V3, side panel, TypeScript, esbuild) + a Google Apps Script backend (paste-deployed single `Code.gs` bundle). The extension scrapes a job description from the current page (working scrapers for LinkedIn / Indeed / Greenhouse / Lever / Workday / Ashby / generic HTML), the backend calls the Anthropic API with prompt caching + a set of load-bearing rule files to produce a tailored resume in Markdown, writes outputs to a per-job Google Drive folder, can export DOCX/PDF and fill a user-supplied DOCX template, and logs every application to a Google Sheet. Seven optional v2 features layer on top (company research, LinkedIn role benchmark, critique pass, auto-revise, cover letter, verify-CL-hooks, multi-version). Single-file Drive config (`jobhelp-config.json`) is the v2.1 setup model; legacy per-machine `chrome.storage` keys are mirrored from it as a derived cache.
 
 ## Repo layout
 
@@ -25,11 +15,11 @@ extension-app/appsscript/src/
                           coverLetter, verifyHooks, multiVersion, createDriveFile, ...)
   message-builder.ts      shared user-message composition (generate + multiVersion)
   drive.ts                DriveOps implementation (Drive/Docs/Sheets)
-  claude.ts               the only place UrlFetchApp hits the Anthropic API
+  Codex.ts               the only place UrlFetchApp hits the Anthropic API
   prompt.ts               composeSystemPrompt from rule files
   cost.ts                 pricing table + cost calc
   lib/structuredLog.ts    leveled logger with secret redaction (USE THIS, not console.*)
-  types/                  api-contract.ts (the wire shape), drive-ops.ts, claude-api.ts, job-insights.ts
+  types/                  api-contract.ts (the wire shape), drive-ops.ts, Codex-api.ts, job-insights.ts
 extension-app/appsscript/tests/         vitest; mocks GAS globals
 extension-app/appsscript/scripts/build.mts   bundles -> extension-app/appsscript/dist/Code.gs
 
@@ -53,24 +43,6 @@ docs/                     CHANGELOG.md, v2-features.md, security.md, setup-for-n
 scripts/                  test-handler.mts (CLI to POST any action), verify-bundle.mts,
                           smoke-test.mts, iterate-template.mts
 extension-app/tests/contracts/, extension-app/tests/smoke/   black-box wire-shape tests + post-build smoke
-
-jobhelp-mcp/
-  mcp/src/                stdio MCP server entrypoint, tools, resources, prompts,
-                          wiring, and protocol-facing schemas
-  core/                   deterministic behavior: config, source adapters, pipeline,
-                          digest generation, rules, resume registry, app folders, state
-  core/sources/           source adapters for Adzuna, Ashby, Breezy, Greenhouse,
-                          JSearch, Lever, Personio, Pinpoint, Recruitee, RemoteOK,
-                          Remotive, SmartRecruiters, Teamtailor, USAJobs,
-                          We Work Remotely, Workable, YC
-  core/pipeline/          normalize, dedupe, ghost filtering, BM25/keyword scoring,
-                          recency, reciprocal-rank fusion
-  prompts-bundle/         MCP-packaged copy of the 15 tailoring rule files
-  company-lists/          curated company identifiers for ATS source adapters
-  tests/                  vitest coverage for MCP tools, config, sources, ranking,
-                          applications, resumes, rules, and state
-  scripts/run-digest.mts  local digest runner for source/pipeline checks
-
 vitest.config.ts          include globs: extension-app/extension/tests/**,
                           extension-app/appsscript/tests/**, extension-app/tests/**,
                           extension-app/prompts/**, jobhelp-mcp/tests/**
@@ -81,12 +53,10 @@ vitest.config.ts          include globs: extension-app/extension/tests/**,
 - Tests: `npx vitest run` (run from the repo root — running from inside `extension-app/extension/` or `extension-app/appsscript/` picks up a different cwd and surfaces spurious failures).
 - Type check: `npx tsc --noEmit` (must be clean; run from repo root).
 - Build extension: `node extension-app/extension/scripts/build.mts`. Build Apps Script: `node extension-app/appsscript/scripts/build.mts`.
-- Build MCP package: `npm --prefix jobhelp-mcp run build`.
-- MCP focused tests: `npm --prefix jobhelp-mcp test -- --run tests/mcp` or `npm --prefix jobhelp-mcp test -- --run tests/sources/validate.test.ts`.
-- Post-build sanity: `node scripts/verify-bundle.mts` (builds extension + Apps Script, runs MCP regression checks, then verifies bundle sizes, manifest schema, version match against CHANGELOG, and all 20 Apps Script action strings in `Code.gs`).
+- Post-build sanity: `node scripts/verify-bundle.mts` (builds both + 12 checks: bundle sizes, manifest schema, version match against CHANGELOG, all action strings present in `Code.gs`).
 - Hit a deployed backend: `APPS_SCRIPT_URL=... node scripts/test-handler.mts ping` (or any action).
 
-A change isn't done until `npx vitest run` is fully green AND `npx tsc --noEmit` is clean AND relevant builds pass. For publication-wide work, run `node scripts/verify-bundle.mts`. State the actual command output before claiming success — don't assert, verify.
+A change isn't done until `npx vitest run` is fully green AND `npx tsc --noEmit` is clean AND both bundles build. State the actual command output before claiming success — don't assert, verify.
 
 ## Conventions
 
@@ -99,9 +69,6 @@ A change isn't done until `npx vitest run` is fully green AND `npx tsc --noEmit`
 - Error policy in handlers: never throw across the HTTP boundary. Return `ApiResult<T>` = `{ ok: true, ... } | { ok: false, error: { type, message, retryable } }`. `error.type` is the union in `api-contract.ts`; `retryable` is true only for `rate_limit` and `server`. Forward `err.errorType` verbatim from a `ClaudeApiError` — do not collapse `rate_limit` into `server`.
 - `api-contract.ts` exists in two copies: `extension-app/extension/src/types/api-contract.ts` is the SOURCE OF TRUTH; `extension-app/appsscript/src/types/api-contract.ts` is a manual mirror. If you change one, change the other byte-identically (except the file-header comment, which legitimately differs). JSDoc-only changes are fine; type-signature changes ripple — be deliberate.
 - Apps Script V8 runtime: NO `Promise.all`, no `async`/`await` in the request path (it's synchronous), no Node APIs. The `Code.gs` bundle is paste-deployed by the user — anything you add must be esbuild-inlinable (same module system as everything else). `ContentService`, `DriveApp`, `DocumentApp`, `SpreadsheetApp`, `UrlFetchApp`, `CacheService`, `ScriptApp`, `Utilities` are GAS globals — guard for `typeof X === 'undefined'` in code that also runs under vitest.
-- MCP server rule: `jobhelp-mcp/mcp/src/` should stay thin and protocol-facing. Put durable behavior in `jobhelp-mcp/core/` so it can be tested without an MCP client.
-- MCP zero-API-key rule: `jobhelp-mcp` must not make server-side LLM calls or require an Anthropic API key. It should expose data, deterministic scores, resources, and prompts; the client AI performs reasoning in its own session.
-- MCP state rule: default config/state paths are `~/.config/jobhelp/config.json`, `~/.config/jobhelp/log.jsonl`, and `~/jobhelp/`. Respect `JOBHELP_CONFIG_PATH` when touching config-loading code.
 - Cache keys that include user-supplied strings must be collision-safe — encode tuples (`JSON.stringify([company, role])`), don't `${company}:${role}`.
 - `git`: only commit when the user asks. Never `--no-verify`, never force-push to main, never amend a published commit, never skip hooks. No "Co-Authored-By" trailers unless asked. New commits, not amends.
 
@@ -131,11 +98,34 @@ Report format every agent uses on completion (keep it tight):
 - **Your approach** — the design decisions you made and why.
 - **Cross-impacts / follow-ups** — `CROSS-IMPACT:` lines for forbidden-file changes you need; anything you couldn't finish; pre-existing/in-flight breakage you observed but (correctly) didn't touch.
 
+## Karen army quality gates
+
+For non-trivial tasks, especially parallel-agent work, invoke the predefined Karen agents before treating the work as merge-ready. The main agent is the dispatcher and reporter, not the fixer or final judge.
+
+1. **Auditor first, always.** For each completed task/lane, launch `karen-the-auditor` before any Karen manager, fixer, or gatekeeper. Do not skip straight to manager/fixer because the lane "looks obvious." The auditor is read-first and decides what additional Karen roles are needed.
+2. If the tooling does not let `karen-the-auditor` spawn child agents directly, the main agent only dispatches the exact Karen agent the auditor asks for, with the exact scope the auditor gives.
+3. If a Karen finds a real issue, do not have the main agent silently fix it. Launch `karen-the-fixer` for one narrow issue at a time, with explicit owned files and forbidden files.
+4. After a fixer returns, launch `karen-the-manager` to verify the fix and run the relevant tests/builds. Do not substitute the main agent's own checks for Karen verification.
+5. After a manager accepts a code-changing fix, launch the code-review gatekeeper. In the current agent tool this role is exposed as `karen` even when it is discussed as `karen-code-reviewer`. Use `agent_type: karen` for that final diff-only review.
+6. Do not interrupt, close, or bypass Karen agents just because the main agent can fix faster. If an agent times out, hangs, fails, or is closed, report that status plainly and do not count it as a pass.
+7. Do not merge a lane with unresolved Critical or Important Karen findings. Either route them through a scoped fixer pass or explicitly report why the auditor/final gatekeeper marked the finding invalid.
+8. Karen agents follow the same file-ownership and cross-impact rules as every other agent. If a fix would touch another lane's files, report it or route it to the correct owner/fixer instead of editing across boundaries.
+9. The user should not have to babysit Karen dispatch. Once an auditor reports findings, the main orchestrator automatically launches the requested next Karen agent unless the next step is destructive or outside the user's approved scope.
+10. Final summaries must include a Karen status table with each agent's role, scope, status, findings, fixes, verification, and any timeout/closed/failure state.
+
+Karen review is an iterative loop, not a one-pass checklist:
+
+1. `karen-the-auditor` finds an issue.
+2. `karen-the-fixer` fixes exactly one scoped issue.
+3. `karen-the-manager` verifies the fix and may find an uncovered edge case.
+4. If a new or incomplete issue remains, launch another scoped `karen-the-fixer`.
+5. Re-run auditor or manager verification after each meaningful fix.
+6. Before merge or push, run the same `karen` code-review gatekeeper again as the final diff-only review.
+7. If any Karen says the fix went off course, hardcoded values were added, tests are weak, or scope leaked, route it back through fixer and re-verify.
+8. Continue the loop until there are no unresolved Critical or Important findings, tests/typecheck/build are green, and the final code-review gatekeeper passes.
+
 ## Gotchas worth knowing
 
-- `jobhelp-mcp` is deliberately local-stdio only today. Do not turn it into a hosted multi-user service or add remote auth/secrets unless the task explicitly asks for that architecture.
-- MCP source adapters should fail loudly with typed source errors and should not silently treat rate limits, bad tokens, malformed JSON, or ghost/template jobs as successful results.
-- MCP resume tailoring prompts validate against the user's original resume. Do not add wording that encourages fabricated experience, inferred metrics, or job-description-only claims.
 - `generate.ts` imports `getRuntimeConfig` from `sidepanel/index.ts` (a circular import) — it's safe because `getRuntimeConfig` is only called inside event handlers, esbuild bundles both into one file, and importing `index.ts` under vitest is inert (`init()` early-returns when `#tab-content` is absent).
 - The background service worker still reads the legacy `chrome.storage` keys; the side panel mirror-writes them from the loaded Drive config. Don't "clean that up" by deleting the legacy keys — it's load-bearing during the migration window.
 - `extension-app/prompts/shared/_validate.test.ts` is now in the vitest include glob — if you change the rule files (count, load-bearing flags, total tokens), update its assertions.
