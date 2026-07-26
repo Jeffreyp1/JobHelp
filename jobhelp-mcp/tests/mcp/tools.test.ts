@@ -26,6 +26,7 @@ describe('createTools — surface', () => {
         'prepare_batch_applications',
         'read_resume',
         'read_rules',
+        'record_job_verdicts',
         'register_resume',
         'rerank_top_jobs',
         'analyze_fit',

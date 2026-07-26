@@ -102,6 +102,8 @@ export interface RankDeps {
   readonly embedder?: Embedder;
   readonly reranker?: Reranker;
   readonly applications?: readonly ApplicationEntry[];
+  // jobId -> multiplier in (0, 1] applied as a final demotion (e.g. 'skipped' verdicts).
+  readonly demotions?: ReadonlyMap<string, number>;
 }
 
 // BM25F × recency half-life × source-trust, optionally fused. Fusion is either RRF (rank-based, +recency/role-fit/semantic lists)
@@ -223,6 +225,19 @@ export async function rank(
         return { ...r, score: r.score * boost, breakdown: { ...r.breakdown, historyBoost: boost } };
       });
     }
+  }
+
+  const demotions = deps?.demotions;
+  if (demotions !== undefined && demotions.size > 0) {
+    scored = scored.map((r) => {
+      const demotion = demotions.get(r.job.id);
+      if (demotion === undefined || demotion === 1) return r;
+      return {
+        ...r,
+        score: r.score * demotion,
+        breakdown: { ...r.breakdown, verdictDemotion: demotion },
+      };
+    });
   }
 
   scored.sort((a, b) => b.score - a.score);

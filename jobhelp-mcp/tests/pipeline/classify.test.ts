@@ -275,4 +275,46 @@ describe('detectSeniorityLevel', () => {
       detectSeniorityLevel('Software Engineer', "We're hiring senior engineers"),
     ).toBeUndefined();
   });
+
+  it('classifies a 6+ years required body as senior', () => {
+    expect(
+      detectSeniorityLevel(
+        'Software Engineer',
+        'Requirements: 6+ years of backend development experience. Strong SQL.',
+      ),
+    ).toBe('senior');
+  });
+
+  it('does not classify a 5-7 years range as senior when the posting welcomes juniors', () => {
+    expect(
+      detectSeniorityLevel(
+        'Software Engineer',
+        'Typically 5-7 years of experience, but new grads with strong projects are encouraged to apply.',
+      ),
+    ).toBe('entry');
+  });
+
+  it('a preferred-only 5+ years mention is not a senior signal', () => {
+    expect(
+      detectSeniorityLevel(
+        'Software Engineer',
+        '2+ years of TypeScript required. 5+ years of experience preferred.',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('classifies a 0-2 years body as entry', () => {
+    expect(
+      detectSeniorityLevel('Software Engineer', '0-2 years of professional experience.'),
+    ).toBe('entry');
+  });
+
+  it('keeps the staff keyword signal above the years count', () => {
+    expect(
+      detectSeniorityLevel(
+        'Great role',
+        'Join as a Staff Software Engineer. 10+ years of experience required.',
+      ),
+    ).toBe('staff');
+  });
 });

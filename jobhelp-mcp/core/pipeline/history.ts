@@ -1,6 +1,6 @@
 import type { NormalizedJob } from '../types/job.js';
 import type { ApplicationEntry } from '../state/index.js';
-import { tokenize } from './tokenize.js';
+import { normalizeCompany, titleTokenSet, tokenSetsEqual, jaccard } from './identity.js';
 
 const DEFAULT_BOOST_CAP = 1.15;
 const JACCARD_FLOOR = 0.4;
@@ -16,33 +16,6 @@ function normalizeUrl(raw: string): string | undefined {
   }
   const path = parsed.pathname.replace(/\/+$/, '');
   return `${parsed.protocol}//${parsed.host}${path}${parsed.search}`;
-}
-
-// Application entries store companies as slugs ("abnormalsecurity") while jobs
-// carry display names ("Abnormal Security"), so spaces/punctuation must go.
-function normalizeCompany(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function titleTokenSet(raw: string): ReadonlySet<string> {
-  return new Set(tokenize(raw));
-}
-
-function tokenSetsEqual(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
-  if (a.size === 0 || a.size !== b.size) return false;
-  for (const t of a) {
-    if (!b.has(t)) return false;
-  }
-  return true;
-}
-
-function jaccard(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
-  if (a.size === 0 || b.size === 0) return 0;
-  let intersection = 0;
-  for (const t of a) {
-    if (b.has(t)) intersection++;
-  }
-  return intersection / (a.size + b.size - intersection);
 }
 
 interface PreparedApplication {

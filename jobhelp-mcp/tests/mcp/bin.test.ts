@@ -36,6 +36,7 @@ const EXPECTED_TOOL_NAMES = [
   'write_application_output',
   'list_application_versions',
   'list_recent_applications',
+  'record_job_verdicts',
   'validate_sources',
   'rerank_top_jobs',
 ] as const;
@@ -157,10 +158,10 @@ describe('bootstrap (wired) — surface', () => {
     expect(typeof resourceDeps.readState).toBe('function');
   });
 
-  it('buildServer accepts wired deps and exposes 23 tools + 10 resources + 4 prompts', async () => {
+  it('buildServer accepts wired deps and exposes 24 tools + 10 resources + 4 prompts', async () => {
     const { coreDeps, resourceDeps } = await bootstrap();
     const handle = buildServer({ coreDeps, resourceDeps });
-    expect(handle.tools.length).toBe(23);
+    expect(handle.tools.length).toBe(24);
     expect(handle.resources.length).toBe(10);
     expect(handle.prompts.length).toBe(4);
     const toolNames = handle.tools.map((t) => t.definition.name).sort();

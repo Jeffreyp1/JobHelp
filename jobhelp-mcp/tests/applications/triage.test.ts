@@ -105,6 +105,21 @@ describe('buildTriageLine', () => {
     };
     expect(buildTriageLine(noDate, [])).toContain('| undated |');
   });
+
+  it('appends an APPLIED tag when the job id is in the applied set', () => {
+    const line = buildTriageLine(makeRanked(1), ['typescript'], new Set(['src:job-1']));
+    expect(line.endsWith('| APPLIED')).toBe(true);
+  });
+
+  it('omits the APPLIED tag when the job id is not applied', () => {
+    const line = buildTriageLine(makeRanked(1), ['typescript'], new Set(['other:id']));
+    expect(line).not.toContain('APPLIED');
+  });
+
+  it('leaves the frozen format untouched when no applied set is given', () => {
+    const line = buildTriageLine(makeRanked(7), ['typescript', 'node', 'go']);
+    expect(line).not.toContain('APPLIED');
+  });
 });
 
 describe('buildProfileCard', () => {
@@ -165,5 +180,14 @@ describe('bundleTriage', () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error.type).toBe('no_digest');
+  });
+
+  it('tags only the applied jobs when given an appliedJobIds set', async () => {
+    await persistJobs([makeRanked(1), makeRanked(2)]);
+    const r = await bundleTriage(makeConfig(), { appliedJobIds: new Set(['src:job-1']) });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.lines[0]).toContain('| APPLIED');
+    expect(r.value.lines[1]).not.toContain('APPLIED');
   });
 });

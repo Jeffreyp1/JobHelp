@@ -3,9 +3,11 @@ import { buildHandler, unwrap } from './tools-helpers.js';
 import {
   parseEmpty,
   parseListApplicationVersions,
+  parseRecordJobVerdicts,
   parseStartApplication,
   parseWriteApplicationOutput,
 } from './tools-parsers.js';
+import { JOB_VERDICTS } from '../../core/state/index.js';
 
 const KIND_ENUM = ['resume', 'cover-letter', 'critique', 'notes'] as const;
 
@@ -72,6 +74,36 @@ export function createApplicationTools(deps: CoreDeps): readonly ToolHandler[] {
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       parse: parseEmpty,
       run: async () => unwrap(await deps.listRecentApplications()),
+    }),
+    buildHandler({
+      name: 'record_job_verdicts',
+      description:
+        'Persist per-job judgments after a rerank so future rankings honor them: drop suppresses ' +
+        'the same role in later digests, skipped demotes it, others are informational. Each item is ' +
+        '{jobId, verdict, reason?}; jobId must come from the latest digest. Unknown jobIds are ' +
+        'returned as unresolvedIds, not errors.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          verdicts: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                jobId: { type: 'string' },
+                verdict: { type: 'string', enum: JOB_VERDICTS },
+                reason: { type: 'string' },
+              },
+              required: ['jobId', 'verdict'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['verdicts'],
+        additionalProperties: false,
+      },
+      parse: parseRecordJobVerdicts,
+      run: async (args) => unwrap(await deps.recordJobVerdicts(args)),
     }),
   ];
 }

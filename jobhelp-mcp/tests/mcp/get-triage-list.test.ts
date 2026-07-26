@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { handleGetTriageList } from '../../mcp/src/wiring-handlers-triage.js';
 import { persistDigest } from '../../core/state/digestStore.js';
+import { writeState } from '../../core/state/store.js';
 import { validateConfig } from '../../core/lib/config-validation.js';
-import type { PersistedDigest } from '../../core/state/index.js';
-import type { RankedJob } from '../../core/types/index.js';
+import { EMPTY_STATE, type ApplicationEntry, type PersistedDigest } from '../../core/state/index.js';
+import type { JobDigestConfig, RankedJob } from '../../core/types/index.js';
 
 let sandbox: string;
 let prevHome: string | undefined;
@@ -84,5 +85,69 @@ describe('handleGetTriageList', () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error.type).toBe('not_found');
+  });
+
+  async function persistTwoAndSeedApplied(): Promise<void> {
+    const applied = makeRanked(1);
+    const other = makeRanked(2);
+    const digest: PersistedDigest = {
+      date: '2026-05-15',
+      generatedAt: '2026-05-15T13:00:00.000Z',
+      totalDurationMs: 1,
+      sourceResults: [{ source: 'adzuna', jobCount: 2, durationMs: 1 }],
+      jobs: [
+        { ...applied, job: { ...applied.job, title: 'Backend Platform Engineer' } },
+        { ...other, job: { ...other.job, title: 'Frontend Product Designer' } },
+      ],
+    };
+    const persisted = await persistDigest(digest);
+    if (!persisted.ok) throw new Error(persisted.error.message);
+    const app: ApplicationEntry = {
+      jobId: 'greenhouse:other',
+      company: 'acme',
+      role: 'Platform Backend Engineer',
+      date: '2026-05-10',
+      dir: '/tmp/apps/acme',
+      url: 'https://other.test/xyz',
+      createdAt: '2026-05-10T00:00:00.000Z',
+      updatedAt: '2026-05-10T00:00:00.000Z',
+    };
+    const w = await writeState({ ...EMPTY_STATE, applications: [app] });
+    if (!w.ok) throw new Error(w.error.message);
+  }
+
+  function withHistory(enabled: boolean): JobDigestConfig {
+    return validateConfig({
+      profile: {
+        resumeDumpPath: '/tmp/r.md',
+        skills: ['typescript'],
+        location: 'Remote',
+        remoteOk: true,
+        salaryFloor: 1,
+        seniority: 'entry',
+        roleFamily: ['backend'],
+      },
+      ranking: { topN: 2, digestK: 2, history: { enabled } },
+      output: { dir: '/tmp' },
+    });
+  }
+
+  it('tags an already-applied job with APPLIED when history is enabled', async () => {
+    await persistTwoAndSeedApplied();
+    const r = await handleGetTriageList(withHistory(true), {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const applied = r.value.lines.find((l) => l.includes('src:job-1'));
+    const other = r.value.lines.find((l) => l.includes('src:job-2'));
+    expect(applied?.endsWith('| APPLIED')).toBe(true);
+    expect(other).not.toContain('APPLIED');
+  });
+
+  it('does NOT tag applied jobs when history is disabled', async () => {
+    await persistTwoAndSeedApplied();
+    const r = await handleGetTriageList(withHistory(false), {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.lines.some((l) => l.includes('APPLIED'))).toBe(false);
   });
 });

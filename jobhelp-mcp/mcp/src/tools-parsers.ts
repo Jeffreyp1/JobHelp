@@ -5,7 +5,9 @@ import type {
   ApplyConfigAnswersArgs,
   FindMatchingJobsArgs,
   InitConfigArgs,
+  JobVerdictInput,
   ListApplicationVersionsArgs,
+  RecordJobVerdictsArgs,
   RegisterResumeArgs,
   RerankTopJobsArgs,
   RulesMode,
@@ -16,6 +18,7 @@ import type {
   ValidateSourcesArgs,
   WriteApplicationOutputArgs,
 } from './tools-types.js';
+import { JOB_VERDICTS, type JobVerdict } from '../../core/state/index.js';
 import {
   getOptional,
   isApplicationKind,
@@ -242,6 +245,54 @@ export function parseListApplicationVersions(
 
 export function parseEmpty(_obj: Record<string, unknown>): Result<Record<string, never>, ToolError> {
   return { ok: true, value: {} };
+}
+
+const RECORD_MAX_VERDICTS = 1000;
+const RECORD_MAX_REASON_CHARS = 500;
+
+function isJobVerdict(v: unknown): v is JobVerdict {
+  return typeof v === 'string' && (JOB_VERDICTS as readonly string[]).includes(v);
+}
+
+function parseVerdictItem(raw: unknown, i: number): Result<JobVerdictInput, ToolError> {
+  if (!isPlainObject(raw)) return bad(`verdicts[${i}] must be an object`);
+  if (!isString(raw['jobId']) || raw['jobId'].length === 0) {
+    return bad(`verdicts[${i}].jobId is required`);
+  }
+  if (!isJobVerdict(raw['verdict'])) {
+    return bad(`verdicts[${i}].verdict must be one of: ${JOB_VERDICTS.join(', ')}`);
+  }
+  const out: { jobId: string; verdict: JobVerdict; reason?: string } = {
+    jobId: raw['jobId'],
+    verdict: raw['verdict'],
+  };
+  const reason = getOptional(raw, 'reason', isString);
+  if (reason !== undefined) {
+    if (reason.length > RECORD_MAX_REASON_CHARS) {
+      return bad(`verdicts[${i}].reason must be <= ${RECORD_MAX_REASON_CHARS} chars`);
+    }
+    out.reason = reason;
+  }
+  return { ok: true, value: out };
+}
+
+export function parseRecordJobVerdicts(
+  obj: Record<string, unknown>,
+): Result<RecordJobVerdictsArgs, ToolError> {
+  const raw = obj['verdicts'];
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return bad('verdicts must be a non-empty array');
+  }
+  if (raw.length > RECORD_MAX_VERDICTS) {
+    return bad(`verdicts must contain <= ${RECORD_MAX_VERDICTS} items`);
+  }
+  const verdicts: JobVerdictInput[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const parsed = parseVerdictItem(raw[i], i);
+    if (!parsed.ok) return parsed;
+    verdicts.push(parsed.value);
+  }
+  return { ok: true, value: { verdicts } };
 }
 
 export function parseDoctor(

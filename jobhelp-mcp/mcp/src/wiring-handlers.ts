@@ -31,6 +31,7 @@ export {
 export { handleValidateSources } from './wiring-handlers-validate.js';
 export { handleRerankTopJobs } from './wiring-handlers-rerank.js';
 export { handleGetTriageList } from './wiring-handlers-triage.js';
+export { handleRecordJobVerdicts } from './wiring-handlers-verdicts.js';
 import {
   getConfigPath, loadRulesByMode, rulesToReadRulesResult,
   todayIsoDate, toToolError,

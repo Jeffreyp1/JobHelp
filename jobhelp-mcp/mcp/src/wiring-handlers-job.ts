@@ -11,6 +11,14 @@ import {
 } from '../../core/state/digestStore.js';
 import { ALL_ADAPTERS } from '../../core/sources/index.js';
 import { runPipeline, type PipelineOverrides } from '../../core/pipeline/index.js';
+import { appliedJobIds } from '../../core/pipeline/history.js';
+import {
+  readState,
+  updateSeenLedger,
+  type ApplicationEntry,
+  type JobVerdictEntry,
+} from '../../core/state/index.js';
+import { log } from '../../core/lib/log.js';
 import type {
   AnalyzeFitArgs,
   AnalyzeFitResult,
@@ -75,15 +83,36 @@ export async function handleFindMatchingJobs(
       message: 'all source adapters failed or are unconfigured',
     });
   }
+  let applications: readonly ApplicationEntry[] = [];
+  let verdicts: readonly JobVerdictEntry[] = [];
+  const stateRes = await readState();
+  if (stateRes.ok) {
+    // History boosts are an opt-in ranking mode; verdict suppression is user intent and always on.
+    if (config.ranking.history?.enabled === true) {
+      applications = stateRes.value.applications;
+    }
+    verdicts = stateRes.value.verdicts ?? [];
+  } else {
+    log('warn', 'find_matching_jobs.state_unavailable', { error: stateRes.error });
+  }
   const overrides: PipelineOverrides = {
     now,
     ...(args.maxAgeDays === null || typeof args.maxAgeDays === 'number'
       ? { maxAgeDays: args.maxAgeDays }
       : {}),
     ...(args.recencyEnabled !== undefined ? { recencyEnabled: args.recencyEnabled } : {}),
+    ...(applications.length > 0 ? { applications } : {}),
+    ...(verdicts.length > 0 ? { verdicts } : {}),
   };
   const ranked = await runPipeline(pool, config, overrides);
   const topK = ranked.slice(0, args.count ?? config.ranking.digestK);
+  const applied =
+    applications.length > 0
+      ? appliedJobIds(
+          topK.map((r) => r.job),
+          applications,
+        )
+      : undefined;
   const persistK = Math.max(config.ranking.persistK ?? 1000, topK.length);
   const date = todayIsoDate(now);
   const persisted = await persistDigest(
@@ -101,9 +130,26 @@ export async function handleFindMatchingJobs(
       })),
       jobs: ranked.slice(0, persistK),
     },
-    { displayCount: topK.length },
+    {
+      displayCount: topK.length,
+      ...(applied !== undefined ? { appliedJobIds: applied } : {}),
+    },
   );
   if (!persisted.ok) return err(toToolError(persisted.error));
+  void updateSeenLedger(
+    ranked.map((r) => r.job),
+    now,
+  )
+    .then((ledger) => {
+      if (!ledger.ok) {
+        log('warn', 'find_matching_jobs.seen_ledger_failed', { error: ledger.error });
+      }
+    })
+    .catch((e: unknown) => {
+      log('warn', 'find_matching_jobs.seen_ledger_failed', {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    });
   return ok({
     digestPath: persisted.value.path,
     markdownPath: persisted.value.markdownPath,

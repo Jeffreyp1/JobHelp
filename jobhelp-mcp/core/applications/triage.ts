@@ -19,6 +19,7 @@ export interface TriageBundle {
 
 export interface TriageOptions {
   readonly triageK?: number;
+  readonly appliedJobIds?: ReadonlySet<string>;
 }
 
 function matchedSkills(r: RankedJob, skills: readonly string[]): readonly string[] {
@@ -41,14 +42,19 @@ function sanitizeField(s: string): string {
   return s.replace(/[|\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-export function buildTriageLine(r: RankedJob, skills: readonly string[]): string {
+export function buildTriageLine(
+  r: RankedJob,
+  skills: readonly string[],
+  applied?: ReadonlySet<string>,
+): string {
   const matched = matchedSkills(r, skills);
   const skillsField = matched.length > 0 ? matched.join(',') : '-';
   const posted = r.job.postedAt !== undefined && r.job.postedAt !== '' ? r.job.postedAt : 'undated';
   const title = sanitizeField(r.job.title);
   const company = sanitizeField(r.job.company);
   const location = sanitizeField(r.job.location);
-  return `${r.rank}. ${r.job.id} | ${title} @ ${company} | ${location} | ${r.job.remote} | ${posted} | skills:${skillsField} | s=${r.score.toFixed(4)}`;
+  const line = `${r.rank}. ${r.job.id} | ${title} @ ${company} | ${location} | ${r.job.remote} | ${posted} | skills:${skillsField} | s=${r.score.toFixed(4)}`;
+  return applied?.has(r.job.id) === true ? `${line} | APPLIED` : line;
 }
 
 export function buildProfileCard(profile: ProfileConfig): string {
@@ -106,6 +112,6 @@ export async function bundleTriage(
       chunkSize: triageCfg?.chunkSize ?? 150,
     },
     profileCard: buildProfileCard(config.profile),
-    lines: selected.map((r) => buildTriageLine(r, skills)),
+    lines: selected.map((r) => buildTriageLine(r, skills, options.appliedJobIds)),
   });
 }

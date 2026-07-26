@@ -6,6 +6,7 @@ import type {
   InitConfigResult,
   ListApplicationVersionsResult,
   ListRecentApplicationsResult,
+  RecordJobVerdictsResult,
   ReadResumeResult,
   ReadRulesResult,
   RegisterResumeResult,
@@ -44,6 +45,7 @@ export interface Calls {
   writeApplicationOutput: unknown[];
   listApplicationVersions: unknown[];
   listRecentApplications: unknown[];
+  recordJobVerdicts: unknown[];
   applyConfigAnswers: unknown[];
   validateSources: unknown[];
   rerankTopJobs: unknown[];
@@ -68,6 +70,7 @@ export function makeDeps(
     writeApplicationOutput: [],
     listApplicationVersions: [],
     listRecentApplications: [],
+    recordJobVerdicts: [],
     validateSources: [],
     rerankTopJobs: [],
   };
@@ -138,6 +141,7 @@ export function makeDeps(
   };
   const listVersionsResult: ListApplicationVersionsResult = { versions: [] };
   const listRecentResult: ListRecentApplicationsResult = { applications: [] };
+  const recordVerdictsResult: RecordJobVerdictsResult = { recorded: 0, unresolvedIds: [] };
   const validateSourcesResult: ValidateSourcesResult = {
     results: [],
     summary: { total: 0, ok: 0, failed: 0 },
@@ -225,6 +229,10 @@ export function makeDeps(
     listRecentApplications: async () => {
       calls.listRecentApplications.push({});
       return ok(listRecentResult);
+    },
+    recordJobVerdicts: async (args) => {
+      calls.recordJobVerdicts.push(args);
+      return ok(recordVerdictsResult);
     },
     validateSources: async (args) => {
       calls.validateSources.push(args);

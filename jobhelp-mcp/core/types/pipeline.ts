@@ -40,6 +40,8 @@ export interface ScoreBreakdown {
   readonly rerank?: number;
   /** Reserved multiplier from the applied-history signal; not yet produced by rank(). */
   readonly historyBoost?: number;
+  /** Demotion multiplier in (0, 1] from a stored 'skipped' verdict. Present only when a verdict demoted this job. */
+  readonly verdictDemotion?: number;
   /** LLM fit-score in [0, 1]. Unused in Design B (no LLM scoring); always undefined. */
   readonly llmFitScore?: number;
 }

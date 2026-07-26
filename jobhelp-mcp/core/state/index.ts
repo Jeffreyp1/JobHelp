@@ -29,12 +29,36 @@ export interface DigestEntry {
   readonly createdAt: string;
 }
 
+export type JobVerdict = 'strong' | 'solid' | 'borderline' | 'drop' | 'skipped' | 'applied';
+
+export const JOB_VERDICTS: readonly JobVerdict[] = [
+  'strong',
+  'solid',
+  'borderline',
+  'drop',
+  'skipped',
+  'applied',
+];
+
+export interface JobVerdictEntry {
+  /** Order-independent (company, title) key from pipeline/identity.ts. Upsert key; latest wins. */
+  readonly identityKey: string;
+  readonly jobId?: string;
+  readonly company: string;
+  readonly title: string;
+  readonly url?: string;
+  readonly verdict: JobVerdict;
+  readonly reason?: string;
+  readonly at: string;
+}
+
 export interface JobHelpState {
   readonly version: typeof STATE_SCHEMA_VERSION;
   readonly resumes: ReadonlyArray<RegisteredResumeEntry>;
   readonly activeResumeName?: string;
   readonly applications: ReadonlyArray<ApplicationEntry>;
   readonly digests: ReadonlyArray<DigestEntry>;
+  readonly verdicts?: ReadonlyArray<JobVerdictEntry>;
 }
 
 export interface PersistedDigest {
@@ -86,3 +110,13 @@ export {
   getLatestDigest,
   readDigest,
 } from './digestStore.js';
+
+export { recordVerdicts, VERDICT_RETENTION_CAP } from './verdictsStore.js';
+
+export {
+  getSeenLedgerPath,
+  readSeenLedger,
+  updateSeenLedger,
+  type SeenLedger,
+  type SeenLedgerEntry,
+} from './seenLedger.js';

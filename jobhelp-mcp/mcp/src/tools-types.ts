@@ -1,6 +1,7 @@
 import type { Result } from '../../core/types/result.js';
 import type { JobId, NormalizedJob } from '../../core/types/job.js';
 import type { RankedJob } from '../../core/types/pipeline.js';
+import type { JobVerdict } from '../../core/state/index.js';
 import type { WizardPrompt, WizardResult } from '../../core/init/index.js';
 import type {
   RerankTopJobsArgs,
@@ -232,6 +233,22 @@ export interface RecentApplication {
   readonly basedOnResumeName?: string;
 }
 
+export interface JobVerdictInput {
+  readonly jobId: string;
+  readonly verdict: JobVerdict;
+  readonly reason?: string;
+}
+
+export interface RecordJobVerdictsArgs {
+  readonly verdicts: readonly JobVerdictInput[];
+}
+
+export interface RecordJobVerdictsResult {
+  readonly recorded: number;
+  /** jobIds not present in the latest digest; reported back, never an error. */
+  readonly unresolvedIds: readonly string[];
+}
+
 export interface ListRecentApplicationsResult {
   readonly applications: readonly RecentApplication[];
 }
@@ -288,6 +305,9 @@ export interface CoreDeps {
   readonly listRecentApplications: () => Promise<
     Result<ListRecentApplicationsResult, ToolError>
   >;
+  readonly recordJobVerdicts: (
+    args: RecordJobVerdictsArgs,
+  ) => Promise<Result<RecordJobVerdictsResult, ToolError>>;
   readonly validateSources: (
     args: ValidateSourcesArgs,
   ) => Promise<Result<ValidateSourcesResult, ToolError>>;

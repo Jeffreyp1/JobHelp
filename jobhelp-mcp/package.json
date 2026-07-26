@@ -31,6 +31,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "bench:real": "npx tsx scripts/bench-relevance-real.mts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",

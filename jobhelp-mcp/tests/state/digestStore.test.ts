@@ -11,7 +11,8 @@ import {
   readDigest,
 } from '../../core/state/digestStore.js';
 import { readState } from '../../core/state/store.js';
-import type { PersistedDigest } from '../../core/state/index.js';
+import { appliedJobIds } from '../../core/pipeline/history.js';
+import type { ApplicationEntry, PersistedDigest } from '../../core/state/index.js';
 import { isErr, isOk } from '../../core/types/result.js';
 
 let sandbox: string;
@@ -139,6 +140,47 @@ describe('persistDigest', () => {
     if (isErr(result)) {
       expect(result.error.type).toBe('validation');
     }
+  });
+
+  it('renders the already-applied marker for a job matching an application (company+title, different jobId/url)', async () => {
+    const app: ApplicationEntry = {
+      jobId: 'greenhouse:different',
+      company: 'acme',
+      role: 'Engineer I Software',
+      date: '2026-05-10',
+      dir: '/tmp/apps/acme',
+      url: 'https://elsewhere.example/xyz',
+      createdAt: '2026-05-10T00:00:00.000Z',
+      updatedAt: '2026-05-10T00:00:00.000Z',
+    };
+    const applied = appliedJobIds(FIXTURE_DIGEST.jobs.map((r) => r.job), [app]);
+    expect(applied.has('adzuna:abc123')).toBe(true);
+    const result = await persistDigest(FIXTURE_DIGEST, { appliedJobIds: applied });
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(readFileSync(result.value.markdownPath, 'utf8')).toContain(
+      '- **Status:** already applied',
+    );
+  });
+
+  it('accepts appliedJobIds as a plain string array', async () => {
+    const result = await persistDigest(FIXTURE_DIGEST, {
+      appliedJobIds: ['adzuna:abc123'],
+    });
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(readFileSync(result.value.markdownPath, 'utf8')).toContain('already applied');
+  });
+
+  it('does not persist appliedJobIds into the digest JSON (formatter meta only)', async () => {
+    const result = await persistDigest(FIXTURE_DIGEST, {
+      appliedJobIds: ['adzuna:abc123'],
+    });
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    const json = JSON.parse(readFileSync(result.value.path, 'utf8'));
+    expect(json).toEqual(FIXTURE_DIGEST);
+    expect('appliedJobIds' in json).toBe(false);
   });
 });
 

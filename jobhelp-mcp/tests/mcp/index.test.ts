@@ -68,6 +68,7 @@ function stubCoreDeps(): CoreDeps {
     writeApplicationOutput: async () => ok({ path: '/x', version: 1 }),
     listApplicationVersions: async () => ok({ versions: [] }),
     listRecentApplications: async () => ok({ applications: [] }),
+    recordJobVerdicts: async () => ok({ recorded: 0, unresolvedIds: [] }),
     validateSources: async () => ok({ results: [], summary: { total: 0, ok: 0, failed: 0 } }),
     rerankTopJobs: async () =>
       ok({
@@ -103,7 +104,7 @@ describe('buildServer', () => {
       resourceDeps: stubResourceDeps(),
     });
     expect(handle.server).toBeDefined();
-    expect(handle.tools.length).toBe(23);
+    expect(handle.tools.length).toBe(24);
     expect(handle.resources.length).toBe(10);
     expect(handle.prompts.length).toBe(4);
   });

@@ -30,6 +30,7 @@ import {
   handleListApplicationVersions,
   handleListRecentApplications,
   handleReadResume,
+  handleRecordJobVerdicts,
   handleReadRules,
   handleRegisterResume,
   handleRerankTopJobs,
@@ -69,6 +70,7 @@ export function buildCoreDeps(opts: BuildOpts): CoreDeps {
     writeApplicationOutput: handleWriteApplicationOutput,
     listApplicationVersions: handleListApplicationVersions,
     listRecentApplications: handleListRecentApplications,
+    recordJobVerdicts: handleRecordJobVerdicts,
     validateSources: (args) => handleValidateSources(config, args),
     rerankTopJobs: (args) => handleRerankTopJobs(registry, args),
   };

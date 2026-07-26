@@ -1,3 +1,5 @@
+import { extractMinYears, SENIOR_MIN_YEARS } from './experience.js';
+
 export type RoleFamily =
   | 'backend'
   | 'frontend'
@@ -160,18 +162,19 @@ const ROLE_NOUN = '(?:engineer|developer|dev|swe|sde)';
 // "Staff Machine Learning Engineer"); and/or/to excluded so prose like
 // "senior and junior engineers" cannot bridge the gap.
 const LEVEL_MOD = '(?:(?!and\\b|or\\b|to\\b)[\\w/&+.-]+\\s+){0,2}';
-const SENIORITY_DESC_RULES: readonly SeniorityRule[] = [
+// Intern and staff keyword signals take precedence over the years-of-experience count (a
+// "Staff Engineer, 10+ years" body is staff, not just senior).
+const SENIORITY_DESC_HEAD_RULES: readonly SeniorityRule[] = [
   { pattern: /\b(intern|internship)\b/i, level: 'intern' },
   {
     pattern: new RegExp(`\\b(staff|principal|distinguished)\\s+${LEVEL_MOD}${ROLE_NOUN}\\b`, 'i'),
     level: 'staff',
   },
-  // 5+ years (or higher) of experience/industry/professional is a strong senior signal; sub-5
-  // year counts (2+, 3+, 4+) are ambiguous between entry and mid so they stay signal-less.
-  {
-    pattern: /\b(?:[5-9]|[12]\d)(?:[\s-]+\d+)?\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:experience|exp(?:erience)?|industry|professional|relevant)\b/i,
-    level: 'senior',
-  },
+];
+
+// Consulted only after the years-of-experience signal (see detectSeniorityLevel): the
+// years count sits where the old 5+-years regex did, between staff and these keyword rules.
+const SENIORITY_DESC_TAIL_RULES: readonly SeniorityRule[] = [
   {
     pattern: new RegExp(
       `\\b(senior|forward[\\s-]+deployed|head of|lead)\\s+${LEVEL_MOD}${ROLE_NOUN}\\b`,
@@ -207,7 +210,9 @@ export function detectTitleSeniority(title: string): SeniorityLevel | undefined 
 }
 
 // Title first; description fallback uses tighter level+role-noun patterns so generic mentions
-// ("we are hiring senior engineers") don't trip. Returns undefined when neither surface signals.
+// ("we are hiring senior engineers") don't trip. The years-of-experience requirement (>=5 senior,
+// entry-friendly => entry) sits between the intern/staff keywords and the remaining keyword rules,
+// where the old years regex lived. Returns undefined when neither surface signals.
 export function detectSeniorityLevel(
   title: string,
   description: string,
@@ -215,7 +220,15 @@ export function detectSeniorityLevel(
   const fromTitle = scanRules(title, SENIORITY_TITLE_RULES);
   if (fromTitle !== undefined) return fromTitle;
   if (description.length === 0) return undefined;
-  return scanRules(description.slice(0, DESCRIPTION_SCAN_LIMIT), SENIORITY_DESC_RULES);
+  const scanned = description.slice(0, DESCRIPTION_SCAN_LIMIT);
+  const fromHead = scanRules(scanned, SENIORITY_DESC_HEAD_RULES);
+  if (fromHead !== undefined) return fromHead;
+  const minYears = extractMinYears(description);
+  if (minYears !== undefined) {
+    if (minYears >= SENIOR_MIN_YEARS) return 'senior';
+    if (minYears === 0) return 'entry';
+  }
+  return scanRules(scanned, SENIORITY_DESC_TAIL_RULES);
 }
 
 export { detectCountryFromLocation } from './geo.js';

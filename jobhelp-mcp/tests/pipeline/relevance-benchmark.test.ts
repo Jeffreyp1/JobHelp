@@ -78,10 +78,10 @@ function getRows(): Promise<readonly Row[]> {
   return rowsPromise;
 }
 
-describe('relevance benchmark: 20 blind-verified tier-labeled probes (rrf mode)', () => {
+describe('relevance benchmark: 22 blind-verified tier-labeled probes (rrf mode)', () => {
   it('ranks all 20 probes', async () => {
     const rows = await getRows();
-    expect(rows).toHaveLength(20);
+    expect(rows).toHaveLength(22);
     log('info', 'relevance-benchmark.metrics', {
       spearmanRho: Number(spearman(rows).toFixed(3)),
       pairwiseAccuracy: Number(pairwiseAccuracy(rows).toFixed(3)),

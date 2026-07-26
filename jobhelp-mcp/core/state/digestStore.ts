@@ -10,7 +10,7 @@ import {
   parseSourceRunResult,
 } from './digestSchema.js';
 import { atomicWriteFile as atomicWriteFileImpl } from '../lib/atomicWrite.js';
-import { formatDigestCsv, formatDigestMarkdown } from '../digest/format.js';
+import { formatDigestCsv, formatDigestMarkdown, type DigestMeta } from '../digest/format.js';
 
 const DIGESTS_DIR_NAME = 'digests';
 const LATEST_POINTER_NAME = 'latest.json';
@@ -110,7 +110,12 @@ async function atomicWriteDigest(
 
 export async function persistDigest(
   digest: PersistedDigest,
-  opts?: { readonly displayCount?: number },
+  opts?: {
+    readonly displayCount?: number;
+    // Formatter meta only: which job ids to annotate "already applied". Never
+    // enters the persisted JSON, so old digests keep parsing unchanged.
+    readonly appliedJobIds?: ReadonlySet<string> | readonly string[];
+  },
 ): Promise<
   Result<
     {
@@ -152,10 +157,17 @@ export async function persistDigest(
   if (!write.ok) return err(write.error);
   const latestWrite = await atomicWriteDigest(latestPath, contents);
   if (!latestWrite.ok) return err(latestWrite.error);
-  const meta = {
+  const applied =
+    opts?.appliedJobIds === undefined
+      ? undefined
+      : opts.appliedJobIds instanceof Set
+        ? opts.appliedJobIds
+        : new Set(opts.appliedJobIds);
+  const meta: DigestMeta = {
     date: digest.date,
     sourceResults: digest.sourceResults,
     totalDurationMs: digest.totalDurationMs,
+    ...(applied !== undefined ? { appliedJobIds: applied } : {}),
   };
   const markdownWrite = await atomicWriteDigest(
     markdownPath,

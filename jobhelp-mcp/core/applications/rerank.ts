@@ -67,6 +67,10 @@ Markdown:
 
 End with one line: "Recommended next action: ...".
 
+After tiering, you MUST call record_job_verdicts with one {jobId, verdict, reason} per judged
+job, mapping tiers directly: strong, solid, borderline, drop. Use 'skipped' for jobs you chose
+not to judge. This persists your judgment so future digests suppress drops and demote skips.
+
 Be honest. Don't pad. Drop noise aggressively.`;
 }
 

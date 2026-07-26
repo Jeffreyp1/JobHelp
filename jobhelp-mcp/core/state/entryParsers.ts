@@ -1,4 +1,11 @@
-import type { ApplicationEntry, DigestEntry, RegisteredResumeEntry } from './index.js';
+import {
+  JOB_VERDICTS,
+  type ApplicationEntry,
+  type DigestEntry,
+  type JobVerdict,
+  type JobVerdictEntry,
+  type RegisteredResumeEntry,
+} from './index.js';
 
 export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -57,6 +64,43 @@ export function parseApplicationEntry(raw: unknown): ApplicationEntry | null {
     ...(url !== undefined ? { url } : {}),
     ...(location !== undefined ? { location } : {}),
     ...(basedOnResumeName !== undefined ? { basedOnResumeName } : {}),
+  };
+}
+
+function asVerdict(v: unknown): JobVerdict | undefined {
+  return typeof v === 'string' && (JOB_VERDICTS as readonly string[]).includes(v)
+    ? (v as JobVerdict)
+    : undefined;
+}
+
+export function parseJobVerdictEntry(raw: unknown): JobVerdictEntry | null {
+  if (!isPlainObject(raw)) return null;
+  const identityKey = asString(raw['identityKey']);
+  const company = asString(raw['company']);
+  const title = asString(raw['title']);
+  const verdict = asVerdict(raw['verdict']);
+  const at = asString(raw['at']);
+  if (
+    identityKey === undefined ||
+    company === undefined ||
+    title === undefined ||
+    verdict === undefined ||
+    at === undefined
+  ) {
+    return null;
+  }
+  const jobId = asString(raw['jobId']);
+  const url = asString(raw['url']);
+  const reason = asString(raw['reason']);
+  return {
+    identityKey,
+    company,
+    title,
+    verdict,
+    at,
+    ...(jobId !== undefined ? { jobId } : {}),
+    ...(url !== undefined ? { url } : {}),
+    ...(reason !== undefined ? { reason } : {}),
   };
 }
 

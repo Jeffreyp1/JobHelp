@@ -128,15 +128,30 @@ describe('buildLevelFitRank', () => {
     expect(order).toEqual(['newgrad', 'plain', 'senior']);
   });
 
-  it('treats below-level jobs as neutral, not promoted', () => {
+  it('promotes below-level jobs to the entry-friendly tier for a mid profile', () => {
     const jobs = [
-      levelJob('entryjob', 'Junior Engineer'),
-      levelJob('internjob', 'Software Engineering Intern'),
+      levelJob('above', 'Staff Software Engineer'),
+      levelJob('nosignal', 'Software Engineer'),
+      levelJob('below', 'Junior Software Engineer'),
+      levelJob('intern', 'Software Engineering Intern'),
     ];
     const ranked = buildLevelFitRank(jobs, 'mid');
-    const tiersById = new Map(ranked.items.map((e) => [e.job.id, e.rank]));
-    expect(tiersById.get('internjob')).toBeGreaterThanOrEqual(1);
     const order = ranked.items.map((e) => e.job.id);
-    expect(order[0]).toBe('entryjob');
+    // below-level (junior, intern) share the best tier; no-signal next; above-level last.
+    expect(order).toEqual(['below', 'intern', 'nosignal', 'above']);
+  });
+
+  it('keeps a below-level (intern) posting neutral for an entry profile', () => {
+    const jobs = [
+      levelJob('intern', 'Software Engineering Intern'),
+      levelJob('nosignal', 'Software Engineer'),
+      levelJob('match', 'Software Engineer, New Grad'),
+    ];
+    const ranked = buildLevelFitRank(jobs, 'entry');
+    const rankById = new Map(ranked.items.map((e) => [e.job.id, e.rank]));
+    // the exact entry match is promoted; the intern posting is not lifted above the no-signal role.
+    expect(rankById.get('match')).toBe(1);
+    expect(rankById.get('intern')).toBe(2);
+    expect(rankById.get('nosignal')).toBe(3);
   });
 });

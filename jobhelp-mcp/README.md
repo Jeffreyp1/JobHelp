@@ -109,6 +109,7 @@ Configuration-dependent tool calls return a typed error if the config file is mi
 | `write_application_output` | Write a resume, cover letter, critique, or notes artifact; auto-versions resumes and cover letters |
 | `list_application_versions` | List versions of an artifact for diff or recovery |
 | `list_recent_applications` | Return application history from `~/jobhelp/state.json` |
+| `record_job_verdicts` | Persist per-job rerank judgments (strong/solid/borderline/drop/skipped/applied) so future digests suppress drops and demote skips |
 | `validate_sources` | Check configured source adapters for stale credentials, bad tokens, or rate limits |
 | `rerank_top_jobs` | Bundle top jobs, active resume, and rerank instructions for client-side AI judgment |
 
