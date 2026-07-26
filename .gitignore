@@ -114,3 +114,6 @@ extension-app/prompts/shared/_validate.test.ts
 /autoapply-repair/
 /autoapply/updates/
 autoapply/engine/node_modules/
+
+# Full raw ATS harvest (8.6MB, 168k slugs) — keep local, regenerate via scripts; the curated active list lives in company-lists/smartrecruiters.json
+jobhelp-mcp/company-lists/smartrecruiters.validated.json
