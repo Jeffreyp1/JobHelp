@@ -134,3 +134,6 @@ extension-app/prompts/shared/_validate.test.ts
 !extension-app/tests/contracts/verify-bundle-actions.test.ts
 !autoapply/engine/tests/
 !autoapply/engine/tests/**
+
+# Large regenerable ATS dataset (671k lines) — regenerate via scripts, never commit
+jobhelp-mcp/company-lists/smartrecruiters.validated.json
