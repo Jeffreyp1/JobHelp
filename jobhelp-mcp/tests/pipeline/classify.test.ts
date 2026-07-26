@@ -86,6 +86,34 @@ describe('detectRoleFamily', () => {
   it('Services Lead is solutions-architect (F5 positive — still caught)', () => {
     expect(detectRoleFamily('Services Lead', '')).toBe('solutions-architect');
   });
+
+  it('classifies an AI engineer as ml', () => {
+    expect(detectRoleFamily('AI Engineer', '')).toBe('ml');
+  });
+
+  it('classifies an LLM engineer as ml', () => {
+    expect(detectRoleFamily('LLM Engineer', '')).toBe('ml');
+  });
+
+  it('classifies an applied AI engineer as ml', () => {
+    expect(detectRoleFamily('Applied AI Engineer', '')).toBe('ml');
+  });
+
+  it('classifies a GenAI engineer as ml', () => {
+    expect(detectRoleFamily('GenAI Engineer', '')).toBe('ml');
+  });
+
+  it('classifies a generative AI engineer as ml', () => {
+    expect(detectRoleFamily('Generative AI Engineer', '')).toBe('ml');
+  });
+
+  it('classifies an AI/ML engineer as ml', () => {
+    expect(detectRoleFamily('AI/ML Engineer', '')).toBe('ml');
+  });
+
+  it('does not classify Bonsai Engineer as ml', () => {
+    expect(detectRoleFamily('Bonsai Engineer', '')).toBeUndefined();
+  });
 });
 
 describe('isGhostJob', () => {
@@ -97,6 +125,71 @@ describe('isGhostJob', () => {
 
   it('flags [TEST] Engineering Position as ghost', () => {
     expect(isGhostJob({ title: '[TEST] Engineering Position', description: longDesc })).toBe(true);
+  });
+
+  it('does not flag a short-description job from a short-feed source (yc)', () => {
+    expect(
+      isGhostJob({
+        title: 'Founding Engineer',
+        description: 'Role type: Full stack\nAI estimating for construction',
+        source: 'yc',
+      }),
+    ).toBe(false);
+  });
+
+  it('still flags ghost titles from short-feed sources', () => {
+    expect(
+      isGhostJob({ title: '[TEMPLATE] Default Template', description: 'short', source: 'yc' }),
+    ).toBe(true);
+  });
+
+  // Sampled from a live WaaS fetch (2026-07): every real yc posting is a
+  // Role type / Job type / one-liner triple of 58-114 stripped chars, so the
+  // length heuristic would convict the entire source without the exemption.
+  const LIVE_YC_SAMPLES = [
+    {
+      title: 'Software Engineer',
+      description: 'Role type: Full stack\nJob type: Fulltime\nPioneering Generative AI for Nursing',
+    },
+    {
+      title: 'Software Developer ',
+      description:
+        'Role type: Full stack\nJob type: Fulltime\nMaking financial services simple, transparent and delightful. ',
+    },
+    {
+      title: 'Senior Software Engineer',
+      description:
+        'Role type: Full stack\nJob type: Fulltime\nPlatform that allows anyone to create and monetize video games.',
+    },
+    {
+      title: 'Software Engineer I',
+      description:
+        'Role type: Full stack\nJob type: Fulltime\nWe deploy sensors and software that increase hospital efficiency.',
+    },
+    {
+      title: 'Software Engineer',
+      description: 'Role type: Full stack\nJob type: Fulltime\nA better data science notebook.',
+    },
+  ] as const;
+
+  it.each(LIVE_YC_SAMPLES)('does not flag live-sampled yc posting "$title"', (sample) => {
+    expect(isGhostJob({ ...sample, source: 'yc' })).toBe(false);
+  });
+
+  it('same live yc shapes WOULD be flagged without the source exemption (guards heuristic strength)', () => {
+    for (const sample of LIVE_YC_SAMPLES) {
+      expect(isGhostJob({ ...sample, source: 'greenhouse' })).toBe(true);
+    }
+  });
+
+  it('does not flag a yc job whose optional fields are all absent (empty description)', () => {
+    expect(isGhostJob({ title: 'Founding Engineer', description: '', source: 'yc' })).toBe(false);
+  });
+
+  it('still flags short descriptions from full-JD sources', () => {
+    expect(
+      isGhostJob({ title: 'Backend Engineer', description: 'Apply now.', source: 'greenhouse' }),
+    ).toBe(true);
   });
 
   it('does not flag a real SWE job with a 5KB description', () => {
@@ -150,6 +243,27 @@ describe('detectSeniorityLevel', () => {
 
   it('classifies Junior Backend Engineer as entry', () => {
     expect(detectSeniorityLevel('Junior Backend Engineer', '')).toBe('entry');
+  });
+
+  it('classifies New Grad titles as entry, not intern', () => {
+    expect(detectSeniorityLevel('New Grad Software Engineer', '')).toBe('entry');
+    expect(
+      detectSeniorityLevel('Software Engineer, Agent Runtime (New Grad / Early Career)', ''),
+    ).toBe('entry');
+    expect(detectSeniorityLevel('Software Engineer (New Graduate)', '')).toBe('entry');
+  });
+
+  it('keeps intern classification when an intern marker is present alongside new grad', () => {
+    expect(detectSeniorityLevel('Software Engineer Intern (New Grad)', '')).toBe('intern');
+  });
+
+  it('classifies a new-grad-welcoming description as entry', () => {
+    expect(
+      detectSeniorityLevel(
+        'Software Engineer',
+        'Early-career and new-grad engineers are welcome to apply.',
+      ),
+    ).toBe('entry');
   });
 
   it('returns undefined for plain Software Engineer with no markers', () => {

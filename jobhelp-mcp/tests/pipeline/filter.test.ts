@@ -121,19 +121,34 @@ describe('filter', () => {
     expect(out).toHaveLength(0);
   });
 
+  it('keeps a New Grad posting for an entry profile (new grad is entry, not intern)', async () => {
+    const cfg = makeConfig({ profile: { ...makeConfig().profile, seniority: 'entry' } });
+    const out = await filter(
+      [makeJob({ title: 'Software Engineer, Agent Runtime (New Grad / Early Career)' })],
+      cfg,
+    );
+    expect(out).toHaveLength(1);
+  });
+
   it('keeps a posting with no seniority signal (missing data never drops)', async () => {
     const cfg = makeConfig({ profile: { ...makeConfig().profile, seniority: 'intern' } });
     const out = await filter([makeJob({ title: 'Software Engineer' })], cfg);
     expect(out).toHaveLength(1);
   });
 
-  it('detects seniority signal in description as well as title', async () => {
+  it('keeps a description-only seniority signal (demoted in ranking, not dropped)', async () => {
     const cfg = makeConfig({ profile: { ...makeConfig().profile, seniority: 'intern' } });
     const longDesc =
       'We need a staff engineer to lead our distributed-systems efforts and own the platform. ' +
       'You will mentor others, set technical direction, and help us scale safely. ' +
       'Experience with Go, Kubernetes, and large-team collaboration is a strong plus.';
     const out = await filter([makeJob({ title: 'Engineer', description: longDesc })], cfg);
+    expect(out).toHaveLength(1);
+  });
+
+  it('still drops on a title-level seniority signal', async () => {
+    const cfg = makeConfig({ profile: { ...makeConfig().profile, seniority: 'intern' } });
+    const out = await filter([makeJob({ title: 'Engineer III' })], cfg);
     expect(out).toHaveLength(0);
   });
 
@@ -251,5 +266,62 @@ describe('filter', () => {
       const out = await filter([makeJob({ title: 'Senior Software Engineer' })], cfg);
       expect(out).toHaveLength(1);
     });
+  });
+
+  describe('non-software expansion: keeps real software roles (recall guard)', () => {
+    // roleFamily: [] disables the role-family rule so ONLY the non-software gate can drop.
+    const noRoleFamily = (): JobDigestConfig => {
+      const base = makeConfig();
+      return { ...base, profile: { ...base.profile, roleFamily: [] } };
+    };
+    const keepTitles = [
+      'Software Engineer',
+      'Firmware Engineer',
+      'Embedded Software Engineer',
+      'Hardware Security Engineer',
+      'Backend Engineer',
+      'Platform Engineer',
+      'Site Reliability Engineer',
+      // Discipline word as a modifier of a software role must NOT trip the gate.
+      'Manufacturing Engineering Software Engineer',
+      'Industrial Engineering Systems Developer',
+    ];
+    for (const title of keepTitles) {
+      it(`keeps "${title}"`, async () => {
+        const out = await filter([makeJob({ title })], noRoleFamily());
+        expect(out).toHaveLength(1);
+      });
+    }
+  });
+
+  describe('non-software expansion: drops other-discipline engineering and trades', () => {
+    // roleFamily: [] disables the role-family rule so the drop is attributable to the non-software gate alone.
+    const noRoleFamily = (): JobDigestConfig => {
+      const base = makeConfig();
+      return { ...base, profile: { ...base.profile, roleFamily: [] } };
+    };
+    const dropTitles = [
+      'Mechanical Engineer',
+      'Electrical Engineer',
+      'Civil Engineer',
+      'Chemical Engineer',
+      'Industrial Engineer',
+      'Biomedical Engineer',
+      'Aerospace Engineer',
+      'Manufacturing Engineer',
+      'Hardware Engineer',
+      'Mechatronics Engineer',
+      'Electrician',
+      'Plumber',
+      'Welder',
+      'HVAC Technician',
+      'Machinist',
+    ];
+    for (const title of dropTitles) {
+      it(`drops "${title}"`, async () => {
+        const out = await filter([makeJob({ title })], noRoleFamily());
+        expect(out).toHaveLength(0);
+      });
+    }
   });
 });
