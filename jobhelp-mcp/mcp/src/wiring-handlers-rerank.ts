@@ -26,9 +26,10 @@ export async function handleRerankTopJobs(
     });
   }
 
-  const opts: { topK?: number; instructions?: string } = {};
+  const opts: { topK?: number; instructions?: string; jobIds?: readonly string[] } = {};
   if (args.topK !== undefined) opts.topK = args.topK;
   if (args.instructions !== undefined) opts.instructions = args.instructions;
+  if (args.jobIds !== undefined) opts.jobIds = args.jobIds;
 
   const bundle = await bundleRerank(registry, resumeName, opts);
   if (!bundle.ok) {

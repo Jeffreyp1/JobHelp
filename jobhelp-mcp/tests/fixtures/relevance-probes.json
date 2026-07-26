@@ -378,5 +378,43 @@
     "company": "Copperleaf Travel Management",
     "description": "Copperleaf Travel Management arranges business travel for professional services firms and conference groups across North America. We are seeking a Corporate Travel Coordinator to join our remote reservations team.\n\nIn this role you will build itineraries, book air, hotel, and ground transportation, and serve as the calm, resourceful point of contact when plans change. You'll work a set weekday schedule with a rotating on-call weekend once every six weeks.\n\nDay to day:\n- Book and modify flights, hotels, and car service for corporate travelers\n- Monitor schedule changes and disruptions and proactively rebook affected travelers\n- Apply client travel policies and preferred vendor programs to every booking\n- Reconcile invoices against bookings and flag discrepancies for accounting\n- Maintain traveler profiles, loyalty numbers, and documentation requirements\n\nYou bring:\n- 1-3 years in travel booking, hospitality, airline customer service, or another guest-facing role\n- Composure under pressure and excellent phone and email etiquette\n- Willingness to earn industry booking certifications; we provide full training\n\nPay: $21-$26 per hour plus quarterly service bonuses. Location: Remote (US).",
     "rationale": "Travel reservations and guest services is a hospitality/logistics-service occupation with zero technical overlap — no engineering title, no software work, and no proximity to the candidate's hidden domains — placing it unambiguously at T5."
+  },
+  {
+    "id": "T1-E",
+    "intendedTier": 1,
+    "finalTier": 1,
+    "relabeled": false,
+    "verifierTiers": [
+      1,
+      1
+    ],
+    "verifierNotes": [
+      "1/high: Agentic-AI backend role on the candidate's exact core stack (TypeScript, Python, Node.js, PostgreSQL, Redis, Kafka, Docker, AWS) centered on multi-agent orchestration, RAG retrieval, and LLM tool calling. The posting states 5-7 years is preferred but explicitly encourages new grads with strong agent-framework projects to apply, so seniority is not a barrier for an early-career candidate. Role family, stack, and stated entry-friendliness all align at the top tier.",
+      "1/high: The role is squarely the candidate's target: an LLM/agentic platform team building multi-agent workflows, RAG pipelines, and evaluation harnesses in TypeScript and Python on AWS with PostgreSQL, Redis, and Kafka. Although the body mentions 5-7 years preferred, it immediately welcomes new grads and early-career engineers with substantial LLM projects, which matches the candidate's profile directly. An explicit new-grad invitation on a perfect-stack agentic role is a should-apply-today match."
+    ],
+    "tiebreakNote": null,
+    "title": "Software Engineer, LLM Agent Platform",
+    "company": "Kestrel Loop",
+    "description": "Kestrel Loop builds an agent platform that lets operations teams automate document-heavy workflows with fleets of coordinated LLM agents. Our platform team owns the agent runtime: multi-agent orchestration, tool calling, RAG retrieval over customer knowledge bases, and the evaluation harnesses that keep quality from regressing.\n\nWhat you'll do:\n- Build backend services in TypeScript and Python (Node.js) that route tool calls, persist agent state, and stream results\n- Design PostgreSQL schemas and Redis-backed session stores for long-running agentic workflows\n- Extend our Kafka event pipeline that feeds traces into the evaluation and observability stack\n- Ship with Docker on AWS (ECS, SQS, S3, Lambda) behind CI with strong test coverage\n- Improve RAG retrieval quality with embeddings, reranking, and offline eval suites against Claude and other LLM APIs\n\nWhat we're looking for:\n- 5-7 years of backend experience is preferred, but new grads and early-career engineers with substantial LLM or agent-framework projects are strongly encouraged to apply - two of our best platform engineers joined straight from school\n- Strong TypeScript or Python fundamentals and working SQL\n- Hands-on exposure to LLM APIs, function/tool calling, RAG, or multi-agent orchestration through work, internships, or side projects\n\nRemote (US). Competitive salary and equity, learning budget, weekly ship cadence.",
+    "rationale": "Agentic-AI platform role on the candidate's exact core stack whose body lists 5-7 years only as a preference and explicitly encourages new grads to apply - the entry-friendly marker must neutralize the year range, keeping this a top-tier match instead of being misread as senior."
+  },
+  {
+    "id": "T4-E",
+    "intendedTier": 4,
+    "finalTier": 4,
+    "relabeled": false,
+    "verifierTiers": [
+      4,
+      4
+    ],
+    "verifierNotes": [
+      "4/high: A .NET/C# enterprise payments role requiring 6+ years of professional experience. The ecosystem (C#, ASP.NET Core, SQL Server, Azure) sits outside the candidate's TypeScript/Python/Go core, there is no AI/LLM component, and the hard 6+ years requirement plus payment-domain ownership expectations rule out an early-career candidate. Wrong ecosystem and wrong seniority with only incidental overlap (general backend concepts, SQL): a recruiter would not shortlist.",
+      "4/high: The posting is a senior-scoped .NET payments platform role: 6+ years of experience required, ownership of PCI-scoped services, and mentoring expectations, all in C#/ASP.NET Core on SQL Server and Azure. None of the candidate's core stack or AI/LLM focus applies, and the explicit 6+ years requirement makes the seniority mismatch unambiguous even though the title reads as a generic software engineer role. Weak match on both ecosystem and level: T4."
+    ],
+    "tiebreakNote": null,
+    "title": "Software Engineer, Payments Platform (.NET)",
+    "company": "Ledgerholm Systems",
+    "description": "Ledgerholm Systems processes card and ACH payments for regional credit unions. We are hiring a Software Engineer for the payments platform team, which owns the transaction pipeline from authorization through settlement and reconciliation.\n\nThe work:\n- Design and evolve C#/.NET 8 services (ASP.NET Core) that process authorization, capture, and settlement flows under strict latency and audit requirements\n- Own SQL Server data models, stored procedures, and migration strategy for PCI-scoped ledgers\n- Extend our Azure Service Bus messaging backbone and the reconciliation jobs that keep partner ledgers in sync\n- Lead design reviews for payment-flow changes and mentor engineers joining the payments domain\n- Operate what you ship on Azure (AKS, Azure SQL, Key Vault) with Bicep and Azure DevOps pipelines\n\nRequirements:\n- 6+ years of professional software engineering experience required, including production ownership of payment, banking, or other regulated transaction systems\n- Expert C# and deep SQL Server fluency, including query tuning and isolation-level reasoning\n- Working knowledge of PCI-DSS obligations and secure coding practices in a regulated environment\n\nRemote (US). Benefits include health coverage, 401(k) match, and an annual compliance training budget.",
+    "rationale": "A generically titled software engineer role whose body demands 6+ years required in a foreign ecosystem (C#/.NET/SQL Server/Azure) with no AI component - the description-level years requirement is the only seniority signal, and it must demote the posting for an entry-level candidate."
   }
 ]

@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob, RemoteMode } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asNumber,
@@ -11,7 +12,8 @@ import {
   runWithConcurrency,
 } from './_shared.js';
 
-const LEVER_CONCURRENCY = 10;
+// Shared api.lever.co host: moderate ceiling, unlike the per-tenant-subdomain sources.
+const LEVER_CONCURRENCY = 15;
 
 export { SourceFetchError };
 
@@ -79,7 +81,7 @@ function parseLeverPosting(raw: unknown): LeverPosting | undefined {
   };
 }
 
-function normalize(slug: string, p: LeverPosting, raw: unknown): NormalizedJob {
+function normalize(slug: string, p: LeverPosting): NormalizedJob {
   const remote = detectRemoteMode(`${p.title} ${p.location} ${p.description}`, p.workplaceType);
   const norm: NormalizedJob = {
     id: `lever:${p.id}`,
@@ -90,7 +92,6 @@ function normalize(slug: string, p: LeverPosting, raw: unknown): NormalizedJob {
     location: p.location,
     remote,
     description: p.description,
-    rawSourceData: raw,
     ...(p.salaryMin !== undefined ? { salaryMin: p.salaryMin } : {}),
     ...(p.salaryMax !== undefined ? { salaryMax: p.salaryMax } : {}),
     ...(p.salaryCurrency !== undefined ? { salaryCurrency: p.salaryCurrency } : {}),
@@ -102,11 +103,11 @@ function normalize(slug: string, p: LeverPosting, raw: unknown): NormalizedJob {
   return norm;
 }
 
-async function fetchPostings(slug: string): Promise<unknown> {
+async function fetchPostings(slug: string, http?: SharedHttpOptions): Promise<unknown> {
   const url = `https://api.lever.co/v0/postings/${encodeURIComponent(slug)}?mode=json`;
-  let response: Response;
+  let response: HttpTextResult;
   try {
-    response = await fetch(url);
+    response = await httpGetText(url, { ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `lever network error: ${msg}`);
@@ -114,16 +115,19 @@ async function fetchPostings(slug: string): Promise<unknown> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `lever HTTP ${response.status}`);
   }
-  const text = await response.text();
   try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(response.bodyText) as unknown;
   } catch {
     throw new SourceFetchError('parse', 'lever response was not valid JSON');
   }
 }
 
-async function fetchSlugJobs(slug: string): Promise<NormalizedJob[]> {
-  const body = await fetchPostings(slug);
+async function fetchSlugJobs(
+  slug: string,
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<NormalizedJob[]> {
+  const body = await fetchPostings(slug, http);
   if (!Array.isArray(body)) {
     throw new SourceFetchError('parse', 'lever response was not an array');
   }
@@ -131,7 +135,9 @@ async function fetchSlugJobs(slug: string): Promise<NormalizedJob[]> {
   for (const rawPosting of body) {
     const parsed = parseLeverPosting(rawPosting);
     if (parsed === undefined) continue;
-    out.push(normalize(slug, parsed, rawPosting));
+    const job = normalize(slug, parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
   return out;
 }
@@ -142,13 +148,15 @@ export const lever: SourceAdapter = {
     const c = config.sources.lever;
     return c !== undefined && c.slugs.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.lever;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'lever config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const slugs = c.slugs;
-    const tasks = slugs.map((slug) => (): Promise<NormalizedJob[]> => fetchSlugJobs(slug));
+    const tasks = slugs.map((slug) => (): Promise<NormalizedJob[]> => fetchSlugJobs(slug, accept, http));
     const settled = await runWithConcurrency(tasks, { limit: LEVER_CONCURRENCY });
     const all: NormalizedJob[] = [];
     let lastError: unknown;

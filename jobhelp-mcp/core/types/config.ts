@@ -64,6 +64,7 @@ export interface SourcesConfig {
   readonly personio?: PersonioConfig;
   readonly yc?: YcStartupConfig;
   readonly weworkremotely?: WeWorkRemotelyConfig;
+  readonly hn?: HnConfig;
 }
 
 export interface AdzunaConfig {
@@ -147,6 +148,14 @@ export interface WeWorkRemotelyConfig {
   readonly categories?: readonly string[];
 }
 
+export interface HnConfig {
+  /**
+   * Optional case-insensitive substring filters applied against each parsed
+   * job's title+description. Empty/missing keeps every parsed post.
+   */
+  readonly queries?: readonly string[];
+}
+
 export interface RemotiveConfig {
   /** Optional list of search keywords; if empty/missing, fetches general feed (limit 100). */
   readonly queries?: readonly string[];
@@ -174,6 +183,10 @@ export interface RankingConfig {
   readonly sourceTrust?: SourceTrustConfig;
   /** Reciprocal Rank Fusion toggle. Opt-in (default disabled); when enabled, replaces the multiplicative product score. */
   readonly fusion?: FusionConfig;
+  /** How many ranked jobs are persisted to the digest JSON. The digest markdown/CSV and tool results keep their own top-K cut. */
+  readonly persistK?: number;
+  /** Funnel-skim knobs surfaced verbatim to the client AI; model is a plain string so switching sonnet -> opus is a config edit only. */
+  readonly triage?: TriageConfig;
   /** Local-embedding semantic signal, fused via RRF. Participates only when fusion.enabled. */
   readonly semantic?: SemanticConfig;
   /** Applied-history signal: boost jobs similar to past applications, annotate already-applied ones. Default disabled. */
@@ -186,6 +199,12 @@ export interface HistoryConfig {
   readonly enabled: boolean;
   /** Ceiling for the similarity-to-applied multiplier; values below 1 fall back to the default 1.15. */
   readonly boostCap?: number;
+}
+
+export interface TriageConfig {
+  readonly model: string;
+  readonly chunkSize: number;
+  readonly triageK: number;
 }
 
 export interface SemanticConfig {

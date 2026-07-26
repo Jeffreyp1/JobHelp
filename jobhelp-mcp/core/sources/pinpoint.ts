@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -14,7 +15,8 @@ import {
 
 export { SourceFetchError };
 
-const MAX_CONCURRENT = 5;
+// Each slug is its own *.pinpointhq.com tenant, so cross-slug parallelism is rate-limit safe.
+const MAX_CONCURRENT = 10;
 
 function stripHtml(html: string): string {
   return html
@@ -99,7 +101,7 @@ function parsePinpointPosting(raw: unknown): PinpointPosting | undefined {
   };
 }
 
-function normalize(slug: string, posting: PinpointPosting, raw: unknown): NormalizedJob {
+function normalize(slug: string, posting: PinpointPosting): NormalizedJob {
   const remote = detectRemoteMode(`${posting.title} ${posting.location} ${posting.description}`);
   const norm: NormalizedJob = {
     id: `pinpoint:${posting.id}`,
@@ -110,7 +112,6 @@ function normalize(slug: string, posting: PinpointPosting, raw: unknown): Normal
     location: posting.location,
     remote,
     description: posting.description,
-    rawSourceData: raw,
     ...(posting.salaryMin !== undefined ? { salaryMin: posting.salaryMin } : {}),
     ...(posting.salaryMax !== undefined ? { salaryMax: posting.salaryMax } : {}),
     ...(posting.salaryCurrency !== undefined ? { salaryCurrency: posting.salaryCurrency } : {}),
@@ -122,11 +123,11 @@ function normalize(slug: string, posting: PinpointPosting, raw: unknown): Normal
   return norm;
 }
 
-async function fetchBoard(slug: string): Promise<unknown> {
+async function fetchBoard(slug: string, http?: SharedHttpOptions): Promise<unknown> {
   const url = `https://${encodeURIComponent(slug)}.pinpointhq.com/postings.json`;
-  let response: Response;
+  let response: HttpTextResult;
   try {
-    response = await fetch(url);
+    response = await httpGetText(url, { ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `pinpoint network error: ${msg}`);
@@ -134,20 +135,24 @@ async function fetchBoard(slug: string): Promise<unknown> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `pinpoint HTTP ${response.status}`);
   }
-  const contentType = response.headers.get('content-type') ?? '';
+  const contentType = response.contentType;
   if (!contentType.toLowerCase().includes('json')) {
     throw new SourceFetchError('not_found', `pinpoint: non-JSON content-type (${contentType}) — likely invalid slug`);
   }
-  const text = await response.text();
   try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(response.bodyText) as unknown;
   } catch {
     throw new SourceFetchError('parse', 'pinpoint response was not valid JSON');
   }
 }
 
-async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void> {
-  const body = await fetchBoard(slug);
+async function fetchAndCollect(
+  slug: string,
+  out: NormalizedJob[],
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<void> {
+  const body = await fetchBoard(slug, http);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'pinpoint response was not an object');
   }
@@ -158,7 +163,9 @@ async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void
   for (const raw of data) {
     const parsed = parsePinpointPosting(raw);
     if (parsed === undefined) continue;
-    out.push(normalize(slug, parsed, raw));
+    const job = normalize(slug, parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
 }
 
@@ -168,14 +175,16 @@ export const pinpoint: SourceAdapter = {
     const c = config.sources.pinpoint;
     return c !== undefined && c.tokens.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.pinpoint;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'pinpoint config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const tasks = c.tokens.map((slug) => async (): Promise<{ slug: string; jobs: NormalizedJob[] }> => {
       const local: NormalizedJob[] = [];
-      await fetchAndCollect(slug, local);
+      await fetchAndCollect(slug, local, accept, http);
       return { slug, jobs: local };
     });
     const results = await runWithConcurrency(tasks, { limit: MAX_CONCURRENT });

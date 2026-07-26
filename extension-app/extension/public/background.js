@@ -14,7 +14,9 @@ var STORAGE_DEFAULTS = {
   onboardingState: "noConfig",
   lastJobInsights: null,
   lastDigest: null,
-  v2Toggles: null
+  v2Toggles: null,
+  autofillProfile: null,
+  autofillResumeDump: null
 };
 
 // extension-app/extension/src/lib/storage.ts

@@ -8,6 +8,7 @@ import {
   PROMPT_TAILOR_RESUME_URI,
   PROMPT_TAILOR_RESUMES_URI,
   PROMPT_VALIDATE_RESUME_URI,
+  PROMPT_JOB_DIGEST_TAILOR_URI,
   RECENT_DIGEST_URI,
   RESUME_URI,
   RULES_DEFAULTS_URI,
@@ -33,8 +34,20 @@ function stubCoreDeps(): CoreDeps {
     applyConfigAnswers: async () => ok({ path: '/x' }),
     registerResume: async () => ok({ name: 'r', storedAt: '/x', active: true }),
     setActiveResume: async () => ok({ active: 'r', registered: ['r'] }),
-    findMatchingJobs: async () => ok({ digestPath: '/x', jobs: [], warnings: [] }),
-    getLatestDigest: async () => ok({ path: '/x', jobs: [], generatedAt: '2026' }),
+    findMatchingJobs: async () =>
+      ok({ digestPath: '/x', jobs: [], warnings: [], nextRequiredStep: 'rerank' }),
+    getLatestDigest: async () =>
+      ok({ path: '/x', jobs: [], totalPersisted: 0, generatedAt: '2026', nextRequiredStep: 'rerank' }),
+    getTriageList: async () =>
+      ok({
+        total: 0,
+        returned: 0,
+        truncated: false,
+        triage: { model: 'sonnet', chunkSize: 150 },
+        profileCard: 'profile',
+        lines: [],
+        nextRequiredStep: 'triage',
+      }),
     getJob: async () => ok({
       job: {
         id: 'a:1',
@@ -50,10 +63,12 @@ function stubCoreDeps(): CoreDeps {
     readRules: async () => ok({ mode: 'merged', files: [] }),
     readResume: async () => ok({ name: 'r', content: '#' }),
     scoreKeywordMatch: async () => ok({ score: 1, matched: [], missing: [] }),
+    analyzeFit: async () => ok({ matched: [], missing: [], matchedCount: 0, jobSkillCount: 0 }),
     startApplication: async () => ok({ path: '/x', created: true }),
     writeApplicationOutput: async () => ok({ path: '/x', version: 1 }),
     listApplicationVersions: async () => ok({ versions: [] }),
     listRecentApplications: async () => ok({ applications: [] }),
+    recordJobVerdicts: async () => ok({ recorded: 0, unresolvedIds: [] }),
     validateSources: async () => ok({ results: [], summary: { total: 0, ok: 0, failed: 0 } }),
     rerankTopJobs: async () =>
       ok({
@@ -89,9 +104,9 @@ describe('buildServer', () => {
       resourceDeps: stubResourceDeps(),
     });
     expect(handle.server).toBeDefined();
-    expect(handle.tools.length).toBe(21);
-    expect(handle.resources.length).toBe(9);
-    expect(handle.prompts.length).toBe(3);
+    expect(handle.tools.length).toBe(24);
+    expect(handle.resources.length).toBe(10);
+    expect(handle.prompts.length).toBe(4);
   });
 
   it('registers a stable set of tool names', () => {
@@ -118,6 +133,7 @@ describe('buildServer', () => {
         PROMPT_TAILOR_RESUME_URI,
         PROMPT_TAILOR_RESUMES_URI,
         PROMPT_VALIDATE_RESUME_URI,
+        PROMPT_JOB_DIGEST_TAILOR_URI,
         RESUME_URI,
         RULES_DEFAULTS_URI,
         RULES_MERGED_URI,
@@ -133,7 +149,7 @@ describe('buildServer', () => {
       resourceDeps: stubResourceDeps(),
     });
     const names = handle.prompts.map((p) => p.definition.name).sort();
-    expect(names).toEqual(['tailor_resume', 'tailor_resumes', 'validate_resume']);
+    expect(names).toEqual(['job_digest_tailor', 'tailor_resume', 'tailor_resumes', 'validate_resume']);
   });
 
   it('serves prompts through the MCP list/get handlers', async () => {
@@ -141,6 +157,7 @@ describe('buildServer', () => {
       expect(client.getServerCapabilities()?.prompts).toEqual({});
       const listed = await client.listPrompts();
       expect(listed.prompts.map((p) => p.name).sort()).toEqual([
+        'job_digest_tailor',
         'tailor_resume',
         'tailor_resumes',
         'validate_resume',

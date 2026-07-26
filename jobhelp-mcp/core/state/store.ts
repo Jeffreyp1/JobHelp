@@ -7,6 +7,7 @@ import {
   type ApplicationEntry,
   type DigestEntry,
   type JobHelpState,
+  type JobVerdictEntry,
   type RegisteredResumeEntry,
   type StateError,
 } from './index.js';
@@ -15,6 +16,7 @@ import {
   isPlainObject,
   parseApplicationEntry,
   parseDigestEntry,
+  parseJobVerdictEntry,
   parseResumeEntry,
 } from './entryParsers.js';
 import { err, ok, type Result } from '../types/result.js';
@@ -39,15 +41,20 @@ function parseState(raw: unknown): Result<JobHelpState, StateError> {
   if (!isPlainObject(raw)) {
     return err({ type: 'validation', message: 'state root must be an object' });
   }
-  if (raw['version'] !== STATE_SCHEMA_VERSION) {
+  const rawVersion = raw['version'];
+  if (rawVersion !== undefined && rawVersion !== STATE_SCHEMA_VERSION) {
     return err({
       type: 'validation',
-      message: `unsupported state version: ${String(raw['version'])}`,
+      message: `unsupported state version: ${String(rawVersion)}`,
     });
   }
-  const resumesRaw = raw['resumes'];
-  const applicationsRaw = raw['applications'];
-  const digestsRaw = raw['digests'];
+  // Legacy migration: state.json files written before the version field existed have
+  // version === undefined and may omit resumes/digests. Default missing arrays to [];
+  // a present-but-non-array value is still corrupt and rejected below.
+  const resumesRaw = raw['resumes'] ?? [];
+  const applicationsRaw = raw['applications'] ?? [];
+  const digestsRaw = raw['digests'] ?? [];
+  const verdictsRaw = raw['verdicts'] ?? [];
   if (!Array.isArray(resumesRaw)) {
     return err({ type: 'validation', message: 'state.resumes must be an array' });
   }
@@ -56,6 +63,9 @@ function parseState(raw: unknown): Result<JobHelpState, StateError> {
   }
   if (!Array.isArray(digestsRaw)) {
     return err({ type: 'validation', message: 'state.digests must be an array' });
+  }
+  if (!Array.isArray(verdictsRaw)) {
+    return err({ type: 'validation', message: 'state.verdicts must be an array' });
   }
   const resumes: RegisteredResumeEntry[] = [];
   for (let i = 0; i < resumesRaw.length; i++) {
@@ -81,6 +91,14 @@ function parseState(raw: unknown): Result<JobHelpState, StateError> {
     }
     digests.push(parsed);
   }
+  const verdicts: JobVerdictEntry[] = [];
+  for (let i = 0; i < verdictsRaw.length; i++) {
+    const parsed = parseJobVerdictEntry(verdictsRaw[i]);
+    if (parsed === null) {
+      return err({ type: 'validation', message: `state.verdicts[${i}] invalid shape` });
+    }
+    verdicts.push(parsed);
+  }
   const activeResumeName = asString(raw['activeResumeName']);
   if (activeResumeName !== undefined && !resumes.some((r) => r.name === activeResumeName)) {
     return err({
@@ -88,6 +106,7 @@ function parseState(raw: unknown): Result<JobHelpState, StateError> {
       message: `state.activeResumeName "${activeResumeName}" not in resumes`,
     });
   }
+  const verdictsField = verdicts.length > 0 ? { verdicts } : {};
   const state: JobHelpState =
     activeResumeName !== undefined
       ? {
@@ -96,8 +115,9 @@ function parseState(raw: unknown): Result<JobHelpState, StateError> {
           activeResumeName,
           applications,
           digests,
+          ...verdictsField,
         }
-      : { version: STATE_SCHEMA_VERSION, resumes, applications, digests };
+      : { version: STATE_SCHEMA_VERSION, resumes, applications, digests, ...verdictsField };
   return ok(state);
 }
 

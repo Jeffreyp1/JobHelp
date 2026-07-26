@@ -1,0 +1,91 @@
+{
+  "id": 45100001,
+  "created_at": "2026-07-01T15:00:02Z",
+  "author": "whoishiring",
+  "title": "Ask HN: Who is hiring? (July 2026)",
+  "text": "Please state the location and include REMOTE, INTERNS and/or VISA when that sort of candidate is welcome.",
+  "type": "story",
+  "parent_id": null,
+  "story_id": null,
+  "points": 402,
+  "children": [
+    {
+      "id": 41000101,
+      "created_at": "2026-07-01T16:12:03Z",
+      "author": "acmehiring",
+      "text": "Acme Robotics | Senior Backend Engineer | San Francisco, CA | $150k-$200k | REMOTE (US)<p>We&#x27;re building autonomous warehouse robots. Our stack is TypeScript, Go, and Postgres running on AWS.<p>You&#x27;ll own the fleet-coordination service end to end. 5+ years of backend experience required.<p>Apply: <a href=\"https:&#x2F;&#x2F;acme.example&#x2F;jobs\" rel=\"nofollow\">https:&#x2F;&#x2F;acme.example&#x2F;jobs</a>",
+      "type": "comment",
+      "parent_id": 45100001,
+      "story_id": 45100001,
+      "points": null,
+      "children": [
+        {
+          "id": 41000999,
+          "created_at": "2026-07-01T17:30:00Z",
+          "author": "curiouscandidate",
+          "text": "Is this open to candidates based in Canada, or US only?",
+          "type": "comment",
+          "parent_id": 41000101,
+          "story_id": 45100001,
+          "points": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": 41000102,
+      "created_at": "2026-07-01T16:45:10Z",
+      "author": "globexrecruiter",
+      "text": "Globex | ONSITE | New York | Full-Stack Developer | $120k<p>Globex builds low-latency trading infrastructure. React, Node, and Rust. In-office five days a week, lunch covered.<p>Email jobs@globex.example with your resume and a short note about what you&#x27;ve built.",
+      "type": "comment",
+      "parent_id": 45100001,
+      "story_id": 45100001,
+      "points": null,
+      "children": []
+    },
+    {
+      "id": 41000103,
+      "created_at": "2026-07-01T18:02:44Z",
+      "author": "lurker99",
+      "text": "This thread gets better every month. Thanks for running it!",
+      "type": "comment",
+      "parent_id": 45100001,
+      "story_id": 45100001,
+      "points": null,
+      "children": []
+    },
+    {
+      "id": 41000104,
+      "created_at": "2026-07-01T18:30:00Z",
+      "author": null,
+      "text": null,
+      "type": "comment",
+      "parent_id": 45100001,
+      "story_id": 45100001,
+      "points": null,
+      "children": []
+    },
+    {
+      "id": 41000105,
+      "created_at": "2026-07-02T09:15:27Z",
+      "author": "initechberlin",
+      "text": "Initech GmbH | DevOps Engineer | Berlin, Germany or Remote (EU) | &#8364;70k-&#8364;90k<p>We run a payments platform on Kubernetes across three regions. Terraform, Go, Postgres. Visa sponsorship available for relocation to Berlin.<p>Hiring process: intro call, one technical interview, offer within a week.",
+      "type": "comment",
+      "parent_id": 45100001,
+      "story_id": 45100001,
+      "points": null,
+      "children": []
+    },
+    {
+      "id": 41000106,
+      "created_at": "2026-07-02T11:40:12Z",
+      "author": "foocorpfounder",
+      "text": "FooCorp is hiring senior engineers in Austin, TX.<p>We build developer tools used by thousands of teams. The role covers distributed-systems work in Rust and TypeScript, plus occasional on-call. Compensation is competitive and includes meaningful equity. Interview process is one phone screen and a half-day onsite.<p>Reach out at hiring@foocorp.example.",
+      "type": "comment",
+      "parent_id": 45100001,
+      "story_id": 45100001,
+      "points": null,
+      "children": []
+    }
+  ]
+}

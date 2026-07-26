@@ -8,6 +8,8 @@ import { createBatchTools } from './tools-batch.js';
 import { createMetaTools } from './tools-meta.js';
 
 export type {
+  AnalyzeFitArgs,
+  AnalyzeFitResult,
   ApplicationKind,
   ApplicationVersion,
   ApplyConfigAnswersArgs,
@@ -19,9 +21,12 @@ export type {
   GetLatestDigestResult,
   InitConfigArgs,
   InitConfigResult,
+  JobVerdictInput,
   ListApplicationVersionsArgs,
   ListApplicationVersionsResult,
   ListRecentApplicationsResult,
+  RecordJobVerdictsArgs,
+  RecordJobVerdictsResult,
   ReadResumeResult,
   ReadRulesArgs,
   ReadRulesResult,

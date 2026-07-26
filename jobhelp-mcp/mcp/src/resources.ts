@@ -57,6 +57,7 @@ export const STATE_URI = 'jobhelp://state';
 export const PROMPT_TAILOR_RESUMES_URI = PROMPT_RESOURCE_URIS.tailor_resumes;
 export const PROMPT_TAILOR_RESUME_URI = PROMPT_RESOURCE_URIS.tailor_resume;
 export const PROMPT_VALIDATE_RESUME_URI = PROMPT_RESOURCE_URIS.validate_resume;
+export const PROMPT_JOB_DIGEST_TAILOR_URI = PROMPT_RESOURCE_URIS.job_digest_tailor;
 
 function errorContent(uri: string, error: ResourceError): ResourceReadResponse {
   return {

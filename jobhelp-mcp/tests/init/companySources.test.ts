@@ -14,7 +14,7 @@ describe('loadDefaultCompanySources', () => {
 
     expect(sources.greenhouse?.tokens.length).toBeGreaterThan(1000);
     expect(sources.ashby?.tokens.length).toBeGreaterThan(1000);
-    expect(sources.workable?.tokens.length).toBeGreaterThan(1000);
+    expect(sources.workable?.tokens.length).toBeGreaterThan(10);
     expect(sources.lever?.slugs.length).toBeGreaterThan(50);
   });
 

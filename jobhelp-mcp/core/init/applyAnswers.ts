@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { ok, err, type Result } from '../types/result.js';
+import { expandHome } from '../lib/config-path.js';
 import { writeDefaultCompanySourcesIfMissing } from './companySources.js';
 
 export interface ApplyError {
@@ -39,6 +40,8 @@ interface SourcesBlock {
 }
 
 function defaultConfigPath(): string {
+  const override = process.env['JOBHELP_CONFIG_PATH'];
+  if (override) return expandHome(override);
   return join(homedir(), '.config', 'jobhelp', 'config.json');
 }
 

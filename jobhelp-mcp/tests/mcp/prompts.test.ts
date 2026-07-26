@@ -85,6 +85,33 @@ describe('createPrompts', () => {
     expect(text).toContain('fair-rephrase claims pass');
   });
 
+  it('job_digest_tailor drives all five phases with one approval gate', () => {
+    const prompt = getPrompt('job_digest_tailor');
+    const text = prompt.get({ count: '30' }).messages[0]?.content.text ?? '';
+    expect(text).toContain('ALL of phases 1-5');
+    expect(text).toContain('find_matching_jobs is step 1 of 5, NOT the deliverable');
+    expect(text).toContain('ONLY permitted stop is the approval gate');
+    expect(text).toContain('doctor');
+    expect(text).toContain('find_matching_jobs({ count: 30 })');
+    expect(text).toContain('rerank_top_jobs({ topK: 30');
+    expect(text).toContain('Strong, Solid, Borderline, or Drop');
+    expect(text).toContain('APPROVAL GATE');
+    // Phase 5 delegates ALL resume writing to /tailor-batch's sub-agents; the
+    // main session is orchestrator-only and never tailors inline.
+    expect(text).toContain('ORCHESTRATOR ONLY');
+    expect(text).toContain('/tailor-batch');
+    expect(text).toContain('resume-tailor');
+    expect(text).toContain('resume-validator');
+    expect(text).toContain('read in full');
+    expect(text).toContain('NOT get_resume_outline');
+    expect(text).toContain('jobhelp://rules/merged');
+    expect(text).toContain('per-job tailoring status');
+  });
+
+  it('exposes a resource fallback URI for job_digest_tailor', () => {
+    expect(PROMPT_RESOURCE_URIS.job_digest_tailor).toBe('jobhelp://prompts/job-digest-tailor');
+  });
+
   it('exposes resource fallback URIs for all prompts', () => {
     expect(Object.keys(PROMPT_RESOURCE_URIS).sort()).toEqual([...PROMPT_NAMES].sort());
     expect(PROMPT_RESOURCE_URIS.tailor_resumes).toBe('jobhelp://prompts/tailor-resumes');

@@ -8,6 +8,7 @@ import { adzuna } from './adzuna.js';
 import { ashby } from './ashby.js';
 import { breezy } from './breezy.js';
 import { greenhouse } from './greenhouse.js';
+import { hn } from './hn.js';
 import { jsearch } from './jsearch.js';
 import { lever } from './lever.js';
 import { personio } from './personio.js';
@@ -28,6 +29,7 @@ export const ALL_ADAPTERS: readonly SourceAdapter[] = [
   ashby,
   breezy,
   greenhouse,
+  hn,
   jsearch,
   lever,
   personio,
@@ -51,6 +53,7 @@ export {
   ashby,
   breezy,
   greenhouse,
+  hn,
   jsearch,
   lever,
   personio,

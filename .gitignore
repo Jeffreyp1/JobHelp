@@ -22,6 +22,9 @@ jobhelp-config.json
 .agents/
 jobhelp-mcp/scripts/companies-all.json
 jobhelp-mcp/scripts/companies-report.md
+jobhelp-mcp/scripts/*-report.md
+jobhelp-mcp/scripts/*-slugs.json
+jobhelp-mcp/scripts/*-tokens.json
 
 # Local user-specific Claude / extension config (contains permissioned commands list,
 # may contain personal paths — not appropriate for a shared repo)
@@ -35,18 +38,41 @@ jobhelp-mcp/scripts/companies-report.md
 .superpowers/
 
 # Personal job-search artifacts (NEVER commit — these contain real resume, scraped JDs, etc.)
-applications/
-digests/
-resumes/
-state.json
-resume-dump/
-out/
-job-descriptions/
-experiments/
-docs/research/
+/applications/
+/digests/
+/resumes/
+/state.json
+/resume-dump/
+/out/
+/job-descriptions/
+/experiments/
+/docs/research/
+
+# Auto-apply run artifacts (personal answers, per-job status, location/gap logs,
+# canary baselines, learned selector overrides, and repair page-snapshots).
+# JOBHELP_HOME defaults to ~/jobhelp, which is this repo root on a case-insensitive
+# filesystem, so the engine's local state lands here and must never be committed.
+/answer-bank.json
+/autoapply-*.json
+/autoapply-*.jsonl
+/autoapply-repair/
+
+# Root-level images are filled-application screenshots and fixture captures
+# (root-anchored: extension icons under extension-app/ are unaffected)
+/*.png
+/*.jpg
+/*.jpeg
+
+# Dev-session journals (contain bio: school, grad year, skills, target companies)
+/docs/timeline-weeks/
+
+# Local caches and generated graph output
+/cache/
+/graphify-out/
 
 # Scratch dirs used by sub-agents as Write-tool sandbox workaround
 .scratch-*/
+/.scratch/
 
 # Source maps for built bundles (generated, not source of truth)
 extension-app/extension/public/**/*.js.map
@@ -106,14 +132,8 @@ extension-app/prompts/shared/_validate.test.ts
 !extension-app/tests/contracts/
 !extension-app/tests/contracts/configLoader.test.ts
 !extension-app/tests/contracts/verify-bundle-actions.test.ts
+!autoapply/engine/tests/
+!autoapply/engine/tests/**
 
-# Auto-apply engine local state + deps
-/answer-bank.json
-/autoapply-*.json
-/autoapply-*.jsonl
-/autoapply-repair/
-/autoapply/updates/
-autoapply/engine/node_modules/
-
-# Full raw ATS harvest (8.6MB, 168k slugs) — keep local, regenerate via scripts; the curated active list lives in company-lists/smartrecruiters.json
+# Large regenerable ATS dataset (671k lines) — regenerate via scripts, never commit
 jobhelp-mcp/company-lists/smartrecruiters.validated.json

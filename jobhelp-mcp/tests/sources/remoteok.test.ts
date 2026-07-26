@@ -87,7 +87,20 @@ describe('remoteok adapter', () => {
       expect(first.salaryMax).toBe(190000);
       expect(first.postedAt).toBeDefined();
       expect(first.description.length).toBeGreaterThan(0);
-      expect(first.rawSourceData).toBeDefined();
+    });
+
+    it('applies accept predicate to filter normalized jobs', async () => {
+      const fixture = loadFixture();
+      const fetchMock = vi.fn().mockImplementation(() =>
+        Promise.resolve(new Response(JSON.stringify(fixture), { status: 200 })),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const rejected = await remoteok.fetch(makeConfig({}), { accept: () => false });
+      expect(rejected).toEqual([]);
+
+      const accepted = await remoteok.fetch(makeConfig({}), { accept: () => true });
+      expect(accepted.length).toBeGreaterThan(0);
     });
 
     it('maps all jobs as remote=remote', async () => {

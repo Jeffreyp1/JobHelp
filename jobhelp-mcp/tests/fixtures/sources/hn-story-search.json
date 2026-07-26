@@ -1,0 +1,46 @@
+{
+  "hits": [
+    {
+      "created_at": "2026-07-01T15:00:03Z",
+      "title": "Ask HN: Who wants to be hired? (July 2026)",
+      "author": "whoishiring",
+      "story_text": "Share your status here.",
+      "num_comments": 210,
+      "objectID": "45100002",
+      "_tags": ["story", "author_whoishiring", "story_45100002"]
+    },
+    {
+      "created_at": "2026-07-01T15:00:02Z",
+      "title": "Ask HN: Who is hiring? (July 2026)",
+      "author": "whoishiring",
+      "story_text": "Please state the location and include REMOTE, INTERNS and/or VISA when that sort of candidate is welcome.",
+      "num_comments": 512,
+      "objectID": "45100001",
+      "_tags": ["story", "author_whoishiring", "story_45100001"]
+    },
+    {
+      "created_at": "2026-07-01T15:00:01Z",
+      "title": "Ask HN: Freelancer? Seeking freelancer? (July 2026)",
+      "author": "whoishiring",
+      "story_text": "Please use this format.",
+      "num_comments": 95,
+      "objectID": "45100003",
+      "_tags": ["story", "author_whoishiring", "story_45100003"]
+    },
+    {
+      "created_at": "2026-06-02T15:00:02Z",
+      "title": "Ask HN: Who is hiring? (June 2026)",
+      "author": "whoishiring",
+      "story_text": "Please state the location.",
+      "num_comments": 498,
+      "objectID": "44100001",
+      "_tags": ["story", "author_whoishiring", "story_44100001"]
+    }
+  ],
+  "nbHits": 4,
+  "page": 0,
+  "nbPages": 1,
+  "hitsPerPage": 10,
+  "query": "",
+  "params": "tags=story%2Cauthor_whoishiring"
+}

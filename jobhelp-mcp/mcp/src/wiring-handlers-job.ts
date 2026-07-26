@@ -11,7 +11,17 @@ import {
 } from '../../core/state/digestStore.js';
 import { ALL_ADAPTERS } from '../../core/sources/index.js';
 import { runPipeline, type PipelineOverrides } from '../../core/pipeline/index.js';
+import { appliedJobIds } from '../../core/pipeline/history.js';
+import {
+  readState,
+  updateSeenLedger,
+  type ApplicationEntry,
+  type JobVerdictEntry,
+} from '../../core/state/index.js';
+import { log } from '../../core/lib/log.js';
 import type {
+  AnalyzeFitArgs,
+  AnalyzeFitResult,
   FindMatchingJobsArgs,
   FindMatchingJobsResult,
   GetJobResult,
@@ -20,6 +30,8 @@ import type {
   ScoreKeywordMatchResult,
   ToolError,
 } from './tools-types.js';
+import type { Registry } from '../../core/resumes/registry.js';
+import { analyzeFit } from '../../core/pipeline/fit.js';
 import {
   extractSkillsFromMarkdown,
   runAdapterIsolated,
@@ -27,6 +39,12 @@ import {
   todayIsoDate,
   toToolError,
 } from './wiring-helpers.js';
+
+export const RERANK_DIRECTIVE =
+  'These jobs are a RAW DETERMINISTIC ranking (BM25 keyword overlap + recency), NOT recommendations. ' +
+  'Before presenting any of them to the user, you MUST rerank them against the user\'s actual resume and ' +
+  'profile constraints: in Claude Code invoke the job-rerank skill; otherwise call rerank_top_jobs and ' +
+  'apply its rubric. Present Strong/Solid/Borderline/Drop tiers with reasons, never the raw score order.';
 
 export async function findJobInLatestDigest(
   id: string,
@@ -65,37 +83,80 @@ export async function handleFindMatchingJobs(
       message: 'all source adapters failed or are unconfigured',
     });
   }
+  let applications: readonly ApplicationEntry[] = [];
+  let verdicts: readonly JobVerdictEntry[] = [];
+  const stateRes = await readState();
+  if (stateRes.ok) {
+    // History boosts are an opt-in ranking mode; verdict suppression is user intent and always on.
+    if (config.ranking.history?.enabled === true) {
+      applications = stateRes.value.applications;
+    }
+    verdicts = stateRes.value.verdicts ?? [];
+  } else {
+    log('warn', 'find_matching_jobs.state_unavailable', { error: stateRes.error });
+  }
   const overrides: PipelineOverrides = {
     now,
     ...(args.maxAgeDays === null || typeof args.maxAgeDays === 'number'
       ? { maxAgeDays: args.maxAgeDays }
       : {}),
     ...(args.recencyEnabled !== undefined ? { recencyEnabled: args.recencyEnabled } : {}),
+    ...(applications.length > 0 ? { applications } : {}),
+    ...(verdicts.length > 0 ? { verdicts } : {}),
   };
   const ranked = await runPipeline(pool, config, overrides);
   const topK = ranked.slice(0, args.count ?? config.ranking.digestK);
+  const applied =
+    applications.length > 0
+      ? appliedJobIds(
+          topK.map((r) => r.job),
+          applications,
+        )
+      : undefined;
+  const persistK = Math.max(config.ranking.persistK ?? 1000, topK.length);
   const date = todayIsoDate(now);
-  const persisted = await persistDigest({
-    date,
-    generatedAt: now.toISOString(),
-    totalDurationMs: 0,
-    sourceResults: outcomes.map((o) => ({
-      source: o.source,
-      jobCount: o.jobs.length,
-      durationMs: 0,
-      ...(o.error !== undefined
-        ? { error: { type: 'unknown' as const, message: o.error.message } }
-        : {}),
-    })),
-    jobs: topK,
-  });
+  const persisted = await persistDigest(
+    {
+      date,
+      generatedAt: now.toISOString(),
+      totalDurationMs: 0,
+      sourceResults: outcomes.map((o) => ({
+        source: o.source,
+        jobCount: o.jobs.length,
+        durationMs: 0,
+        ...(o.error !== undefined
+          ? { error: { type: 'unknown' as const, message: o.error.message } }
+          : {}),
+      })),
+      jobs: ranked.slice(0, persistK),
+    },
+    {
+      displayCount: topK.length,
+      ...(applied !== undefined ? { appliedJobIds: applied } : {}),
+    },
+  );
   if (!persisted.ok) return err(toToolError(persisted.error));
+  void updateSeenLedger(
+    ranked.map((r) => r.job),
+    now,
+  )
+    .then((ledger) => {
+      if (!ledger.ok) {
+        log('warn', 'find_matching_jobs.seen_ledger_failed', { error: ledger.error });
+      }
+    })
+    .catch((e: unknown) => {
+      log('warn', 'find_matching_jobs.seen_ledger_failed', {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    });
   return ok({
     digestPath: persisted.value.path,
     markdownPath: persisted.value.markdownPath,
     csvPath: persisted.value.csvPath,
     jobs: topK,
     warnings,
+    nextRequiredStep: RERANK_DIRECTIVE,
   });
 }
 
@@ -109,12 +170,15 @@ export async function handleGetLatestDigest(): Promise<
     }
     return err(toToolError(r.error));
   }
+  const displayK = r.value.displayK;
   return ok({
     path: getLatestPointerPath(),
     markdownPath: getDigestMarkdownPath(r.value.date),
     csvPath: getDigestCsvPath(r.value.date),
-    jobs: r.value.jobs,
+    jobs: displayK !== undefined ? r.value.jobs.slice(0, displayK) : r.value.jobs,
+    totalPersisted: r.value.jobs.length,
     generatedAt: r.value.generatedAt,
+    nextRequiredStep: RERANK_DIRECTIVE,
   });
 }
 
@@ -133,4 +197,16 @@ export async function handleScoreKeywordMatch(
   const jobText = `${job.value.title} ${job.value.description}`;
   const { score, matched, missing } = scoreOverlap(jobText, skills);
   return ok({ score, matched, missing });
+}
+
+export async function handleAnalyzeFit(
+  registry: Registry,
+  args: AnalyzeFitArgs,
+): Promise<Result<AnalyzeFitResult, ToolError>> {
+  const job = await findJobInLatestDigest(args.jobId);
+  if (!job.ok) return err(job.error);
+  const resume = await registry.readResume({});
+  if (!resume.ok) return err(toToolError(resume.error));
+  const jobText = `${job.value.title} ${job.value.description}`;
+  return ok(analyzeFit(jobText, resume.value));
 }

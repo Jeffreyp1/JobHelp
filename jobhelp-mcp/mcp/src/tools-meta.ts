@@ -12,6 +12,8 @@ import { loadDefaults } from '../../core/rules/loader.js';
 import { getApplicationsRoot } from '../../core/applications/paths.js';
 import { getConfigPath } from './wiring-helpers.js';
 import { ok, type Result } from '../../core/types/result.js';
+import type { JobDigestConfig } from '../../core/types/config.js';
+import type { SourceCoverageGap } from './tools-meta-types.js';
 import type {
   DoctorCheck,
   DoctorResult,
@@ -83,6 +85,51 @@ function nextSteps(checks: readonly DoctorCheck[]): readonly string[] {
   return checks.flatMap((c) => (c.ok || c.nextStep === undefined ? [] : [c.nextStep]));
 }
 
+const KEYLESS_SOURCES: readonly string[] = ['hn', 'remoteok', 'remotive', 'weworkremotely', 'yc'];
+
+const KEYED_SOURCE_HINTS: ReadonlyArray<readonly [string, string]> = [
+  ['adzuna', 'free app key at developer.adzuna.com'],
+  ['jsearch', 'RapidAPI key at rapidapi.com (JSearch API)'],
+  ['usajobs', 'free API key at developer.usajobs.gov'],
+];
+
+function sourceCoverageGaps(config: JobDigestConfig, enabled: ReadonlySet<string>): readonly SourceCoverageGap[] {
+  const gaps: SourceCoverageGap[] = [];
+  for (const source of KEYLESS_SOURCES) {
+    if (!ALL_SOURCE_NAMES.includes(source) || enabled.has(source)) continue;
+    gaps.push({
+      source,
+      kind: 'keyless-disabled',
+      hint: `free source; enable it by adding "${source}": {} under sources`,
+    });
+  }
+  for (const [source, hint] of KEYED_SOURCE_HINTS) {
+    if (!enabled.has(source)) gaps.push({ source, kind: 'key-missing', hint });
+  }
+  const s = config.sources;
+  const tokenLists: ReadonlyArray<readonly [string, readonly string[] | undefined]> = [
+    ['ashby', s.ashby?.tokens],
+    ['breezy', s.breezy?.tokens],
+    ['greenhouse', s.greenhouse?.tokens],
+    ['lever', s.lever?.slugs],
+    ['personio', s.personio?.tokens],
+    ['pinpoint', s.pinpoint?.tokens],
+    ['recruitee', s.recruitee?.tokens],
+    ['smartrecruiters', s.smartrecruiters?.tokens],
+    ['teamtailor', s.teamtailor?.tokens],
+    ['workable', s.workable?.tokens],
+  ];
+  for (const [source, tokens] of tokenLists) {
+    if (tokens === undefined || tokens.length > 0) continue;
+    gaps.push({
+      source,
+      kind: 'empty-token-list',
+      hint: `sources.${source} is configured with 0 company tokens; add tokens (see company-lists/) or remove the entry`,
+    });
+  }
+  return gaps;
+}
+
 async function runDoctor(): Promise<Result<DoctorResult, ToolError>> {
   const checks: DoctorCheck[] = [];
   const configPath = getConfigPath();
@@ -96,7 +143,7 @@ async function runDoctor(): Promise<Result<DoctorResult, ToolError>> {
       detail: loaded.error.message,
       nextStep: 'Run init_config or set JOBHELP_CONFIG_PATH to a readable config file.',
     });
-    return ok({ ready: false, checks, nextSteps: nextSteps(checks) });
+    return ok({ ready: false, checks, nextSteps: nextSteps(checks), sourceCoverage: [] });
   }
   checks.push({
     name: 'config',
@@ -181,7 +228,12 @@ async function runDoctor(): Promise<Result<DoctorResult, ToolError>> {
     ...(applications.ok ? {} : { nextStep: 'Make the JOBHELP_HOME applications path writable.' }),
   });
 
-  return ok({ ready: checks.every((c) => c.ok), checks, nextSteps: nextSteps(checks) });
+  return ok({
+    ready: checks.every((c) => c.ok),
+    checks,
+    nextSteps: nextSteps(checks),
+    sourceCoverage: sourceCoverageGaps(config, new Set(enabledSources)),
+  });
 }
 
 export function createMetaTools(deps: CoreDeps): readonly ToolHandler[] {
@@ -189,7 +241,7 @@ export function createMetaTools(deps: CoreDeps): readonly ToolHandler[] {
     buildHandler({
       name: 'doctor',
       description:
-        'Read-only setup diagnostics for MCP readiness: config readability, enabled sources, active resume, latest digest, rules, output path, and application path. Use before long runs to get actionable next steps.',
+        'Read-only setup diagnostics for MCP readiness: config readability, enabled sources, active resume, latest digest, rules, output path, and application path, plus a sourceCoverage section flagging keyless sources left disabled, keyed sources missing credentials, and company-list sources with zero tokens. Use before long runs to get actionable next steps.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -223,13 +275,19 @@ export function createMetaTools(deps: CoreDeps): readonly ToolHandler[] {
     buildHandler({
       name: 'rerank_top_jobs',
       description:
-        'Bundle the top-K ranked jobs from the latest digest with the active resume and a structured rerank prompt for the client AI to apply semantic judgment in its own session. The server makes NO LLM calls; the client consumes the bundle and produces a curated tier-ranked list. Default topK=30, max 50.',
+        'Bundle ranked jobs from the latest digest with the active resume and a structured rerank prompt for the client AI to apply semantic judgment in its own session. The server makes NO LLM calls; the client consumes the bundle and produces a curated tier-ranked list. Two selection modes: default top-K (topK=30, max 50), or jobIds (max 100) to bundle exactly the triage survivors from get_triage_list — jobIds wins over topK; unknown ids are reported in summary.missingIds.',
       inputSchema: {
         type: 'object',
         properties: {
           topK: {
             type: 'number',
-            description: 'How many top-ranked jobs to bundle. Default 30, max 50.',
+            description: 'How many top-ranked jobs to bundle. Default 30, max 50. Ignored when jobIds is set.',
+          },
+          jobIds: {
+            type: 'array',
+            items: { type: 'string' },
+            maxItems: 100,
+            description: 'Explicit job ids to bundle (triage survivors). Digest rank order is preserved.',
           },
           instructions: {
             type: 'string',

@@ -1,10 +1,13 @@
 import type { Result } from '../../core/types/result.js';
 import type {
+  AnalyzeFitArgs,
   ApplicationKind,
   ApplyConfigAnswersArgs,
   FindMatchingJobsArgs,
   InitConfigArgs,
+  JobVerdictInput,
   ListApplicationVersionsArgs,
+  RecordJobVerdictsArgs,
   RegisterResumeArgs,
   RerankTopJobsArgs,
   RulesMode,
@@ -15,6 +18,7 @@ import type {
   ValidateSourcesArgs,
   WriteApplicationOutputArgs,
 } from './tools-types.js';
+import { JOB_VERDICTS, type JobVerdict } from '../../core/state/index.js';
 import {
   getOptional,
   isApplicationKind,
@@ -132,6 +136,17 @@ export function parseGetJob(
   return { ok: true, value: { id: obj['id'] } };
 }
 
+export function parseGetTriageList(
+  obj: Record<string, unknown>,
+): Result<{ triageK?: number }, ToolError> {
+  const raw = obj['triageK'];
+  if (raw === undefined) return { ok: true, value: {} };
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1) {
+    return bad('triageK must be an integer >= 1');
+  }
+  return { ok: true, value: { triageK: raw } };
+}
+
 export function parseReadRules(
   obj: Record<string, unknown>,
 ): Result<{ mode: RulesMode }, ToolError> {
@@ -152,6 +167,13 @@ export function parseScoreKeywordMatch(
     ok: true,
     value: { resumeMarkdown: obj['resumeMarkdown'], jobId: obj['jobId'] },
   };
+}
+
+export function parseAnalyzeFit(
+  obj: Record<string, unknown>,
+): Result<AnalyzeFitArgs, ToolError> {
+  if (!isString(obj['jobId']) || obj['jobId'].length === 0) return bad('jobId is required');
+  return { ok: true, value: { jobId: obj['jobId'] } };
 }
 
 export function parseStartApplication(
@@ -225,6 +247,54 @@ export function parseEmpty(_obj: Record<string, unknown>): Result<Record<string,
   return { ok: true, value: {} };
 }
 
+const RECORD_MAX_VERDICTS = 1000;
+const RECORD_MAX_REASON_CHARS = 500;
+
+function isJobVerdict(v: unknown): v is JobVerdict {
+  return typeof v === 'string' && (JOB_VERDICTS as readonly string[]).includes(v);
+}
+
+function parseVerdictItem(raw: unknown, i: number): Result<JobVerdictInput, ToolError> {
+  if (!isPlainObject(raw)) return bad(`verdicts[${i}] must be an object`);
+  if (!isString(raw['jobId']) || raw['jobId'].length === 0) {
+    return bad(`verdicts[${i}].jobId is required`);
+  }
+  if (!isJobVerdict(raw['verdict'])) {
+    return bad(`verdicts[${i}].verdict must be one of: ${JOB_VERDICTS.join(', ')}`);
+  }
+  const out: { jobId: string; verdict: JobVerdict; reason?: string } = {
+    jobId: raw['jobId'],
+    verdict: raw['verdict'],
+  };
+  const reason = getOptional(raw, 'reason', isString);
+  if (reason !== undefined) {
+    if (reason.length > RECORD_MAX_REASON_CHARS) {
+      return bad(`verdicts[${i}].reason must be <= ${RECORD_MAX_REASON_CHARS} chars`);
+    }
+    out.reason = reason;
+  }
+  return { ok: true, value: out };
+}
+
+export function parseRecordJobVerdicts(
+  obj: Record<string, unknown>,
+): Result<RecordJobVerdictsArgs, ToolError> {
+  const raw = obj['verdicts'];
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return bad('verdicts must be a non-empty array');
+  }
+  if (raw.length > RECORD_MAX_VERDICTS) {
+    return bad(`verdicts must contain <= ${RECORD_MAX_VERDICTS} items`);
+  }
+  const verdicts: JobVerdictInput[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const parsed = parseVerdictItem(raw[i], i);
+    if (!parsed.ok) return parsed;
+    verdicts.push(parsed.value);
+  }
+  return { ok: true, value: { verdicts } };
+}
+
 export function parseDoctor(
   _obj: Record<string, unknown>,
 ): Result<Record<string, never>, ToolError> {
@@ -232,6 +302,7 @@ export function parseDoctor(
 }
 
 const RERANK_MAX_TOP_K = 50;
+const RERANK_MAX_JOB_IDS = 100;
 const RERANK_MAX_INSTRUCTIONS_CHARS = 1000;
 
 export function parseRerankTopJobs(
@@ -240,7 +311,7 @@ export function parseRerankTopJobs(
   if ('fetchFullJDs' in obj && obj['fetchFullJDs'] !== undefined) {
     return bad('fetchFullJDs is not a valid parameter');
   }
-  const out: { topK?: number; instructions?: string } = {};
+  const out: { topK?: number; instructions?: string; jobIds?: readonly string[] } = {};
   if ('topK' in obj) {
     const raw = obj['topK'];
     if (raw !== undefined) {
@@ -248,6 +319,18 @@ export function parseRerankTopJobs(
       if (raw < 1) return bad('topK must be >= 1');
       if (raw > RERANK_MAX_TOP_K) return bad(`topK must be <= ${RERANK_MAX_TOP_K}`);
       out.topK = raw;
+    }
+  }
+  if ('jobIds' in obj) {
+    const raw = obj['jobIds'];
+    if (raw !== undefined) {
+      if (!isStringArray(raw) || raw.length === 0) {
+        return bad('jobIds must be a non-empty array of strings');
+      }
+      if (raw.length > RERANK_MAX_JOB_IDS) {
+        return bad(`jobIds must contain <= ${RERANK_MAX_JOB_IDS} ids`);
+      }
+      out.jobIds = raw;
     }
   }
   if ('instructions' in obj) {

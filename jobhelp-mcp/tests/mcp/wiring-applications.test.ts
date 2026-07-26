@@ -1,13 +1,15 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { bootstrap } from '../../mcp/src/wiring.js';
 import { buildServer } from '../../mcp/src/index.js';
-import { handleFindMatchingJobs } from '../../mcp/src/wiring-handlers.js';
+import { handleFindMatchingJobs, handleGetLatestDigest } from '../../mcp/src/wiring-handlers.js';
 import { ALL_ADAPTERS } from '../../core/sources/index.js';
 import { getLatestDigest, persistDigest } from '../../core/state/digestStore.js';
-import type { SourceAdapter } from '../../core/types/index.js';
+import { writeState } from '../../core/state/store.js';
+import { EMPTY_STATE, type ApplicationEntry } from '../../core/state/index.js';
+import type { JobDigestConfig, SourceAdapter } from '../../core/types/index.js';
 import { findTool, makeJobConfig, parseToolBody, writeMinimalConfig } from './_wiring-fixtures.js';
 
 describe('mcp/wiring application flows — boot real server with temp JOBHELP_HOME', () => {
@@ -79,12 +81,111 @@ describe('mcp/wiring application flows — boot real server with temp JOBHELP_HO
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.jobs).toHaveLength(2);
+      expect(result.value.nextRequiredStep).toMatch(/raw deterministic/i);
+      expect(result.value.nextRequiredStep).toMatch(/rerank/i);
       const latest = await getLatestDigest();
       expect(latest.ok).toBe(true);
       if (latest.ok) expect(latest.value.jobs).toHaveLength(2);
+      const latestResult = await handleGetLatestDigest();
+      expect(latestResult.ok).toBe(true);
+      if (latestResult.ok) expect(latestResult.value.nextRequiredStep).toMatch(/rerank/i);
     } finally {
       mutableAdapters.length = 0;
       mutableAdapters.push(...originalAdapters);
+    }
+  });
+
+  function installTwoJobAdapter(): () => void {
+    const original = [...ALL_ADAPTERS];
+    const mutable = ALL_ADAPTERS as unknown as SourceAdapter[];
+    mutable.length = 0;
+    mutable.push({
+      name: 'fixture',
+      enabled: () => true,
+      fetch: async () => [
+        {
+          id: 'fixture:applied',
+          source: 'fixture',
+          url: 'https://example.test/applied',
+          title: 'Backend TypeScript Engineer',
+          company: 'Acme',
+          location: 'Remote',
+          remote: 'remote',
+          description:
+            'TypeScript Go backend services for high-volume APIs, distributed systems, observability, database migrations, deployment automation, incident response, and developer experience. The role partners with product teams and ships reliable backend platform features.',
+        },
+        {
+          id: 'fixture:fresh',
+          source: 'fixture',
+          url: 'https://example.test/fresh',
+          title: 'Backend Go Engineer',
+          company: 'Beta',
+          location: 'Remote',
+          remote: 'remote',
+          description:
+            'Go TypeScript backend services for high-volume APIs, distributed systems, observability, database migrations, deployment automation, incident response, and developer experience. The role partners with product teams and ships reliable backend platform features.',
+        },
+      ],
+    });
+    return () => {
+      mutable.length = 0;
+      mutable.push(...original);
+    };
+  }
+
+  async function seedAppliedApplication(): Promise<void> {
+    const app: ApplicationEntry = {
+      jobId: 'greenhouse:some-other-id',
+      company: 'acme',
+      role: 'TypeScript Backend Engineer',
+      date: '2026-05-10',
+      dir: join(tmp, 'apps', 'acme'),
+      url: 'https://other.test/xyz',
+      createdAt: '2026-05-10T00:00:00.000Z',
+      updatedAt: '2026-05-10T00:00:00.000Z',
+    };
+    const w = await writeState({ ...EMPTY_STATE, applications: [app] });
+    if (!w.ok) throw new Error(`seed state failed: ${w.error.message}`);
+  }
+
+  function withHistory(config: JobDigestConfig, enabled: boolean): JobDigestConfig {
+    return { ...config, ranking: { ...config.ranking, history: { enabled } } };
+  }
+
+  it('marks already-applied jobs in the digest markdown when history is enabled', async () => {
+    const restore = installTwoJobAdapter();
+    try {
+      await seedAppliedApplication();
+      const result = await handleFindMatchingJobs(withHistory(makeJobConfig(tmp), true), {
+        count: 5,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.markdownPath).toBeDefined();
+      if (result.value.markdownPath === undefined) return;
+      const md = readFileSync(result.value.markdownPath, 'utf8');
+      expect(md).toContain('- **Status:** already applied');
+      expect(md.split('- **Status:** already applied')).toHaveLength(2);
+    } finally {
+      restore();
+    }
+  });
+
+  it('does NOT read applications when history is disabled (no applied marker)', async () => {
+    const restore = installTwoJobAdapter();
+    try {
+      await seedAppliedApplication();
+      const result = await handleFindMatchingJobs(withHistory(makeJobConfig(tmp), false), {
+        count: 5,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.markdownPath).toBeDefined();
+      if (result.value.markdownPath === undefined) return;
+      const md = readFileSync(result.value.markdownPath, 'utf8');
+      expect(md).not.toContain('already applied');
+    } finally {
+      restore();
     }
   });
 

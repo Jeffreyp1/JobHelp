@@ -85,8 +85,21 @@ describe('remotive adapter', () => {
       expect(first.location).toBe('Worldwide');
       expect(first.remote).toBe('remote');
       expect(first.description.length).toBeGreaterThan(0);
-      expect(first.rawSourceData).toBeDefined();
       expect(first.postedAt).toBeDefined();
+    });
+
+    it('applies accept predicate to filter normalized jobs', async () => {
+      const fixture = loadFixture();
+      const fetchMock = vi.fn().mockImplementation(() =>
+        Promise.resolve(new Response(JSON.stringify(fixture), { status: 200 })),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const rejected = await remotive.fetch(makeConfig({}), { accept: () => false });
+      expect(rejected).toEqual([]);
+
+      const accepted = await remotive.fetch(makeConfig({}), { accept: () => true });
+      expect(accepted.length).toBeGreaterThan(0);
     });
 
     it('maps all jobs as remote=remote', async () => {

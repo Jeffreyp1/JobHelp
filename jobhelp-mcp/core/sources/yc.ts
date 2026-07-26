@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asNumber,
@@ -120,7 +121,7 @@ function buildDescription(job: YcJob): string {
   return lines.join('\n');
 }
 
-function normalize(job: YcJob, raw: unknown): NormalizedJob {
+function normalize(job: YcJob): NormalizedJob {
   const description = buildDescription(job);
   const remote = detectRemoteMode(`${job.title} ${job.location} ${description}`);
   const norm: NormalizedJob = {
@@ -132,7 +133,6 @@ function normalize(job: YcJob, raw: unknown): NormalizedJob {
     location: job.location,
     remote,
     description,
-    rawSourceData: raw,
     ...(job.salaryMin !== undefined ? { salaryMin: job.salaryMin } : {}),
     ...(job.salaryMax !== undefined ? { salaryMax: job.salaryMax } : {}),
     ...(job.salaryCurrency !== undefined ? { salaryCurrency: job.salaryCurrency } : {}),
@@ -140,11 +140,11 @@ function normalize(job: YcJob, raw: unknown): NormalizedJob {
   return norm;
 }
 
-async function fetchQuery(query: string): Promise<unknown> {
+async function fetchQuery(query: string, http?: SharedHttpOptions): Promise<unknown> {
   const url = `${YC_BASE}/jobs/search?q=${encodeURIComponent(query)}`;
-  let response: Response;
+  let response: HttpTextResult;
   try {
-    response = await fetch(url, { headers: YC_HEADERS });
+    response = await httpGetText(url, { headers: YC_HEADERS, ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `yc network error: ${msg}`);
@@ -152,22 +152,19 @@ async function fetchQuery(query: string): Promise<unknown> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `yc HTTP ${response.status}`);
   }
-  let text: string;
   try {
-    text = await response.text();
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'read failed';
-    throw new SourceFetchError('network', `yc body read error: ${msg}`);
-  }
-  try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(response.bodyText) as unknown;
   } catch {
     throw new SourceFetchError('parse', 'yc response was not valid JSON');
   }
 }
 
-async function fetchQueryJobs(query: string): Promise<NormalizedJob[]> {
-  const body = await fetchQuery(query);
+async function fetchQueryJobs(
+  query: string,
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<NormalizedJob[]> {
+  const body = await fetchQuery(query, http);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'yc response was not an object');
   }
@@ -179,7 +176,9 @@ async function fetchQueryJobs(query: string): Promise<NormalizedJob[]> {
   for (const rawJob of jobs) {
     const parsed = parseYcJob(rawJob);
     if (parsed === undefined) continue;
-    out.push(normalize(parsed, rawJob));
+    const job = normalize(parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
   return out;
 }
@@ -187,14 +186,16 @@ async function fetchQueryJobs(query: string): Promise<NormalizedJob[]> {
 export const yc: SourceAdapter = {
   name: 'yc',
   enabled: (config): boolean => Boolean(config.sources.yc),
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.yc;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'yc config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const queries =
       c.queries !== undefined && c.queries.length > 0 ? c.queries : [DEFAULT_QUERY];
-    const tasks = queries.map((query) => (): Promise<NormalizedJob[]> => fetchQueryJobs(query));
+    const tasks = queries.map((query) => (): Promise<NormalizedJob[]> => fetchQueryJobs(query, accept, http));
     const settled = await runWithConcurrency(tasks, { limit: YC_CONCURRENCY });
     const byId = new Map<string, NormalizedJob>();
     let lastError: unknown;

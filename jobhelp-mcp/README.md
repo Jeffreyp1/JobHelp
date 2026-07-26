@@ -95,6 +95,7 @@ Configuration-dependent tool calls return a typed error if the config file is mi
 | `find_matching_jobs` | Discover jobs from all enabled sources, score against the active resume, return ranked digest |
 | `get_latest_digest` | Return the most recent persisted digest without re-running discovery |
 | `get_job` | Return a full `NormalizedJob` (including description) by id |
+| `get_triage_list` | Return the entire persisted ranking as compact one-line-per-job entries plus a profile card, for the funnel skim stage |
 | `get_resume_outline` | Return stable section and bullet ids so clients can edit only selected resume parts |
 | `apply_scoped_resume_edits` | Apply section or bullet replacements by selection id while preserving untouched lines |
 | `apply_validator_resume_edits` | Apply validator-approved edits and return auditable PASS/BLOCK evidence |
@@ -103,10 +104,12 @@ Configuration-dependent tool calls return a typed error if the config file is mi
 | `read_rules` | Return rule files: `defaults`, `user`, or `merged` (default) |
 | `read_resume` | Return the active resume content |
 | `score_keyword_match` | Deterministic 0..1 keyword-overlap score between a resume and a job (ATS coverage check) |
+| `analyze_fit` | Deterministic, alias-aware fit breakdown: which recognized job skills the active resume covers (matched) vs. lacks (missing), plus matched-of-total counts; descriptive, not a recommendation |
 | `start_application` | Create `~/jobhelp/applications/{company-role-date}/` if missing; idempotent |
 | `write_application_output` | Write a resume, cover letter, critique, or notes artifact; auto-versions resumes and cover letters |
 | `list_application_versions` | List versions of an artifact for diff or recovery |
 | `list_recent_applications` | Return application history from `~/jobhelp/state.json` |
+| `record_job_verdicts` | Persist per-job rerank judgments (strong/solid/borderline/drop/skipped/applied) so future digests suppress drops and demote skips |
 | `validate_sources` | Check configured source adapters for stale credentials, bad tokens, or rate limits |
 | `rerank_top_jobs` | Bundle top jobs, active resume, and rerank instructions for client-side AI judgment |
 
@@ -114,12 +117,14 @@ Configuration-dependent tool calls return a typed error if the config file is mi
 
 | Prompt | What it does |
 |--------|-------------|
+| `job_digest_tailor` | One-shot full pipeline: retrieves and ranks jobs, AI-matches them against the active resume, pauses once to show a Strong/Solid shortlist for approval, then tailors and validates a resume for each approved job. Args: `count` (top-N to consider, default 30), `instructions` (optional emphasis). In Claude Code: `/mcp__jobhelp__job_digest_tailor`. |
 | `tailor_resumes` | Orchestrates tailoring for 0..N jobs and automatically validates each draft |
 | `tailor_resume` | Creates or revises one tailored resume draft from the active resume and merged rules |
 | `validate_resume` | Fact-checks a tailored draft against the original resume only |
 
 Fallback resources:
 
+- `jobhelp://prompts/job-digest-tailor`
 - `jobhelp://prompts/tailor-resumes`
 - `jobhelp://prompts/tailor-resume`
 - `jobhelp://prompts/validate-resume`

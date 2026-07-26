@@ -3,6 +3,8 @@ import type { ScoreBreakdown } from '../../core/types/pipeline.js';
 export interface RerankTopJobsArgs {
   readonly topK?: number;
   readonly instructions?: string;
+  /** Explicit selection (triage survivors). Wins over topK; max 100 ids. */
+  readonly jobIds?: readonly string[];
 }
 
 export interface RerankJobSummary {
@@ -28,6 +30,8 @@ export interface RerankTopJobsResult {
     readonly totalJDBytes: number;
     readonly digestDate: string;
     readonly digestPath: string;
+    /** Present only on the jobIds path: requested ids absent from the latest digest. */
+    readonly missingIds?: readonly string[];
   };
 }
 
@@ -66,8 +70,17 @@ export interface DoctorCheck {
   readonly nextStep?: string;
 }
 
+export type SourceCoverageKind = 'keyless-disabled' | 'key-missing' | 'empty-token-list';
+
+export interface SourceCoverageGap {
+  readonly source: string;
+  readonly kind: SourceCoverageKind;
+  readonly hint: string;
+}
+
 export interface DoctorResult {
   readonly ready: boolean;
   readonly checks: readonly DoctorCheck[];
   readonly nextSteps: readonly string[];
+  readonly sourceCoverage: readonly SourceCoverageGap[];
 }

@@ -3,6 +3,7 @@ import type {
   AshbyConfig,
   BreezyConfig,
   GreenhouseConfig,
+  HnConfig,
   JSearchConfig,
   LeverConfig,
   PersonioConfig,
@@ -86,6 +87,15 @@ function validateWeWorkRemotely(raw: unknown): WeWorkRemotelyConfig {
   return out;
 }
 
+function validateHn(raw: unknown): HnConfig {
+  const obj = requireRecord(raw, 'sources.hn');
+  const out: { queries?: string[] } = {};
+  if (obj['queries'] !== undefined) {
+    out.queries = requireStringArray(obj['queries'], 'sources.hn.queries');
+  }
+  return out;
+}
+
 function validateAshby(raw: unknown): AshbyConfig {
   const obj = requireRecord(raw, 'sources.ashby');
   return { tokens: requireStringArray(obj['tokens'], 'sources.ashby.tokens') };
@@ -164,6 +174,7 @@ export function validateSources(raw: unknown): SourcesConfig {
     weworkremotely?: WeWorkRemotelyConfig;
     workable?: WorkableConfig;
     yc?: YcStartupConfig;
+    hn?: HnConfig;
   } = {};
   if (obj['adzuna'] !== undefined) out.adzuna = validateAdzuna(obj['adzuna']);
   if (obj['ashby'] !== undefined) out.ashby = validateAshby(obj['ashby']);
@@ -182,5 +193,6 @@ export function validateSources(raw: unknown): SourcesConfig {
   if (obj['weworkremotely'] !== undefined) out.weworkremotely = validateWeWorkRemotely(obj['weworkremotely']);
   if (obj['workable'] !== undefined) out.workable = validateWorkable(obj['workable']);
   if (obj['yc'] !== undefined) out.yc = validateYc(obj['yc']);
+  if (obj['hn'] !== undefined) out.hn = validateHn(obj['hn']);
   return out;
 }

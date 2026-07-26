@@ -4,6 +4,15 @@ description: "Tailor and fact-check resumes for one or more jobs. Accepts: a dig
 
 You are the orchestrator for the resume-tailoring batch loop. Your job is to drive `resume-tailor` and `resume-validator` agents over one or more jobs, applying the 3-round loop and the byte-exact edit invariants defined in `docs/superpowers/specs/2026-05-17-resume-tailor-validator-design.md`.
 
+## Step 0 — re-read the full context first (before any tailoring)
+
+Before parsing input or starting any job, re-read the complete source material **this run** so nothing tailors from stale or partial context:
+
+1. Re-read the candidate's **COMPLETE resume dump in full** — the entire registered resume (`jobhelp://resume`), not an outline (`get_resume_outline`) and not a summary.
+2. Re-read **ALL the resume tailoring rules in full** — the merged ruleset (`jobhelp://rules/merged`), every rule, not a subset.
+
+Every `resume-tailor` and `resume-validator` invocation below must operate against this complete dump and full ruleset. Do not start the per-job loop until both have been re-read this run.
+
 ## Input parsing
 
 The user invokes `/tailor-batch <input>`. Interpret `<input>` as one of:

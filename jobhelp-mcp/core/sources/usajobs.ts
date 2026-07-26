@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -93,7 +94,7 @@ function parsePosition(raw: unknown): UsaJobsPosition | undefined {
   };
 }
 
-function normalize(position: UsaJobsPosition, raw: unknown): NormalizedJob {
+function normalize(position: UsaJobsPosition): NormalizedJob {
   const remoteText = `${position.title} ${position.description} ${position.location}`;
   const remote = detectRemoteMode(remoteText);
   const job: NormalizedJob = {
@@ -105,7 +106,6 @@ function normalize(position: UsaJobsPosition, raw: unknown): NormalizedJob {
     location: position.location,
     remote,
     description: position.description,
-    rawSourceData: raw,
     ...(position.salaryMin !== undefined ? { salaryMin: position.salaryMin } : {}),
     ...(position.salaryMax !== undefined ? { salaryMax: position.salaryMax } : {}),
     ...((): { postedAt: string } | object => {
@@ -125,15 +125,16 @@ function buildUrl(query: string | undefined, page: number): string {
   return `https://data.usajobs.gov/api/search?${params.toString()}`;
 }
 
-async function fetchOnePage(url: string, apiKey: string, email: string): Promise<unknown> {
-  let response: Response;
+async function fetchOnePage(url: string, apiKey: string, email: string, http?: SharedHttpOptions): Promise<unknown> {
+  let response: HttpTextResult;
   try {
-    response = await fetch(url, {
+    response = await httpGetText(url, {
       headers: {
         Host: 'data.usajobs.gov',
         'User-Agent': email,
         'Authorization-Key': apiKey,
       },
+      ...http,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
@@ -142,15 +143,8 @@ async function fetchOnePage(url: string, apiKey: string, email: string): Promise
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `usajobs HTTP ${response.status}`);
   }
-  let bodyText: string;
   try {
-    bodyText = await response.text();
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'read failed';
-    throw new SourceFetchError('network', `usajobs body read error: ${msg}`);
-  }
-  try {
-    return JSON.parse(bodyText) as unknown;
+    return JSON.parse(response.bodyText) as unknown;
   } catch {
     throw new SourceFetchError('parse', 'usajobs response was not valid JSON');
   }
@@ -167,8 +161,10 @@ async function fetchQueryPage(
   page: number,
   apiKey: string,
   email: string,
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
 ): Promise<UsaJobsPage> {
-  const body = await fetchOnePage(buildUrl(query, page), apiKey, email);
+  const body = await fetchOnePage(buildUrl(query, page), apiKey, email, http);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'usajobs response was not an object');
   }
@@ -184,7 +180,9 @@ async function fetchQueryPage(
   for (const rawItem of items) {
     const parsed = parsePosition(rawItem);
     if (parsed === undefined) continue;
-    jobs.push(normalize(parsed, rawItem));
+    const job = normalize(parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    jobs.push(job);
   }
   return {
     jobs,
@@ -197,15 +195,17 @@ async function fetchQueryJobs(
   query: string | undefined,
   apiKey: string,
   email: string,
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
 ): Promise<NormalizedJob[]> {
-  const first = await fetchQueryPage(query, 1, apiKey, email);
+  const first = await fetchQueryPage(query, 1, apiKey, email, accept, http);
   const out: NormalizedJob[] = [...first.jobs];
   // The public/free key caps a page at 25; loop remaining pages until every
   // result is collected or the page budget is spent.
   const pageSize = first.countThisPage > 0 ? first.countThisPage : USAJOBS_RESULTS_PER_PAGE;
   const totalPages = Math.min(Math.ceil(first.countAll / pageSize), USAJOBS_MAX_PAGES);
   for (let page = 2; page <= totalPages; page += 1) {
-    const next = await fetchQueryPage(query, page, apiKey, email);
+    const next = await fetchQueryPage(query, page, apiKey, email, accept, http);
     if (next.jobs.length === 0) break;
     for (const job of next.jobs) out.push(job);
   }
@@ -218,15 +218,17 @@ export const usajobs: SourceAdapter = {
     const c = config.sources.usajobs;
     return c !== undefined && c.apiKey.length > 0 && c.email.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.usajobs;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'usajobs config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const queries: ReadonlyArray<string | undefined> =
       c.queries !== undefined && c.queries.length > 0 ? c.queries : [undefined];
     const tasks = queries.map((query) => (): Promise<NormalizedJob[]> =>
-      fetchQueryJobs(query, c.apiKey, c.email));
+      fetchQueryJobs(query, c.apiKey, c.email, accept, http));
     const settled = await runWithConcurrency(tasks, { limit: USAJOBS_CONCURRENCY });
     const all: NormalizedJob[] = [];
     let lastError: unknown;

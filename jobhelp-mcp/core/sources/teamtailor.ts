@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob, RemoteMode } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asIsoString,
@@ -10,7 +11,8 @@ import {
 
 export { SourceFetchError };
 
-const MAX_IN_FLIGHT = 5;
+// Each slug is its own *.teamtailor.com tenant, so cross-slug parallelism is rate-limit safe.
+const MAX_IN_FLIGHT = 15;
 
 function decodeEntities(s: string): string {
   return s
@@ -112,7 +114,7 @@ function parseItem(block: string): TeamtailorItem | undefined {
   return { id, title, link, description, location, remote, publishedAt };
 }
 
-function normalize(slug: string, item: TeamtailorItem, raw: string): NormalizedJob {
+function normalize(slug: string, item: TeamtailorItem): NormalizedJob {
   const norm: NormalizedJob = {
     id: `teamtailor:${slug}:${item.id}`,
     source: 'teamtailor',
@@ -122,7 +124,6 @@ function normalize(slug: string, item: TeamtailorItem, raw: string): NormalizedJ
     location: item.location,
     remote: item.remote,
     description: item.description,
-    rawSourceData: raw,
     ...((): { postedAt: string } | object => {
       const iso = asIsoString(item.publishedAt);
       return iso !== undefined ? { postedAt: iso } : {};
@@ -131,11 +132,11 @@ function normalize(slug: string, item: TeamtailorItem, raw: string): NormalizedJ
   return norm;
 }
 
-async function fetchBoard(slug: string): Promise<string> {
+async function fetchBoard(slug: string, http?: SharedHttpOptions): Promise<string> {
   const url = `https://${encodeURIComponent(slug)}.teamtailor.com/jobs.rss`;
-  let response: Response;
+  let response: HttpTextResult;
   try {
-    response = await fetch(url);
+    response = await httpGetText(url, { ...http });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
     throw new SourceFetchError('network', `teamtailor network error: ${msg}`);
@@ -143,20 +144,27 @@ async function fetchBoard(slug: string): Promise<string> {
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `teamtailor HTTP ${response.status}`);
   }
-  const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
-  const text = await response.text();
+  const contentType = response.contentType.toLowerCase();
+  const text = response.bodyText;
   if (!contentType.includes('rss') && !contentType.includes('xml') && !/<rss\b/i.test(text)) {
     throw new SourceFetchError('parse', `teamtailor: non-RSS content-type (${contentType})`);
   }
   return text;
 }
 
-async function fetchAndCollect(slug: string, out: NormalizedJob[]): Promise<void> {
-  const xml = await fetchBoard(slug);
+async function fetchAndCollect(
+  slug: string,
+  out: NormalizedJob[],
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<void> {
+  const xml = await fetchBoard(slug, http);
   for (const block of extractAllItems(xml)) {
     const parsed = parseItem(block);
     if (parsed === undefined) continue;
-    out.push(normalize(slug, parsed, block));
+    const job = normalize(slug, parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
 }
 
@@ -187,11 +195,13 @@ export const teamtailor: SourceAdapter = {
     const c = config.sources.teamtailor;
     return c !== undefined && c.tokens.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.teamtailor;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'teamtailor config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const all: NormalizedJob[] = [];
     let attempts = 0;
     let failures = 0;
@@ -199,7 +209,7 @@ export const teamtailor: SourceAdapter = {
     await runWithConcurrency(c.tokens, MAX_IN_FLIGHT, async (slug) => {
       attempts += 1;
       try {
-        await fetchAndCollect(slug, all);
+        await fetchAndCollect(slug, all, accept, http);
       } catch (err: unknown) {
         failures += 1;
         lastError = err;

@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import type { NormalizedJob } from '../types/job.js';
-import type { SourceAdapter } from '../types/source.js';
+import type { FetchOptions, SharedHttpOptions, SourceAdapter } from '../types/source.js';
+import { httpGetText, type HttpTextResult } from './http.js';
 import {
   SourceFetchError,
   asNumber,
@@ -66,7 +67,7 @@ function buildLocation(job: JSearchJob): string {
   return [job.city, job.country].filter((p): p is string => p !== undefined && p.length > 0).join(', ');
 }
 
-function normalize(job: JSearchJob, raw: unknown): NormalizedJob {
+function normalize(job: JSearchJob): NormalizedJob {
   const location = buildLocation(job);
   const remote = job.isRemote ? 'remote' : detectRemoteMode(`${job.title} ${job.description}`);
   const norm: NormalizedJob = {
@@ -78,7 +79,6 @@ function normalize(job: JSearchJob, raw: unknown): NormalizedJob {
     location,
     remote,
     description: job.description,
-    rawSourceData: raw,
     ...(job.salaryMin !== undefined ? { salaryMin: job.salaryMin } : {}),
     ...(job.salaryMax !== undefined ? { salaryMax: job.salaryMax } : {}),
     ...(job.salaryCurrency !== undefined ? { salaryCurrency: job.salaryCurrency } : {}),
@@ -97,11 +97,12 @@ function buildUrl(query: string): string {
   return `https://${JSEARCH_HOST}/search?${params.toString()}`;
 }
 
-async function fetchOnePage(url: string, rapidApiKey: string): Promise<unknown> {
-  let response: Response;
+async function fetchOnePage(url: string, rapidApiKey: string, http?: SharedHttpOptions): Promise<unknown> {
+  let response: HttpTextResult;
   try {
-    response = await fetch(url, {
+    response = await httpGetText(url, {
       headers: { 'X-RapidAPI-Key': rapidApiKey, 'X-RapidAPI-Host': JSEARCH_HOST },
+      ...http,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'fetch failed';
@@ -110,22 +111,20 @@ async function fetchOnePage(url: string, rapidApiKey: string): Promise<unknown> 
   if (!response.ok) {
     throw new SourceFetchError(classifyHttpStatus(response.status), `jsearch HTTP ${response.status}`);
   }
-  let bodyText: string;
   try {
-    bodyText = await response.text();
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'read failed';
-    throw new SourceFetchError('network', `jsearch body read error: ${msg}`);
-  }
-  try {
-    return JSON.parse(bodyText) as unknown;
+    return JSON.parse(response.bodyText) as unknown;
   } catch {
     throw new SourceFetchError('parse', 'jsearch response was not valid JSON');
   }
 }
 
-async function fetchQueryJobs(query: string, rapidApiKey: string): Promise<NormalizedJob[]> {
-  const body = await fetchOnePage(buildUrl(query), rapidApiKey);
+async function fetchQueryJobs(
+  query: string,
+  rapidApiKey: string,
+  accept?: (job: NormalizedJob) => boolean,
+  http?: SharedHttpOptions,
+): Promise<NormalizedJob[]> {
+  const body = await fetchOnePage(buildUrl(query), rapidApiKey, http);
   if (!isRecord(body)) {
     throw new SourceFetchError('parse', 'jsearch response was not an object');
   }
@@ -140,7 +139,9 @@ async function fetchQueryJobs(query: string, rapidApiKey: string): Promise<Norma
   for (const rawJob of data) {
     const parsed = parseJSearchJob(rawJob);
     if (parsed === undefined) continue;
-    out.push(normalize(parsed, rawJob));
+    const job = normalize(parsed);
+    if (accept !== undefined && !accept(job)) continue;
+    out.push(job);
   }
   return out;
 }
@@ -151,13 +152,15 @@ export const jsearch: SourceAdapter = {
     const c = config.sources.jsearch;
     return c !== undefined && c.rapidApiKey.length > 0;
   },
-  fetch: async (config): Promise<readonly NormalizedJob[]> => {
+  fetch: async (config, opts?: FetchOptions): Promise<readonly NormalizedJob[]> => {
     const c = config.sources.jsearch;
     if (c === undefined) {
       throw new SourceFetchError('auth', 'jsearch config missing');
     }
+    const accept = opts?.accept;
+    const http = opts?.http;
     const queries = c.queries !== undefined && c.queries.length > 0 ? c.queries : [DEFAULT_QUERY];
-    const tasks = queries.map((query) => (): Promise<NormalizedJob[]> => fetchQueryJobs(query, c.rapidApiKey));
+    const tasks = queries.map((query) => (): Promise<NormalizedJob[]> => fetchQueryJobs(query, c.rapidApiKey, accept, http));
     const settled = await runWithConcurrency(tasks, { limit: JSEARCH_CONCURRENCY });
     const all: NormalizedJob[] = [];
     let lastError: unknown;

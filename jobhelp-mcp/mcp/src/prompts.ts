@@ -1,6 +1,7 @@
 import type { ResourceHandler } from './resources.js';
+import { jobDigestTailorText } from './prompts-pipeline.js';
 
-export const PROMPT_NAMES = ['tailor_resumes', 'tailor_resume', 'validate_resume'] as const;
+export const PROMPT_NAMES = ['tailor_resumes', 'tailor_resume', 'validate_resume', 'job_digest_tailor'] as const;
 
 export type PromptName = (typeof PROMPT_NAMES)[number];
 
@@ -8,6 +9,7 @@ export const PROMPT_RESOURCE_URIS: Record<PromptName, string> = {
   tailor_resumes: 'jobhelp://prompts/tailor-resumes',
   tailor_resume: 'jobhelp://prompts/tailor-resume',
   validate_resume: 'jobhelp://prompts/validate-resume',
+  job_digest_tailor: 'jobhelp://prompts/job-digest-tailor',
 };
 
 export interface PromptArgument {
@@ -38,9 +40,9 @@ export interface PromptHandler {
   readonly get: (args?: Readonly<Record<string, string | undefined>>) => PromptGetResponse;
 }
 
-type PromptArgs = Readonly<Record<string, string | undefined>>;
+export type PromptArgs = Readonly<Record<string, string | undefined>>;
 
-function value(args: PromptArgs | undefined, key: string, fallback: string): string {
+export function value(args: PromptArgs | undefined, key: string, fallback: string): string {
   const raw = args?.[key];
   if (raw === undefined || raw.trim() === '') return fallback;
   return raw;
@@ -234,6 +236,18 @@ const PROMPTS: readonly PromptHandler[] = [
       ],
     },
     get: (args) => message('Validate a tailored resume draft.', validateResumeText(args)),
+  },
+  {
+    definition: {
+      name: 'job_digest_tailor',
+      description:
+        'Run the full pipeline in one invocation: retrieve and rank jobs, AI-match against the resume, pause once for approval, then tailor and validate each approved resume.',
+      arguments: [
+        { name: 'count', description: 'How many top-ranked jobs to retrieve and consider. Default 30.' },
+        { name: 'instructions', description: 'Optional free-text emphasis (e.g., "AI startups only").' },
+      ],
+    },
+    get: (args) => message('Run the full job-digest-and-tailor pipeline.', jobDigestTailorText(args)),
   },
 ];
 

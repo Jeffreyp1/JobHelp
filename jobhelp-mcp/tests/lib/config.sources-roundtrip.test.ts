@@ -131,7 +131,7 @@ describe('loadConfig — round-trip for newly-added source adapters', () => {
     }
   });
 
-  it('loads editable company-sources.json next to config.json', async () => {
+  it('loads editable company-sources.json next to config.json, unioned with the bundled lists', async () => {
     const p = writeTempConfig({});
     const dir = dirname(p);
     try {
@@ -144,8 +144,10 @@ describe('loadConfig — round-trip for newly-added source adapters', () => {
       );
       const result = await loadConfig(p);
       if (!isOk(result)) throw new Error(`expected ok; got ${JSON.stringify(result.error)}`);
-      expect(result.value.sources.greenhouse?.tokens).toEqual(['user-kept-greenhouse']);
-      expect(result.value.sources.lever?.slugs).toEqual(['user-kept-lever']);
+      expect(result.value.sources.greenhouse?.tokens).toContain('user-kept-greenhouse');
+      expect(result.value.sources.lever?.slugs).toContain('user-kept-lever');
+      expect(result.value.sources.greenhouse?.tokens.length).toBeGreaterThan(1000);
+      expect(result.value.sources.lever?.slugs.length).toBeGreaterThan(50);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

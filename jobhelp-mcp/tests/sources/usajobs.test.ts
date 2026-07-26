@@ -95,7 +95,26 @@ describe('usajobs adapter', () => {
       expect(first.salaryMin).toBe(90000);
       expect(first.salaryMax).toBe(130000);
       expect(first.postedAt).toBeDefined();
-      expect(first.rawSourceData).toBeDefined();
+    });
+
+    it('drops every job when accept returns false', async () => {
+      const page = searchPage([position('100', 'Software Engineer')], 1);
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(page));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const jobs = await usajobs.fetch(makeConfig(['software engineer']), { accept: () => false });
+
+      expect(jobs).toEqual([]);
+    });
+
+    it('keeps jobs when accept returns true', async () => {
+      const page = searchPage([position('100', 'Software Engineer')], 1);
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(page));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const jobs = await usajobs.fetch(makeConfig(['software engineer']), { accept: () => true });
+
+      expect(jobs.length).toBeGreaterThan(0);
     });
 
     it('collects all results across paginated responses (M2)', async () => {

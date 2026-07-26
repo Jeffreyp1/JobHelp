@@ -51,6 +51,7 @@ const VALID_ACTIONS: string[] = [
   'extract_profile',
   'discover_and_rank',
   'update_job_status',
+  'answer_question',
   'ping',
 ];
 

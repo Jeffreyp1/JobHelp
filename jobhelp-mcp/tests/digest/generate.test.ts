@@ -3,13 +3,14 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import type {
+  FetchOptions,
   JobDigestConfig,
   NormalizedJob,
   RankedJob,
   SourceAdapter,
 } from '../../core/types/index.js';
 
-type FetchFn = (config: JobDigestConfig) => Promise<readonly NormalizedJob[]>;
+type FetchFn = (config: JobDigestConfig, opts?: FetchOptions) => Promise<readonly NormalizedJob[]>;
 type AdapterName = 'alpha' | 'beta' | 'gamma';
 
 interface Handlers {
@@ -36,17 +37,17 @@ const mocks = vi.hoisted((): {
   const adapterAlpha: SourceAdapter = {
     name: 'alpha',
     enabled: () => true,
-    fetch: (cfg) => handlers.alpha(cfg),
+    fetch: (cfg, opts) => handlers.alpha(cfg, opts),
   };
   const adapterBeta: SourceAdapter = {
     name: 'beta',
     enabled: () => true,
-    fetch: (cfg) => handlers.beta(cfg),
+    fetch: (cfg, opts) => handlers.beta(cfg, opts),
   };
   const adapterGamma: SourceAdapter = {
     name: 'gamma',
     enabled: () => true,
-    fetch: (cfg) => handlers.gamma(cfg),
+    fetch: (cfg, opts) => handlers.gamma(cfg, opts),
   };
   const runPipelineMock = vi.fn<
     [readonly NormalizedJob[], JobDigestConfig],
@@ -70,6 +71,7 @@ vi.mock('../../core/pipeline/index.js', () => ({
 }));
 
 import { runDigest } from '../../core/digest/generate.js';
+import { SourceFetchError } from '../../core/sources/_shared.js';
 
 function setHandler(name: AdapterName, fn: FetchFn): void {
   mocks.handlers[name] = fn;
@@ -133,7 +135,38 @@ describe('runDigest', () => {
 
   afterEach(async () => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
     await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('threads http cache options from env to every adapter', async () => {
+    const cacheDir = path.join(tmpDir, 'http-cache');
+    vi.stubEnv('JOBHELP_HTTP_CACHE_DIR', cacheDir);
+    let seen: FetchOptions | undefined;
+    setHandler('alpha', async (_cfg, opts) => {
+      seen = opts;
+      return [];
+    });
+    mocks.runPipelineMock.mockResolvedValue([]);
+
+    await runDigest(makeConfig(tmpDir, 10));
+
+    expect(seen?.http?.cache?.dir).toBe(cacheDir);
+    expect(seen?.http?.cache?.ttlMs).toBe(6 * 60 * 60 * 1000);
+  });
+
+  it('omits the http cache when JOBHELP_HTTP_CACHE=off', async () => {
+    vi.stubEnv('JOBHELP_HTTP_CACHE', 'off');
+    let seen: FetchOptions | undefined;
+    setHandler('alpha', async (_cfg, opts) => {
+      seen = opts;
+      return [];
+    });
+    mocks.runPipelineMock.mockResolvedValue([]);
+
+    await runDigest(makeConfig(tmpDir, 10));
+
+    expect(seen?.http?.cache).toBeUndefined();
   });
 
   it('calls every adapter exactly once and concatenates results', async () => {
@@ -190,6 +223,26 @@ describe('runDigest', () => {
     expect(beta?.jobCount).toBe(1);
     expect(gamma?.error?.type).toBe('rate_limit');
     expect(result.jobs).toHaveLength(1);
+  });
+
+  it('reads SourceFetchError.type for HTTP-status errors rather than guessing from the message', async () => {
+    setHandler('alpha', async () => {
+      throw new SourceFetchError('rate_limit', 'alpha HTTP 429');
+    });
+    setHandler('beta', async () => [makeJob('b1', 'beta')]);
+    setHandler('gamma', async () => {
+      throw new SourceFetchError('not_found', 'gamma HTTP 404');
+    });
+    mocks.runPipelineMock.mockImplementation(async (jobs: readonly NormalizedJob[]) =>
+      jobs.map((j, i) => makeRanked(j, i + 1, 0.5)),
+    );
+
+    const result = await runDigest(makeConfig(tmpDir, 10));
+
+    const alpha = result.sourceResults.find((s) => s.source === 'alpha');
+    const gamma = result.sourceResults.find((s) => s.source === 'gamma');
+    expect(alpha?.error?.type).toBe('rate_limit');
+    expect(gamma?.error?.type).toBe('not_found');
   });
 
   it('takes top digestK of the ranked list', async () => {
@@ -252,6 +305,27 @@ describe('runDigest', () => {
     expect(result.markdownPath.endsWith('.md')).toBe(true);
     expect(result.csvPath.endsWith('.csv')).toBe(true);
     expect(result.jobs).toHaveLength(1);
+  });
+
+  it('appends one metrics line per run to metrics.jsonl in the output dir', async () => {
+    setHandler('alpha', async () => [makeJob('a1', 'alpha')]);
+    mocks.runPipelineMock.mockImplementation(async (jobs: readonly NormalizedJob[]) =>
+      jobs.map((j, i) => makeRanked(j, i + 1, 0.9)),
+    );
+
+    await runDigest(makeConfig(tmpDir, 10));
+    await runDigest(makeConfig(tmpDir, 10));
+
+    const lines = (await readFile(path.join(tmpDir, 'metrics.jsonl'), 'utf8')).trim().split('\n');
+    expect(lines).toHaveLength(2);
+    const first: unknown = JSON.parse(lines[0] ?? '');
+    expect(first).toMatchObject({
+      date: '2026-05-14',
+      poolKept: 1,
+      rankedCount: 1,
+      digestCount: 1,
+      historyBoosted: 0,
+    });
   });
 
   it('classifies auth-flavored errors', async () => {

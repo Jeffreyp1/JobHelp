@@ -38,7 +38,34 @@ export type ApiAction =
   | "extract_profile"
   | "discover_and_rank"
   | "update_job_status"
+  | "answer_question"
   | "ping";
+
+export interface AnswerQuestionRequest {
+  action: "answer_question";
+  /** The application question to answer. */
+  question: string;
+  /** Field kind hint ("text" | "textarea" | "select") to shape the answer. */
+  fieldType?: string;
+  /** Allowed options for a dropdown; the answer must be exactly one of them. */
+  options?: string[];
+  /** The user's resume dump, used to ground the answer. */
+  resumeDump: string;
+  /** Optional standing profile answers, as additional context. */
+  profile?: Record<string, string>;
+  /** Anthropic model id. */
+  model: string;
+}
+
+export interface AnswerQuestionResult {
+  /** The drafted answer. Empty when no grounded answer was possible. */
+  answer: string;
+  /** True when the resume gave no basis and the model declined to invent one. */
+  noBasis: boolean;
+  cost: CostBreakdown;
+}
+
+export type AnswerQuestionResponse = ApiResult<AnswerQuestionResult>;
 
 export interface ToggleSetting {
   enabled: boolean;

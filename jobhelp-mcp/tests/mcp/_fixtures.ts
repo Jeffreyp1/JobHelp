@@ -6,10 +6,12 @@ import type {
   InitConfigResult,
   ListApplicationVersionsResult,
   ListRecentApplicationsResult,
+  RecordJobVerdictsResult,
   ReadResumeResult,
   ReadRulesResult,
   RegisterResumeResult,
   RerankTopJobsResult,
+  AnalyzeFitResult,
   ScoreKeywordMatchResult,
   SetActiveResumeResult,
   StartApplicationResult,
@@ -38,10 +40,12 @@ export interface Calls {
   readRules: unknown[];
   readResume: unknown[];
   scoreKeywordMatch: unknown[];
+  analyzeFit: unknown[];
   startApplication: unknown[];
   writeApplicationOutput: unknown[];
   listApplicationVersions: unknown[];
   listRecentApplications: unknown[];
+  recordJobVerdicts: unknown[];
   applyConfigAnswers: unknown[];
   validateSources: unknown[];
   rerankTopJobs: unknown[];
@@ -61,10 +65,12 @@ export function makeDeps(
     readRules: [],
     readResume: [],
     scoreKeywordMatch: [],
+    analyzeFit: [],
     startApplication: [],
     writeApplicationOutput: [],
     listApplicationVersions: [],
     listRecentApplications: [],
+    recordJobVerdicts: [],
     validateSources: [],
     rerankTopJobs: [],
   };
@@ -85,11 +91,14 @@ export function makeDeps(
     digestPath: '/home/u/jobhelp/digests/digest-2026-05-15.md',
     jobs: [],
     warnings: [],
+    nextRequiredStep: 'rerank',
   };
   const latestDigestResult: GetLatestDigestResult = {
     path: '/home/u/jobhelp/digests/digest-2026-05-15.md',
     jobs: [],
+    totalPersisted: 0,
     generatedAt: '2026-05-15T00:00:00Z',
+    nextRequiredStep: 'rerank',
   };
   const getJobResult: GetJobResult = {
     job: {
@@ -116,6 +125,12 @@ export function makeDeps(
     matched: ['typescript'],
     missing: ['go'],
   };
+  const analyzeFitResult: AnalyzeFitResult = {
+    matched: ['typescript'],
+    missing: ['go'],
+    matchedCount: 1,
+    jobSkillCount: 2,
+  };
   const startAppResult: StartApplicationResult = {
     path: '/home/u/jobhelp/applications/acme-swe-i-2026-05-15/',
     created: true,
@@ -126,6 +141,7 @@ export function makeDeps(
   };
   const listVersionsResult: ListApplicationVersionsResult = { versions: [] };
   const listRecentResult: ListRecentApplicationsResult = { applications: [] };
+  const recordVerdictsResult: RecordJobVerdictsResult = { recorded: 0, unresolvedIds: [] };
   const validateSourcesResult: ValidateSourcesResult = {
     results: [],
     summary: { total: 0, ok: 0, failed: 0 },
@@ -172,6 +188,16 @@ export function makeDeps(
       calls.getJob.push(id);
       return ok(getJobResult);
     },
+    getTriageList: async () =>
+      ok({
+        total: 0,
+        returned: 0,
+        truncated: false,
+        triage: { model: 'sonnet', chunkSize: 150 },
+        profileCard: 'profile',
+        lines: [],
+        nextRequiredStep: 'triage',
+      }),
     readRules: async (mode) => {
       calls.readRules.push(mode);
       return ok(readRulesResult);
@@ -183,6 +209,10 @@ export function makeDeps(
     scoreKeywordMatch: async (args) => {
       calls.scoreKeywordMatch.push(args);
       return ok(scoreResult);
+    },
+    analyzeFit: async (args) => {
+      calls.analyzeFit.push(args);
+      return ok(analyzeFitResult);
     },
     startApplication: async (args) => {
       calls.startApplication.push(args);
@@ -199,6 +229,10 @@ export function makeDeps(
     listRecentApplications: async () => {
       calls.listRecentApplications.push({});
       return ok(listRecentResult);
+    },
+    recordJobVerdicts: async (args) => {
+      calls.recordJobVerdicts.push(args);
+      return ok(recordVerdictsResult);
     },
     validateSources: async (args) => {
       calls.validateSources.push(args);

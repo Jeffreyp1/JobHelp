@@ -8,6 +8,7 @@ import type {
   RulesMode,
   SemanticConfig,
   Seniority,
+  TriageConfig,
 } from '../types/config.js';
 import {
   DEFAULT_SEMANTIC_CANDIDATE_LIMIT,
@@ -21,6 +22,12 @@ import {
 } from './config-ranking.js';
 import { expandHome } from './config-path.js';
 import { validateSources } from './config-sources.js';
+import {
+  detectCountryFromLocation,
+  detectRoleFamily,
+  type RoleFamily,
+} from '../pipeline/classify.js';
+import { log } from './log.js';
 import {
   fail,
   requireBoolean,
@@ -40,31 +47,118 @@ function isSeniority(v: unknown): v is Seniority {
   return false;
 }
 
+// Exhaustiveness-checked against the classifier's RoleFamily union: adding a family
+// to classify.ts without listing it here is a compile error.
+const ROLE_FAMILY_SLUGS: Record<RoleFamily, true> = {
+  backend: true,
+  frontend: true,
+  fullstack: true,
+  mobile: true,
+  ml: true,
+  data: true,
+  security: true,
+  devops: true,
+  sre: true,
+  pm: true,
+  sales: true,
+  ops: true,
+  designer: true,
+  analyst: true,
+  marketing: true,
+  support: true,
+  finance: true,
+  'solutions-architect': true,
+};
+
+function isRoleFamilySlug(v: string): v is RoleFamily {
+  return Object.prototype.hasOwnProperty.call(ROLE_FAMILY_SLUGS, v);
+}
+
+// The filter compares profile.roleFamily against detectRoleFamily output, so human
+// strings ("Backend Engineer") must become classifier slugs here or they never match.
+// Unmappable values warn-and-drop rather than fail: roleFamily is open free text
+// (unlike the seniority enum), and a kept unmappable entry could never match anyway.
+function normalizeRoleFamily(values: readonly string[]): readonly string[] {
+  const out: RoleFamily[] = [];
+  const unmapped: string[] = [];
+  for (const raw of values) {
+    const lowered = raw.trim().toLowerCase();
+    const mapped = isRoleFamilySlug(lowered) ? lowered : detectRoleFamily(raw, '');
+    if (mapped === undefined) {
+      unmapped.push(raw);
+      continue;
+    }
+    if (!out.includes(mapped)) out.push(mapped);
+  }
+  if (unmapped.length > 0) {
+    log('warn', 'config.role_family_unmapped', {
+      unmapped,
+      kept: out,
+      validSlugs: Object.keys(ROLE_FAMILY_SLUGS),
+    });
+  }
+  return out;
+}
+
+function warnIfCountryFilterOff(location: string, allowedCountries: unknown): void {
+  if (allowedCountries !== undefined) return;
+  const detected = detectCountryFromLocation(location);
+  if (detected === undefined) return;
+  log('warn', 'config.allowed_countries_missing', {
+    location,
+    detectedCountry: detected,
+  });
+}
+
 function validateProfile(raw: unknown): ProfileConfig {
   const obj = requireRecord(raw, 'profile');
   const seniority = obj['seniority'];
   if (!isSeniority(seniority)) {
     fail(`expected one of ${SENIORITY_VALUES.join(',')} at field profile.seniority`);
   }
+  const location = requireString(obj['location'], 'profile.location');
+  warnIfCountryFilterOff(location, obj['allowedCountries']);
   return {
     resumeDumpPath: expandHome(requireString(obj['resumeDumpPath'], 'profile.resumeDumpPath')),
     skills: requireStringArray(obj['skills'], 'profile.skills'),
-    location: requireString(obj['location'], 'profile.location'),
-    remoteOk: requireBoolean(obj['remoteOk'], 'profile.remoteOk'),
-    salaryFloor: requireNumber(obj['salaryFloor'], 'profile.salaryFloor'),
-    seniority,
-    roleFamily: requireStringArray(obj['roleFamily'], 'profile.roleFamily'),
     ...(obj['coreSkills'] !== undefined
       ? { coreSkills: requireStringArray(obj['coreSkills'], 'profile.coreSkills') }
       : {}),
+    location,
+    remoteOk: requireBoolean(obj['remoteOk'], 'profile.remoteOk'),
+    salaryFloor: requireNumber(obj['salaryFloor'], 'profile.salaryFloor'),
+    seniority,
+    roleFamily: normalizeRoleFamily(requireStringArray(obj['roleFamily'], 'profile.roleFamily')),
     ...(obj['strictLocation'] !== undefined
       ? { strictLocation: requireBoolean(obj['strictLocation'], 'profile.strictLocation') }
+      : {}),
+    ...(obj['allowedCountries'] !== undefined
+      ? { allowedCountries: requireStringArray(obj['allowedCountries'], 'profile.allowedCountries') }
       : {}),
   };
 }
 
 function positiveOr(v: number, fallback: number): number {
   return Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback;
+}
+
+function validateTriage(raw: unknown): TriageConfig {
+  if (raw === undefined) return { model: 'sonnet', chunkSize: 150, triageK: 1000 };
+  const obj = requireRecord(raw, 'ranking.triage');
+  return {
+    model:
+      obj['model'] !== undefined
+        ? requireString(obj['model'], 'ranking.triage.model')
+        : 'sonnet',
+    chunkSize:
+      obj['chunkSize'] !== undefined
+        ? positiveOr(requireNumber(obj['chunkSize'], 'ranking.triage.chunkSize'), 150)
+        : 150,
+    triageK:
+      obj['triageK'] !== undefined
+        ? positiveOr(requireNumber(obj['triageK'], 'ranking.triage.triageK'), 1000)
+        : 1000,
+  };
 }
 
 function validateSemantic(raw: unknown): SemanticConfig {
@@ -97,6 +191,8 @@ function validateRanking(raw: unknown): RankingConfig {
       maxAge: validateMaxAge(undefined),
       sourceTrust: validateSourceTrust(undefined),
       fusion: validateFusion(undefined),
+      persistK: 1000,
+      triage: validateTriage(undefined),
       semantic: validateSemantic(undefined),
       rerank: validateRerank(undefined),
       history: validateHistory(undefined),
@@ -111,6 +207,11 @@ function validateRanking(raw: unknown): RankingConfig {
     maxAge: validateMaxAge(obj['maxAge']),
     sourceTrust: validateSourceTrust(obj['sourceTrust']),
     fusion: validateFusion(obj['fusion']),
+    persistK:
+      obj['persistK'] !== undefined
+        ? positiveOr(requireNumber(obj['persistK'], 'ranking.persistK'), 1000)
+        : 1000,
+    triage: validateTriage(obj['triage']),
     semantic: validateSemantic(obj['semantic']),
     rerank: validateRerank(obj['rerank']),
     history: validateHistory(obj['history']),

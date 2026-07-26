@@ -24,9 +24,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// node_modules/@xmldom/xmldom/lib/conventions.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/conventions.js
 var require_conventions = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/conventions.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/conventions.js"(exports) {
     "use strict";
     function find2(list, predicate, ac) {
       if (ac === void 0) {
@@ -233,9 +233,9 @@ var require_conventions = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/errors.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/errors.js
 var require_errors = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/errors.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/errors.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     function extendError(constructor, writableName) {
@@ -391,9 +391,9 @@ var require_errors = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/grammar.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/grammar.js
 var require_grammar = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/grammar.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/grammar.js"(exports) {
     "use strict";
     function detectUnicodeSupport(RegExpImpl) {
       try {
@@ -594,9 +594,9 @@ var require_grammar = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/dom.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/dom.js
 var require_dom = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/dom.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/dom.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     var find2 = conventions.find;
@@ -3154,9 +3154,9 @@ var require_dom = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/entities.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/entities.js
 var require_entities = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/entities.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/entities.js"(exports) {
     "use strict";
     var freeze = require_conventions().freeze;
     exports.XML_ENTITIES = freeze({
@@ -5297,9 +5297,9 @@ var require_entities = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/sax.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/sax.js
 var require_sax = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/sax.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/sax.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     var g = require_grammar();
@@ -6045,9 +6045,9 @@ var require_sax = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/dom-parser.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/dom-parser.js
 var require_dom_parser = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/dom-parser.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/dom-parser.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     var dom = require_dom();
@@ -6311,9 +6311,9 @@ var require_dom_parser = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/index.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/index.js
 var require_lib = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/index.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/@xmldom/xmldom/lib/index.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     exports.assign = conventions.assign;
@@ -6355,9 +6355,9 @@ var require_lib = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/utils.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/utils.js
 var require_utils = __commonJS({
-  "node_modules/docxtemplater/js/utils.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/utils.js"(exports, module) {
     "use strict";
     function last(a) {
       return a[a.length - 1];
@@ -6372,9 +6372,9 @@ var require_utils = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/errors.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/errors.js
 var require_errors2 = __commonJS({
-  "node_modules/docxtemplater/js/errors.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/errors.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -6829,9 +6829,9 @@ var require_errors2 = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/doc-utils.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/doc-utils.js
 var require_doc_utils = __commonJS({
-  "node_modules/docxtemplater/js/doc-utils.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/doc-utils.js"(exports, module) {
     "use strict";
     function _slicedToArray(r, e) {
       return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest();
@@ -7287,9 +7287,9 @@ var require_doc_utils = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/minizod.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/minizod.js
 var require_minizod = __commonJS({
-  "node_modules/docxtemplater/js/minizod.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/minizod.js"(exports, module) {
     "use strict";
     function _slicedToArray(r, e) {
       return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest();
@@ -7638,9 +7638,9 @@ var require_minizod = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/get-relation-types.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/get-relation-types.js
 var require_get_relation_types = __commonJS({
-  "node_modules/docxtemplater/js/get-relation-types.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/get-relation-types.js"(exports, module) {
     "use strict";
     var _require = require_doc_utils();
     var str2xml = _require.str2xml;
@@ -7662,9 +7662,9 @@ var require_get_relation_types = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/get-content-types.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/get-content-types.js
 var require_get_content_types = __commonJS({
-  "node_modules/docxtemplater/js/get-content-types.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/get-content-types.js"(exports, module) {
     "use strict";
     var _require = require_doc_utils();
     var str2xml = _require.str2xml;
@@ -7710,9 +7710,9 @@ var require_get_content_types = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/module-wrapper.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/module-wrapper.js
 var require_module_wrapper = __commonJS({
-  "node_modules/docxtemplater/js/module-wrapper.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/module-wrapper.js"(exports, module) {
     "use strict";
     var _require = require_errors2();
     var XTInternalError = _require.XTInternalError;
@@ -7760,9 +7760,9 @@ var require_module_wrapper = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/traits.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/traits.js
 var require_traits = __commonJS({
-  "node_modules/docxtemplater/js/traits.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/traits.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -8152,9 +8152,9 @@ var require_traits = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/filetypes.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/filetypes.js
 var require_filetypes = __commonJS({
-  "node_modules/docxtemplater/js/filetypes.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/filetypes.js"(exports, module) {
     "use strict";
     var docxContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
     var docxmContentType = "application/vnd.ms-word.document.macroEnabled.main+xml";
@@ -8182,9 +8182,9 @@ var require_filetypes = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/content-types.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/content-types.js
 var require_content_types = __commonJS({
-  "node_modules/docxtemplater/js/content-types.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/content-types.js"(exports, module) {
     "use strict";
     var coreContentType = "application/vnd.openxmlformats-package.core-properties+xml";
     var appContentType = "application/vnd.openxmlformats-officedocument.extended-properties+xml";
@@ -8203,9 +8203,9 @@ var require_content_types = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/modules/common.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/common.js
 var require_common = __commonJS({
-  "node_modules/docxtemplater/js/modules/common.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/common.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -8310,9 +8310,9 @@ var require_common = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/scope-manager.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/scope-manager.js
 var require_scope_manager = __commonJS({
-  "node_modules/docxtemplater/js/scope-manager.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/scope-manager.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -8589,9 +8589,9 @@ var require_scope_manager = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/lexer.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/lexer.js
 var require_lexer = __commonJS({
-  "node_modules/docxtemplater/js/lexer.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/lexer.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -9123,9 +9123,9 @@ var require_lexer = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/get-tags.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/get-tags.js
 var require_get_tags = __commonJS({
-  "node_modules/docxtemplater/js/get-tags.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/get-tags.js"(exports, module) {
     "use strict";
     function _toConsumableArray(r) {
       return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread();
@@ -9244,9 +9244,9 @@ var require_get_tags = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/error-logger.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/error-logger.js
 var require_error_logger = __commonJS({
-  "node_modules/docxtemplater/js/error-logger.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/error-logger.js"(exports, module) {
     "use strict";
     var _require = require_doc_utils();
     var pushArray = _require.pushArray;
@@ -9277,9 +9277,9 @@ var require_error_logger = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/xml-matcher.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/xml-matcher.js
 var require_xml_matcher = __commonJS({
-  "node_modules/docxtemplater/js/xml-matcher.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/xml-matcher.js"(exports, module) {
     "use strict";
     var _require = require_doc_utils();
     var pregMatchAll = _require.pregMatchAll;
@@ -9295,9 +9295,9 @@ var require_xml_matcher = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/prefix-matcher.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/prefix-matcher.js
 var require_prefix_matcher = __commonJS({
-  "node_modules/docxtemplater/js/prefix-matcher.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/prefix-matcher.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -9355,9 +9355,9 @@ var require_prefix_matcher = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/parser.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/parser.js
 var require_parser = __commonJS({
-  "node_modules/docxtemplater/js/parser.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/parser.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -9644,9 +9644,9 @@ var require_parser = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/get-resolved-id.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/get-resolved-id.js
 var require_get_resolved_id = __commonJS({
-  "node_modules/docxtemplater/js/get-resolved-id.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/get-resolved-id.js"(exports, module) {
     "use strict";
     function getResolvedId(part, options) {
       if (part.lIndex == null) {
@@ -9663,9 +9663,9 @@ var require_get_resolved_id = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/render.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/render.js
 var require_render = __commonJS({
-  "node_modules/docxtemplater/js/render.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/render.js"(exports, module) {
     "use strict";
     var _require = require_errors2();
     var throwUnimplementedTagType = _require.throwUnimplementedTagType;
@@ -9737,9 +9737,9 @@ var require_render = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/postrender.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/postrender.js
 var require_postrender = __commonJS({
-  "node_modules/docxtemplater/js/postrender.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/postrender.js"(exports, module) {
     "use strict";
     function string2buf(str) {
       var c, c2, mPos, i, bufLen = 0;
@@ -9824,9 +9824,9 @@ var require_postrender = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/resolve.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/resolve.js
 var require_resolve = __commonJS({
-  "node_modules/docxtemplater/js/resolve.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/resolve.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -9984,9 +9984,9 @@ var require_resolve = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/join-uncorrupt.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/join-uncorrupt.js
 var require_join_uncorrupt = __commonJS({
-  "node_modules/docxtemplater/js/join-uncorrupt.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/join-uncorrupt.js"(exports, module) {
     "use strict";
     var _require = require_doc_utils();
     var startsWith = _require.startsWith;
@@ -10082,9 +10082,9 @@ var require_join_uncorrupt = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/xml-templater.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/xml-templater.js
 var require_xml_templater = __commonJS({
-  "node_modules/docxtemplater/js/xml-templater.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/xml-templater.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -10362,9 +10362,9 @@ var require_xml_templater = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/modules/loop.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/loop.js
 var require_loop = __commonJS({
-  "node_modules/docxtemplater/js/modules/loop.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/loop.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -10977,9 +10977,9 @@ var require_loop = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/modules/space-preserve.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/space-preserve.js
 var require_space_preserve = __commonJS({
-  "node_modules/docxtemplater/js/modules/space-preserve.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/space-preserve.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -11115,9 +11115,9 @@ var require_space_preserve = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/modules/rawxml.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/rawxml.js
 var require_rawxml = __commonJS({
-  "node_modules/docxtemplater/js/modules/rawxml.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/rawxml.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -11256,9 +11256,9 @@ var require_rawxml = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/merge-sort.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/merge-sort.js
 var require_merge_sort = __commonJS({
-  "node_modules/docxtemplater/js/merge-sort.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/merge-sort.js"(exports, module) {
     "use strict";
     function getMinFromArrays(arrays, state) {
       var minIndex = -1;
@@ -11295,9 +11295,9 @@ var require_merge_sort = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/modules/expand-pair-trait.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/expand-pair-trait.js
 var require_expand_pair_trait = __commonJS({
-  "node_modules/docxtemplater/js/modules/expand-pair-trait.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/expand-pair-trait.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -11579,9 +11579,9 @@ var require_expand_pair_trait = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/modules/render.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/render.js
 var require_render2 = __commonJS({
-  "node_modules/docxtemplater/js/modules/render.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/modules/render.js"(exports, module) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -11784,9 +11784,9 @@ var require_render2 = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/file-type-config.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/file-type-config.js
 var require_file_type_config = __commonJS({
-  "node_modules/docxtemplater/js/file-type-config.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/file-type-config.js"(exports, module) {
     "use strict";
     var loopModule = require_loop();
     var spacePreserveModule = require_space_preserve();
@@ -11879,9 +11879,9 @@ var require_file_type_config = __commonJS({
   }
 });
 
-// node_modules/docxtemplater/js/docxtemplater.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/docxtemplater.js
 var require_docxtemplater = __commonJS({
-  "node_modules/docxtemplater/js/docxtemplater.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/docxtemplater/js/docxtemplater.js"(exports, module) {
     "use strict";
     var _excluded = ["modules"];
     function ownKeys(e, r) {
@@ -12779,9 +12779,9 @@ var require_docxtemplater = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/base64.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/base64.js
 var require_base64 = __commonJS({
-  "node_modules/pizzip/js/base64.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/base64.js"(exports) {
     "use strict";
     var _keyStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
     exports.encode = function(input) {
@@ -12832,9 +12832,9 @@ var require_base64 = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/support.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/support.js
 var require_support = __commonJS({
-  "node_modules/pizzip/js/support.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/support.js"(exports) {
     "use strict";
     exports.base64 = true;
     exports.array = true;
@@ -12867,9 +12867,9 @@ var require_support = __commonJS({
   }
 });
 
-// node_modules/pizzip/node_modules/pako/dist/pako.es5.min.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/node_modules/pako/dist/pako.es5.min.js
 var require_pako_es5_min = __commonJS({
-  "node_modules/pizzip/node_modules/pako/dist/pako.es5.min.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/node_modules/pako/dist/pako.es5.min.js"(exports, module) {
     !function(t, e) {
       "object" == typeof exports && "undefined" != typeof module ? e(exports) : "function" == typeof define && define.amd ? define(["exports"], e) : e((t = "undefined" != typeof globalThis ? globalThis : t || self).pako = {});
     }(exports, function(t) {
@@ -13963,9 +13963,9 @@ var require_pako_es5_min = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/flate.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/flate.js
 var require_flate = __commonJS({
-  "node_modules/pizzip/js/flate.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/flate.js"(exports) {
     "use strict";
     var USE_TYPEDARRAY = typeof Uint8Array !== "undefined" && typeof Uint16Array !== "undefined" && typeof Uint32Array !== "undefined";
     var pako = require_pako_es5_min();
@@ -13984,9 +13984,9 @@ var require_flate = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/compressions.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/compressions.js
 var require_compressions = __commonJS({
-  "node_modules/pizzip/js/compressions.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/compressions.js"(exports) {
     "use strict";
     exports.STORE = {
       magic: "\0\0",
@@ -14003,9 +14003,9 @@ var require_compressions = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/nodeBuffer.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/nodeBuffer.js
 var require_nodeBuffer = __commonJS({
-  "node_modules/pizzip/js/nodeBuffer.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/nodeBuffer.js"(exports, module) {
     "use strict";
     module.exports = function(data, encoding) {
       if (typeof data === "number") {
@@ -14019,9 +14019,9 @@ var require_nodeBuffer = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/utils.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/utils.js
 var require_utils2 = __commonJS({
-  "node_modules/pizzip/js/utils.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/utils.js"(exports) {
     "use strict";
     function _typeof(o) {
       "@babel/helpers - typeof";
@@ -14272,9 +14272,9 @@ var require_utils2 = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/crc32.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/crc32.js
 var require_crc32 = __commonJS({
-  "node_modules/pizzip/js/crc32.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/crc32.js"(exports, module) {
     "use strict";
     var utils = require_utils2();
     var table = [0, 1996959894, 3993919788, 2567524794, 124634137, 1886057615, 3915621685, 2657392035, 249268274, 2044508324, 3772115230, 2547177864, 162941995, 2125561021, 3887607047, 2428444049, 498536548, 1789927666, 4089016648, 2227061214, 450548861, 1843258603, 4107580753, 2211677639, 325883990, 1684777152, 4251122042, 2321926636, 335633487, 1661365465, 4195302755, 2366115317, 997073096, 1281953886, 3579855332, 2724688242, 1006888145, 1258607687, 3524101629, 2768942443, 901097722, 1119000684, 3686517206, 2898065728, 853044451, 1172266101, 3705015759, 2882616665, 651767980, 1373503546, 3369554304, 3218104598, 565507253, 1454621731, 3485111705, 3099436303, 671266974, 1594198024, 3322730930, 2970347812, 795835527, 1483230225, 3244367275, 3060149565, 1994146192, 31158534, 2563907772, 4023717930, 1907459465, 112637215, 2680153253, 3904427059, 2013776290, 251722036, 2517215374, 3775830040, 2137656763, 141376813, 2439277719, 3865271297, 1802195444, 476864866, 2238001368, 4066508878, 1812370925, 453092731, 2181625025, 4111451223, 1706088902, 314042704, 2344532202, 4240017532, 1658658271, 366619977, 2362670323, 4224994405, 1303535960, 984961486, 2747007092, 3569037538, 1256170817, 1037604311, 2765210733, 3554079995, 1131014506, 879679996, 2909243462, 3663771856, 1141124467, 855842277, 2852801631, 3708648649, 1342533948, 654459306, 3188396048, 3373015174, 1466479909, 544179635, 3110523913, 3462522015, 1591671054, 702138776, 2966460450, 3352799412, 1504918807, 783551873, 3082640443, 3233442989, 3988292384, 2596254646, 62317068, 1957810842, 3939845945, 2647816111, 81470997, 1943803523, 3814918930, 2489596804, 225274430, 2053790376, 3826175755, 2466906013, 167816743, 2097651377, 4027552580, 2265490386, 503444072, 1762050814, 4150417245, 2154129355, 426522225, 1852507879, 4275313526, 2312317920, 282753626, 1742555852, 4189708143, 2394877945, 397917763, 1622183637, 3604390888, 2714866558, 953729732, 1340076626, 3518719985, 2797360999, 1068828381, 1219638859, 3624741850, 2936675148, 906185462, 1090812512, 3747672003, 2825379669, 829329135, 1181335161, 3412177804, 3160834842, 628085408, 1382605366, 3423369109, 3138078467, 570562233, 1426400815, 3317316542, 2998733608, 733239954, 1555261956, 3268935591, 3050360625, 752459403, 1541320221, 2607071920, 3965973030, 1969922972, 40735498, 2617837225, 3943577151, 1913087877, 83908371, 2512341634, 3803740692, 2075208622, 213261112, 2463272603, 3855990285, 2094854071, 198958881, 2262029012, 4057260610, 1759359992, 534414190, 2176718541, 4139329115, 1873836001, 414664567, 2282248934, 4279200368, 1711684554, 285281116, 2405801727, 4167216745, 1634467795, 376229701, 2685067896, 3608007406, 1308918612, 956543938, 2808555105, 3495958263, 1231636301, 1047427035, 2932959818, 3654703836, 1088359270, 936918e3, 2847714899, 3736837829, 1202900863, 817233897, 3183342108, 3401237130, 1404277552, 615818150, 3134207493, 3453421203, 1423857449, 601450431, 3009837614, 3294710456, 1567103746, 711928724, 3020668471, 3272380065, 1510334235, 755167117];
@@ -14301,9 +14301,9 @@ var require_crc32 = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/signature.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/signature.js
 var require_signature = __commonJS({
-  "node_modules/pizzip/js/signature.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/signature.js"(exports) {
     "use strict";
     exports.LOCAL_FILE_HEADER = "PK";
     exports.CENTRAL_FILE_HEADER = "PK";
@@ -14314,9 +14314,9 @@ var require_signature = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/defaults.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/defaults.js
 var require_defaults = __commonJS({
-  "node_modules/pizzip/js/defaults.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/defaults.js"(exports) {
     "use strict";
     exports.base64 = false;
     exports.binary = false;
@@ -14331,9 +14331,9 @@ var require_defaults = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/compressedObject.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/compressedObject.js
 var require_compressedObject = __commonJS({
-  "node_modules/pizzip/js/compressedObject.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/compressedObject.js"(exports, module) {
     "use strict";
     function CompressedObject() {
       this.compressedSize = 0;
@@ -14364,9 +14364,9 @@ var require_compressedObject = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/utf8.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/utf8.js
 var require_utf8 = __commonJS({
-  "node_modules/pizzip/js/utf8.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/utf8.js"(exports) {
     "use strict";
     var utils = require_utils2();
     var support = require_support();
@@ -14510,9 +14510,9 @@ var require_utf8 = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/stringWriter.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/stringWriter.js
 var require_stringWriter = __commonJS({
-  "node_modules/pizzip/js/stringWriter.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/stringWriter.js"(exports, module) {
     "use strict";
     var utils = require_utils2();
     function StringWriter() {
@@ -14539,9 +14539,9 @@ var require_stringWriter = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/uint8ArrayWriter.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/uint8ArrayWriter.js
 var require_uint8ArrayWriter = __commonJS({
-  "node_modules/pizzip/js/uint8ArrayWriter.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/uint8ArrayWriter.js"(exports, module) {
     "use strict";
     var utils = require_utils2();
     function Uint8ArrayWriter(length) {
@@ -14572,9 +14572,9 @@ var require_uint8ArrayWriter = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/object.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/object.js
 var require_object = __commonJS({
-  "node_modules/pizzip/js/object.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/object.js"(exports, module) {
     "use strict";
     function _createForOfIteratorHelper(r, e) {
       var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"];
@@ -15174,9 +15174,9 @@ var require_object = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/dataReader.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/dataReader.js
 var require_dataReader = __commonJS({
-  "node_modules/pizzip/js/dataReader.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/dataReader.js"(exports, module) {
     "use strict";
     var utils = require_utils2();
     function DataReader() {
@@ -15289,9 +15289,9 @@ var require_dataReader = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/stringReader.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/stringReader.js
 var require_stringReader = __commonJS({
-  "node_modules/pizzip/js/stringReader.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/stringReader.js"(exports, module) {
     "use strict";
     var DataReader = require_dataReader();
     var utils = require_utils2();
@@ -15321,9 +15321,9 @@ var require_stringReader = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/arrayReader.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/arrayReader.js
 var require_arrayReader = __commonJS({
-  "node_modules/pizzip/js/arrayReader.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/arrayReader.js"(exports, module) {
     "use strict";
     var DataReader = require_dataReader();
     function ArrayReader(data) {
@@ -15363,9 +15363,9 @@ var require_arrayReader = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/uint8ArrayReader.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/uint8ArrayReader.js
 var require_uint8ArrayReader = __commonJS({
-  "node_modules/pizzip/js/uint8ArrayReader.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/uint8ArrayReader.js"(exports, module) {
     "use strict";
     var ArrayReader = require_arrayReader();
     function Uint8ArrayReader(data) {
@@ -15390,9 +15390,9 @@ var require_uint8ArrayReader = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/nodeBufferReader.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/nodeBufferReader.js
 var require_nodeBufferReader = __commonJS({
-  "node_modules/pizzip/js/nodeBufferReader.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/nodeBufferReader.js"(exports, module) {
     "use strict";
     var Uint8ArrayReader = require_uint8ArrayReader();
     function NodeBufferReader(data) {
@@ -15412,9 +15412,9 @@ var require_nodeBufferReader = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/zipEntry.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/zipEntry.js
 var require_zipEntry = __commonJS({
-  "node_modules/pizzip/js/zipEntry.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/zipEntry.js"(exports, module) {
     "use strict";
     var StringReader = require_stringReader();
     var utils = require_utils2();
@@ -15660,9 +15660,9 @@ var require_zipEntry = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/zipEntries.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/zipEntries.js
 var require_zipEntries = __commonJS({
-  "node_modules/pizzip/js/zipEntries.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/zipEntries.js"(exports, module) {
     "use strict";
     var StringReader = require_stringReader();
     var NodeBufferReader = require_nodeBufferReader();
@@ -15878,9 +15878,9 @@ var require_zipEntries = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/load.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/load.js
 var require_load = __commonJS({
-  "node_modules/pizzip/js/load.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/load.js"(exports, module) {
     "use strict";
     var base64 = require_base64();
     var utf8 = require_utf8();
@@ -15921,9 +15921,9 @@ var require_load = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/deprecatedPublicUtils.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/deprecatedPublicUtils.js
 var require_deprecatedPublicUtils = __commonJS({
-  "node_modules/pizzip/js/deprecatedPublicUtils.js"(exports) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/deprecatedPublicUtils.js"(exports) {
     "use strict";
     var utils = require_utils2();
     exports.string2binary = function(str) {
@@ -15965,9 +15965,9 @@ var require_deprecatedPublicUtils = __commonJS({
   }
 });
 
-// node_modules/pizzip/js/index.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/index.js
 var require_js = __commonJS({
-  "node_modules/pizzip/js/index.js"(exports, module) {
+  "../../../../../../../Users/jeffrey/JobHelp/node_modules/pizzip/js/index.js"(exports, module) {
     "use strict";
     var base64 = require_base64();
     function PizZip2(data, options) {
@@ -16325,7 +16325,7 @@ function renderCostEstimator(cost) {
   return card;
 }
 
-// node_modules/@marijn/find-cluster-break/src/index.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@marijn/find-cluster-break/src/index.js
 var rangeFrom = [];
 var rangeTo = [];
 (() => {
@@ -16399,7 +16399,7 @@ function codePointSize(code) {
   return code < 65536 ? 1 : 2;
 }
 
-// node_modules/@codemirror/state/dist/index.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@codemirror/state/dist/index.js
 var Text = class _Text {
   /**
   Get the line description around the given position.
@@ -19697,7 +19697,7 @@ function findColumn(string, col, tabSize, strict) {
   return strict === true ? -1 : string.length;
 }
 
-// node_modules/style-mod/src/style-mod.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/style-mod/src/style-mod.js
 var C = "\u037C";
 var COUNT = typeof Symbol == "undefined" ? "__" + C : Symbol.for(C);
 var SET = typeof Symbol == "undefined" ? "__styleSet" + Math.floor(Math.random() * 1e8) : Symbol("styleSet");
@@ -19828,7 +19828,7 @@ var StyleSet = class {
   }
 };
 
-// node_modules/w3c-keyname/index.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/w3c-keyname/index.js
 var base = {
   8: "Backspace",
   9: "Tab",
@@ -19923,7 +19923,7 @@ var i;
 for (code in base) if (!shift.hasOwnProperty(code)) shift[code] = base[code];
 var code;
 
-// node_modules/@codemirror/view/dist/index.js
+// ../../../../../../../Users/jeffrey/JobHelp/node_modules/@codemirror/view/dist/index.js
 var nav = typeof navigator != "undefined" ? navigator : { userAgent: "", vendor: "", platform: "" };
 var doc = typeof document != "undefined" ? document : { documentElement: { style: {} } };
 var ie_edge = /* @__PURE__ */ /Edge\/(\d+)/.exec(nav.userAgent);
@@ -28842,7 +28842,9 @@ var STORAGE_DEFAULTS = {
   onboardingState: "noConfig",
   lastJobInsights: null,
   lastDigest: null,
-  v2Toggles: null
+  v2Toggles: null,
+  autofillProfile: null,
+  autofillResumeDump: null
 };
 var LEGACY_SETTINGS_KEYS = [
   "anthropicApiKey",
@@ -30751,7 +30753,162 @@ function buildJobsHeader(state) {
   const reExtractLink = el2("button", "btn btn-ghost jobs__reextract", "Re-extract profile");
   reExtractLink.type = "button";
   header.appendChild(reExtractLink);
-  return { header, refreshBtn, reExtractLink, statusEl };
+  const importBtn = el2("button", "btn btn-ghost jobs__import", "Import digest file");
+  importBtn.type = "button";
+  header.appendChild(importBtn);
+  const importFileInput = document.createElement("input");
+  importFileInput.type = "file";
+  importFileInput.accept = "application/json,.json";
+  importFileInput.hidden = true;
+  header.appendChild(importFileInput);
+  return { header, refreshBtn, reExtractLink, importBtn, importFileInput, statusEl };
+}
+
+// extension-app/extension/src/lib/digestImport.ts
+var DigestImportError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "DigestImportError";
+  }
+};
+function isRecord(v) {
+  return typeof v === "object" && v !== null;
+}
+function reqString(o, k, where) {
+  const v = o[k];
+  if (typeof v !== "string") throw new DigestImportError(`${where}.${k} must be a string`);
+  return v;
+}
+function reqNumber(o, k, where) {
+  const v = o[k];
+  if (typeof v !== "number") throw new DigestImportError(`${where}.${k} must be a number`);
+  return v;
+}
+function parseMcpDigest(text) {
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new DigestImportError("file is not valid JSON");
+  }
+  if (!isRecord(raw)) throw new DigestImportError("digest root must be an object");
+  const date = reqString(raw, "date", "digest");
+  const generatedAt = typeof raw["generatedAt"] === "string" ? raw["generatedAt"] : "";
+  if (!Array.isArray(raw["jobs"])) throw new DigestImportError("digest.jobs must be an array");
+  const jobs = raw["jobs"].map((j, i) => {
+    if (!isRecord(j)) throw new DigestImportError(`digest.jobs[${i}] must be an object`);
+    if (!isRecord(j["job"])) throw new DigestImportError(`digest.jobs[${i}].job must be an object`);
+    const job = j["job"];
+    const where = `digest.jobs[${i}].job`;
+    const bd = isRecord(j["breakdown"]) ? j["breakdown"] : {};
+    return {
+      job: {
+        id: reqString(job, "id", where),
+        source: reqString(job, "source", where),
+        url: reqString(job, "url", where),
+        title: reqString(job, "title", where),
+        company: reqString(job, "company", where),
+        location: typeof job["location"] === "string" ? job["location"] : "",
+        remote: typeof job["remote"] === "string" ? job["remote"] : "unknown",
+        description: typeof job["description"] === "string" ? job["description"] : "",
+        salaryMin: typeof job["salaryMin"] === "number" ? job["salaryMin"] : void 0,
+        salaryMax: typeof job["salaryMax"] === "number" ? job["salaryMax"] : void 0,
+        salaryCurrency: typeof job["salaryCurrency"] === "string" ? job["salaryCurrency"] : void 0,
+        postedAt: typeof job["postedAt"] === "string" ? job["postedAt"] : void 0
+      },
+      rank: reqNumber(j, "rank", `digest.jobs[${i}]`),
+      score: reqNumber(j, "score", `digest.jobs[${i}]`),
+      breakdown: {
+        keywordOverlap: typeof bd["keywordOverlap"] === "number" ? bd["keywordOverlap"] : 0,
+        recencyBoost: typeof bd["recencyBoost"] === "number" ? bd["recencyBoost"] : 1,
+        bm25f: typeof bd["bm25f"] === "number" ? bd["bm25f"] : 0,
+        llmFitScore: typeof bd["llmFitScore"] === "number" ? bd["llmFitScore"] : void 0
+      }
+    };
+  });
+  return { date, generatedAt, jobs };
+}
+var KNOWN_SOURCES = /* @__PURE__ */ new Set([
+  "adzuna",
+  "jsearch",
+  "greenhouse",
+  "lever",
+  "usajobs",
+  "email_alert",
+  "manual"
+]);
+function toSource(s) {
+  return KNOWN_SOURCES.has(s) ? s : "manual";
+}
+function toRemote(r) {
+  if (r === "remote") return true;
+  if (r === "hybrid" || r === "onsite") return false;
+  return null;
+}
+function toMs(iso) {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? null : ms;
+}
+function zeroCost() {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    totalUsd: 0
+  };
+}
+function mcpDigestToResult(digest) {
+  const discoveredAt = toMs(digest.generatedAt) ?? Date.now();
+  const jobs = digest.jobs.map((rj) => ({
+    id: rj.job.id,
+    source: toSource(rj.job.source),
+    company: rj.job.company,
+    title: rj.job.title,
+    location: rj.job.location || null,
+    remote: toRemote(rj.job.remote),
+    url: rj.job.url,
+    descriptionText: rj.job.description,
+    postedAt: toMs(rj.job.postedAt),
+    discoveredAt,
+    salaryMin: rj.job.salaryMin ?? null,
+    salaryMax: rj.job.salaryMax ?? null,
+    salaryCurrency: rj.job.salaryCurrency ?? null,
+    keywordScore: rj.breakdown.keywordOverlap,
+    fitScore: rj.breakdown.llmFitScore ?? null,
+    recencyBoost: rj.breakdown.recencyBoost,
+    finalScore: rj.score,
+    matchedSkills: [],
+    missingSkills: []
+  }));
+  return {
+    discoveredCount: jobs.length,
+    rankedCount: jobs.length,
+    jobs,
+    sheetUrl: "",
+    cost: zeroCost()
+  };
+}
+function importDigestText(text) {
+  return mcpDigestToResult(parseMcpDigest(text));
+}
+
+// extension-app/extension/src/lib/digestCache.ts
+async function saveDigest(result) {
+  try {
+    await set("lastDigest", { result, savedAt: Date.now() });
+  } catch (error) {
+    log("warn", "digest cache write failed", { error });
+  }
+}
+async function loadDigest() {
+  try {
+    return await get("lastDigest");
+  } catch (error) {
+    log("warn", "digest cache read failed", { error });
+    return null;
+  }
 }
 
 // extension-app/extension/src/sidepanel/tabs/jobs.ts
@@ -30759,7 +30916,7 @@ function renderJobsTab(hooks = {}) {
   const root = el2("section", "tab-pane tab-pane--jobs");
   let profile = null;
   const state = createControlsState();
-  const { header, refreshBtn, reExtractLink, statusEl } = buildJobsHeader(state);
+  const { header, refreshBtn, reExtractLink, importBtn, importFileInput, statusEl } = buildJobsHeader(state);
   root.appendChild(header);
   const listEl = el2("ul", "jobs__list");
   root.appendChild(listEl);
@@ -30839,8 +30996,35 @@ function renderJobsTab(hooks = {}) {
       setBusy(false);
     }
   }
+  async function importDigestFile(file) {
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      showError("Could not read the selected file.");
+      return;
+    }
+    try {
+      const result = importDigestText(text);
+      renderJobList(result, void 0, view);
+      void saveDigest(result);
+      showInfo(`Imported ${result.jobs.length} jobs.`);
+    } catch (e) {
+      if (e instanceof DigestImportError) {
+        showError(`Not a valid digest file: ${e.message}`);
+        return;
+      }
+      throw e;
+    }
+  }
   refreshBtn.addEventListener("click", () => void runDigest());
   reExtractLink.addEventListener("click", () => void reExtractProfile());
+  importBtn.addEventListener("click", () => importFileInput.click());
+  importFileInput.addEventListener("change", () => {
+    const file = importFileInput.files?.[0];
+    importFileInput.value = "";
+    if (file) void importDigestFile(file);
+  });
   if (hooks.initialResult) {
     renderJobList(hooks.initialResult.result, hooks.initialResult.savedAt, view);
   }
@@ -32070,23 +32254,6 @@ function parseResumeMarkdown2(md) {
     lookup("education", "academic background")
   );
   return { name, contact, skills, experiences, projects, education };
-}
-
-// extension-app/extension/src/lib/digestCache.ts
-async function saveDigest(result) {
-  try {
-    await set("lastDigest", { result, savedAt: Date.now() });
-  } catch (error) {
-    log("warn", "digest cache write failed", { error });
-  }
-}
-async function loadDigest() {
-  try {
-    return await get("lastDigest");
-  } catch (error) {
-    log("warn", "digest cache read failed", { error });
-    return null;
-  }
 }
 
 // extension-app/extension/src/sidepanel/index.ts

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+public/
+.claude/
+.git/
+*.md
+*.d.ts
+*.json
+*.lock
+coverage/
+build/

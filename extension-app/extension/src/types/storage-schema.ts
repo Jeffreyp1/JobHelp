@@ -17,6 +17,7 @@
 
 import type { ToggleConfig, DiscoverAndRankResult } from "./api-contract.js";
 import type { JobInsights } from "./job-insights.js";
+import type { ApplicationProfile } from "../lib/greenhouse/autofill.js";
 
 export type OnboardingState = "noConfig" | "needsApiKey" | "needsFolders" | "seeding" | "ready";
 
@@ -98,6 +99,12 @@ export interface StorageSchema {
 
   /** Last-used v2 toggle state (per-feature enable + model + count). */
   v2Toggles: V2TogglesState | null;
+
+  /** Standing answers the Greenhouse autofill content script fills forms from. */
+  autofillProfile: ApplicationProfile | null;
+
+  /** Free-text resume dump used to ground the autofill panel's AI-drafted answers. */
+  autofillResumeDump: string | null;
 }
 
 export const STORAGE_DEFAULTS: StorageSchema = {
@@ -116,6 +123,8 @@ export const STORAGE_DEFAULTS: StorageSchema = {
   lastJobInsights: null,
   lastDigest: null,
   v2Toggles: null,
+  autofillProfile: null,
+  autofillResumeDump: null,
 };
 
 /** Type-safe storage keys (use as parameters to chrome.storage.local.get) */
