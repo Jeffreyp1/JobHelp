@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Greenhouse (modern) — Delta</title></head>
+<body>
+  <h1>Apply for Engineer at Delta</h1>
+  <form id="application_form">
+    <div>
+      <label for="first_name">First Name *</label>
+      <input id="first_name" type="text" required>
+    </div>
+
+    <div class="field">
+      <label for="country">Country *</label>
+      <div class="select__control" data-for="country">
+        <div class="select__value-container">
+          <div class="select__placeholder">Select...</div>
+          <input id="country" role="combobox" type="text" autocomplete="off">
+        </div>
+      </div>
+      <div class="select__menu" data-options="United States|Canada|Mexico" hidden></div>
+    </div>
+
+    <h3>Education</h3>
+    <div id="education">
+      <div class="edu-row">
+        <label for="school--0">School *</label>
+        <div class="select__control" data-for="school--0">
+          <div class="select__value-container">
+            <div class="select__placeholder">Select...</div>
+            <input id="school--0" role="combobox" type="text" autocomplete="off">
+          </div>
+        </div>
+        <div class="select__menu" data-options="Stanford University|Massachusetts Institute of Technology|Harvard University|University of California, Berkeley|Yale University|Princeton University" hidden></div>
+        <label for="start-year--0">Start date year *</label>
+        <input id="start-year--0" type="number" required>
+      </div>
+    </div>
+    <a id="add-edu" href="#">Add another</a>
+
+    <div>
+      <label for="resume">Attach</label>
+      <input id="resume" type="file">
+    </div>
+    <div>
+      <label for="cover_letter">Attach</label>
+      <input id="cover_letter" type="file">
+    </div>
+
+    <button id="submit_app" type="submit">Submit Application</button>
+  </form>
+
+  <script>
+    const SCHOOLS = 'Stanford University|Massachusetts Institute of Technology|Harvard University|University of California, Berkeley|Yale University|Princeton University';
+
+    function wire(control) {
+      const input = control.querySelector('input');
+      const menu = control.parentElement.querySelector('.select__menu');
+      const all = (menu.getAttribute('data-options') || '').split('|');
+      function render(filter) {
+        menu.innerHTML = '';
+        const matched = all.filter((o) => o.toLowerCase().includes(filter.toLowerCase()));
+        if (matched.length === 0) {
+          const notice = document.createElement('div');
+          notice.className = 'select__menu-notice select__menu-notice--no-options';
+          notice.textContent = 'No options';
+          menu.appendChild(notice);
+          menu.hidden = false;
+          return;
+        }
+        matched.forEach((o) => {
+          const div = document.createElement('div');
+          div.className = 'select__option';
+          div.textContent = o;
+          div.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const ph = control.querySelector('.select__placeholder');
+            if (ph) ph.remove();
+            let sv = control.querySelector('.select__single-value');
+            if (!sv) {
+              sv = document.createElement('div');
+              sv.className = 'select__single-value';
+              control.querySelector('.select__value-container').prepend(sv);
+            }
+            sv.textContent = o;
+            input.value = '';
+            menu.hidden = true;
+          });
+          menu.appendChild(div);
+        });
+        menu.hidden = false;
+      }
+      input.addEventListener('input', () => render(input.value));
+      input.addEventListener('focus', () => render(input.value));
+    }
+
+    document.querySelectorAll('.select__control').forEach(wire);
+
+    document.getElementById('add-edu').addEventListener('click', (e) => {
+      e.preventDefault();
+      const n = document.querySelectorAll('[id^="school--"]').length;
+      const row = document.createElement('div');
+      row.className = 'edu-row';
+      row.innerHTML =
+        '<label for="school--' + n + '">School *</label>' +
+        '<div class="select__control" data-for="school--' + n + '">' +
+        '<div class="select__value-container"><div class="select__placeholder">Select...</div>' +
+        '<input id="school--' + n + '" role="combobox" type="text" autocomplete="off"></div></div>' +
+        '<div class="select__menu" data-options="' + SCHOOLS + '" hidden></div>' +
+        '<label for="start-year--' + n + '">Start date year *</label>' +
+        '<input id="start-year--' + n + '" type="number" required>';
+      document.getElementById('education').appendChild(row);
+      wire(row.querySelector('.select__control'));
+    });
+  </script>
+<script>for (const f of document.querySelectorAll("form")) f.addEventListener("submit", (e) => { e.preventDefault(); document.title = "SUBMIT-FIRED"; });</script>
+</body>
+</html>
