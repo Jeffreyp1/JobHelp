@@ -93,6 +93,8 @@ function buildConfig(answers: Record<string, unknown>): Record<string, unknown> 
     ranking: {
       topN: 20,
       digestK: 10,
+      fusion: { enabled: true, k: 60 },
+      semantic: { enabled: true },
     },
     output: {
       dir: answers['output.dir'] ?? '~/jobhelp/digests',

@@ -6,13 +6,17 @@ import type {
   RankingConfig,
   RulesConfig,
   RulesMode,
+  SemanticConfig,
   Seniority,
 } from '../types/config.js';
 import {
+  DEFAULT_SEMANTIC_CANDIDATE_LIMIT,
   validateBM25,
   validateFusion,
+  validateHistory,
   validateMaxAge,
   validateRecency,
+  validateRerank,
   validateSourceTrust,
 } from './config-ranking.js';
 import { expandHome } from './config-path.js';
@@ -50,6 +54,36 @@ function validateProfile(raw: unknown): ProfileConfig {
     salaryFloor: requireNumber(obj['salaryFloor'], 'profile.salaryFloor'),
     seniority,
     roleFamily: requireStringArray(obj['roleFamily'], 'profile.roleFamily'),
+    ...(obj['coreSkills'] !== undefined
+      ? { coreSkills: requireStringArray(obj['coreSkills'], 'profile.coreSkills') }
+      : {}),
+    ...(obj['strictLocation'] !== undefined
+      ? { strictLocation: requireBoolean(obj['strictLocation'], 'profile.strictLocation') }
+      : {}),
+  };
+}
+
+function positiveOr(v: number, fallback: number): number {
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback;
+}
+
+function validateSemantic(raw: unknown): SemanticConfig {
+  if (raw === undefined) return { enabled: false };
+  const obj = requireRecord(raw, 'ranking.semantic');
+  const enabled = requireBoolean(obj['enabled'], 'ranking.semantic.enabled');
+  return {
+    enabled,
+    ...(obj['model'] !== undefined
+      ? { model: requireString(obj['model'], 'ranking.semantic.model') }
+      : {}),
+    ...(obj['candidateLimit'] !== undefined
+      ? {
+          candidateLimit: positiveOr(
+            requireNumber(obj['candidateLimit'], 'ranking.semantic.candidateLimit'),
+            DEFAULT_SEMANTIC_CANDIDATE_LIMIT,
+          ),
+        }
+      : {}),
   };
 }
 
@@ -63,6 +97,9 @@ function validateRanking(raw: unknown): RankingConfig {
       maxAge: validateMaxAge(undefined),
       sourceTrust: validateSourceTrust(undefined),
       fusion: validateFusion(undefined),
+      semantic: validateSemantic(undefined),
+      rerank: validateRerank(undefined),
+      history: validateHistory(undefined),
     };
   }
   const obj = requireRecord(raw, 'ranking');
@@ -74,6 +111,9 @@ function validateRanking(raw: unknown): RankingConfig {
     maxAge: validateMaxAge(obj['maxAge']),
     sourceTrust: validateSourceTrust(obj['sourceTrust']),
     fusion: validateFusion(obj['fusion']),
+    semantic: validateSemantic(obj['semantic']),
+    rerank: validateRerank(obj['rerank']),
+    history: validateHistory(obj['history']),
   };
 }
 

@@ -131,6 +131,10 @@ const RAW_ALIASES: Record<string, readonly string[]> = {
   lambda: ['aws lambda'],
   s3: ['aws s3'],
   ec2: ['aws ec2'],
+
+  // Role-noun equivalence so "ML Developer" / "AI SWE" titles match engineer-phrased
+  // profiles in BM25; audit measured 8-15 rank drops from these swaps.
+  engineer: ['engineers', 'developer', 'developers', 'dev', 'swe', 'sde'],
 };
 
 function toLookupKey(s: string): string {

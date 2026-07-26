@@ -1,5 +1,11 @@
 import type { NormalizedJob } from '../types/index.js';
-import { detectRoleFamily, type RoleFamily } from './classify.js';
+import type { Seniority } from '../types/config.js';
+import {
+  detectRoleFamily,
+  detectSeniorityLevel,
+  type RoleFamily,
+  type SeniorityLevel,
+} from './classify.js';
 import { log } from '../lib/log.js';
 
 export interface RankedListEntry<T> {
@@ -72,6 +78,63 @@ export function buildBm25Rank(
   });
   return {
     items: withScore.map(({ job }, idx) => ({ job, rank: idx + 1 })),
+  };
+}
+
+// Jobs without a similarity sink to the end but still appear (missing -> -Infinity).
+export function buildSemanticRank(
+  jobs: readonly NormalizedJob[],
+  similarityById: ReadonlyMap<string, number>,
+): RankedList<NormalizedJob> {
+  const withSim = jobs.map((job) => ({
+    job,
+    sim: similarityById.get(job.id) ?? Number.NEGATIVE_INFINITY,
+  }));
+  withSim.sort((a, b) => {
+    if (b.sim !== a.sim) return b.sim - a.sim;
+    return a.job.id.localeCompare(b.job.id);
+  });
+  return {
+    items: withSim.map(({ job }, idx) => ({ job, rank: idx + 1 })),
+  };
+}
+
+const SENIORITY_ORDER: Readonly<Record<SeniorityLevel, number>> = {
+  intern: 0,
+  entry: 1,
+  mid: 2,
+  senior: 3,
+  staff: 4,
+};
+
+// Level-fit tiers: 2 = entry-friendly (detected level at or below the candidate's — a "New Grad"
+// or "0-2 years" posting), 1 = no signal, 0 = above level. A bounded promotion signal: as one RRF
+// list among several it nudges ties toward level-appropriate roles without letting a level match
+// outrank a better-fitting job (which a score multiplier measurably did). The below-level promotion
+// is scoped to candidates above entry: for an entry candidate "below" is only intern, and a
+// graduated entry hire gains nothing from internship postings ranking best — promoting them there
+// merely lets off-domain roles that list an internship keyword outrank on-domain no-signal roles.
+export function buildLevelFitRank(
+  jobs: readonly NormalizedJob[],
+  candidateLevel: Seniority,
+): RankedList<NormalizedJob> {
+  const candidate = SENIORITY_ORDER[candidateLevel];
+  const promotesBelow = candidate !== undefined && candidate > SENIORITY_ORDER.entry;
+  const tiered = jobs.map((job) => {
+    const detected = detectSeniorityLevel(job.title, job.description);
+    let tier: number;
+    if (detected === undefined || candidate === undefined) tier = 1;
+    else if (SENIORITY_ORDER[detected] > candidate) tier = 0;
+    else if (SENIORITY_ORDER[detected] === candidate) tier = 2;
+    else tier = promotesBelow ? 2 : 1;
+    return { job, tier };
+  });
+  tiered.sort((a, b) => {
+    if (b.tier !== a.tier) return b.tier - a.tier;
+    return a.job.id.localeCompare(b.job.id);
+  });
+  return {
+    items: tiered.map(({ job }, idx) => ({ job, rank: idx + 1 })),
   };
 }
 

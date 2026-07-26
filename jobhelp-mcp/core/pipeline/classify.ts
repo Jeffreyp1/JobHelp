@@ -1,3 +1,5 @@
+import { extractMinYears, SENIOR_MIN_YEARS } from './experience.js';
+
 export type RoleFamily =
   | 'backend'
   | 'frontend'
@@ -57,7 +59,7 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
     family: 'support',
   },
   {
-    pattern: /data scientist|machine learning|ml engineer|applied scientist|nlp/i,
+    pattern: /data scientist|machine learning|\bml\s+(?:engineer|developer|dev|swe|sde)\b|applied scientist|nlp|\bai\s+(?:engineer|developer|swe|sde)\b|\bapplied ai\b|\bgenai\b|\bgenerative ai\b|\bllm\b/i,
     family: 'ml',
   },
   { pattern: /data engineer|analytics engineer|data analyst/i, family: 'data' },
@@ -67,12 +69,15 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
     family: 'security',
   },
   { pattern: /site reliability|\bsre\b|production engineer/i, family: 'sre' },
-  { pattern: /devops|platform engineer|infrastructure engineer/i, family: 'devops' },
   {
-    pattern: /android engineer|ios engineer|mobile engineer|react native engineer/i,
+    pattern: /devops|\bplatform\s+(?:engineer|developer)\b|\binfrastructure\s+(?:engineer|developer)\b/i,
+    family: 'devops',
+  },
+  {
+    pattern: /\b(?:android|ios|mobile|react native)\s+(?:engineer|developer)\b/i,
     family: 'mobile',
   },
-  { pattern: /frontend engineer|front-end|ui engineer/i, family: 'frontend' },
+  { pattern: /\bfrontend\s+(?:engineer|developer)\b|front-end|\bui\s+(?:engineer|developer)\b/i, family: 'frontend' },
   // Must precede 'backend' so "Solutions Engineer" / "Services Architect" / "Network Solution Lead"
   // don't fall into backend's systems-engineer match. The (solutions?|services) alternation keeps the
   // immediate (architect|engineer|lead) constraint so "Customer Service Representative" never matches.
@@ -81,10 +86,15 @@ const ROLE_FAMILY_RULES: readonly RoleFamilyRule[] = [
     family: 'solutions-architect',
   },
   {
-    pattern: /backend engineer|back-end|api engineer|systems engineer|,\s*backend\b/i,
+    pattern: /\bbackend\s+(?:engineer|developer|dev|swe|sde)\b|back-end|\bapi\s+(?:engineer|developer)\b|\bsystems?\s+(?:engineer|developer)\b|,\s*backend\b/i,
     family: 'backend',
   },
-  { pattern: /full ?stack|full-stack|software engineer$/i, family: 'fullstack' },
+  // "in Test" excluded so QA roles stay unclassified rather than claiming fullstack.
+  // Bare SWE/SDE count: in job titles those abbreviations mean software engineer.
+  {
+    pattern: /full ?stack|full-stack|\bsoftware\s+(?:engineer|developer)\b(?!\s+in\s+test)|\b(?:swe|sde)\b/i,
+    family: 'fullstack',
+  },
   { pattern: /designer|design engineer|ux engineer/i, family: 'designer' },
 ];
 
@@ -110,10 +120,18 @@ function stripHtml(s: string): string {
   return s.replace(HTML_TAG_RE, ' ').replace(WHITESPACE_RUN_RE, ' ').trim();
 }
 
+// Feeds whose real postings are one-liners by design; the length heuristic would convict all of them.
+const SHORT_DESCRIPTION_FEED_SOURCES = new Set(['yc']);
+
 // Detects template/placeholder postings via title pattern OR description too short after HTML strip.
 // TODO_FUTURE: duplicate-posting detection (same title+company within 7 days) requires digest history; defer.
-export function isGhostJob(job: { readonly title: string; readonly description: string }): boolean {
+export function isGhostJob(job: {
+  readonly title: string;
+  readonly description: string;
+  readonly source?: string;
+}): boolean {
   if (GHOST_TITLE_RE.test(job.title)) return true;
+  if (job.source !== undefined && SHORT_DESCRIPTION_FEED_SOURCES.has(job.source)) return false;
   const cleaned = stripHtml(job.description);
   return cleaned.length < DESCRIPTION_MIN_CHARS;
 }
@@ -123,8 +141,10 @@ interface SeniorityRule {
   readonly level: SeniorityLevel;
 }
 
+// "New grad" marks a full-time entry-level role, not an internship — classifying it as
+// intern makes the intern-mismatch filter silently drop the best-fit postings for entry profiles.
 const SENIORITY_TITLE_RULES: readonly SeniorityRule[] = [
-  { pattern: /\b(intern|internship|new ?grad)\b/i, level: 'intern' },
+  { pattern: /\b(intern|internship)\b/i, level: 'intern' },
   { pattern: /\b(staff|principal|distinguished)\b/i, level: 'staff' },
   { pattern: /\b(senior|sr\.|lead engineer|forward[\s-]+deployed|head of)\b/i, level: 'senior' },
   {
@@ -132,23 +152,34 @@ const SENIORITY_TITLE_RULES: readonly SeniorityRule[] = [
     level: 'mid',
   },
   {
-    pattern: /\b(junior|jr\.|entry[- ]level|associate engineer|graduate engineer)\b/i,
+    pattern: /\b(junior|jr\.|entry[- ]level|associate engineer|graduate engineer|new[\s-]?grad(?:uate)?s?)\b/i,
     level: 'entry',
   },
 ];
 
-const ROLE_NOUN = '(?:engineer|developer|swe|sde)';
-const SENIORITY_DESC_RULES: readonly SeniorityRule[] = [
-  { pattern: /\b(intern|internship|new ?grad)\b/i, level: 'intern' },
-  { pattern: new RegExp(`\\b(staff|principal|distinguished)\\s+${ROLE_NOUN}\\b`, 'i'), level: 'staff' },
-  // 5+ years (or higher) of experience/industry/professional is a strong senior signal; sub-5
-  // year counts (2+, 3+, 4+) are ambiguous between entry and mid so they stay signal-less.
+const ROLE_NOUN = '(?:engineer|developer|dev|swe|sde)';
+// Up to two modifier words between level and role noun ("Senior Full-Stack Engineer",
+// "Staff Machine Learning Engineer"); and/or/to excluded so prose like
+// "senior and junior engineers" cannot bridge the gap.
+const LEVEL_MOD = '(?:(?!and\\b|or\\b|to\\b)[\\w/&+.-]+\\s+){0,2}';
+// Intern and staff keyword signals take precedence over the years-of-experience count (a
+// "Staff Engineer, 10+ years" body is staff, not just senior).
+const SENIORITY_DESC_HEAD_RULES: readonly SeniorityRule[] = [
+  { pattern: /\b(intern|internship)\b/i, level: 'intern' },
   {
-    pattern: /\b(?:[5-9]|[12]\d)(?:[\s-]+\d+)?\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:experience|exp(?:erience)?|industry|professional|relevant)\b/i,
-    level: 'senior',
+    pattern: new RegExp(`\\b(staff|principal|distinguished)\\s+${LEVEL_MOD}${ROLE_NOUN}\\b`, 'i'),
+    level: 'staff',
   },
+];
+
+// Consulted only after the years-of-experience signal (see detectSeniorityLevel): the
+// years count sits where the old 5+-years regex did, between staff and these keyword rules.
+const SENIORITY_DESC_TAIL_RULES: readonly SeniorityRule[] = [
   {
-    pattern: new RegExp(`\\b(senior|forward[\\s-]+deployed|head of|lead)\\s+${ROLE_NOUN}\\b`, 'i'),
+    pattern: new RegExp(
+      `\\b(senior|forward[\\s-]+deployed|head of|lead)\\s+${LEVEL_MOD}${ROLE_NOUN}\\b`,
+      'i',
+    ),
     level: 'senior',
   },
   {
@@ -156,9 +187,10 @@ const SENIORITY_DESC_RULES: readonly SeniorityRule[] = [
     level: 'mid',
   },
   {
-    pattern: new RegExp(`\\b(junior|jr\\.|graduate|associate)\\s+${ROLE_NOUN}\\b`, 'i'),
+    pattern: new RegExp(`\\b(junior|jr\\.|graduate|associate)\\s+${LEVEL_MOD}${ROLE_NOUN}\\b`, 'i'),
     level: 'entry',
   },
+  { pattern: /\bnew[\s-]?grad(?:uate)?s?\b/i, level: 'entry' },
 ];
 
 // 3000 covers qualifications section where "X+ years required" typically lives.
@@ -171,8 +203,16 @@ function scanRules(text: string, rules: readonly SeniorityRule[]): SeniorityLeve
   return undefined;
 }
 
+// Title-only signal: the filter drops on this, while description-level signals only demote
+// in ranking — a body mention is too weak to justify losing the job entirely.
+export function detectTitleSeniority(title: string): SeniorityLevel | undefined {
+  return scanRules(title, SENIORITY_TITLE_RULES);
+}
+
 // Title first; description fallback uses tighter level+role-noun patterns so generic mentions
-// ("we are hiring senior engineers") don't trip. Returns undefined when neither surface signals.
+// ("we are hiring senior engineers") don't trip. The years-of-experience requirement (>=5 senior,
+// entry-friendly => entry) sits between the intern/staff keywords and the remaining keyword rules,
+// where the old years regex lived. Returns undefined when neither surface signals.
 export function detectSeniorityLevel(
   title: string,
   description: string,
@@ -180,53 +220,15 @@ export function detectSeniorityLevel(
   const fromTitle = scanRules(title, SENIORITY_TITLE_RULES);
   if (fromTitle !== undefined) return fromTitle;
   if (description.length === 0) return undefined;
-  return scanRules(description.slice(0, DESCRIPTION_SCAN_LIMIT), SENIORITY_DESC_RULES);
-}
-
-interface CountryRule {
-  readonly pattern: RegExp;
-  readonly country: string;
-}
-
-// Order matters. More-specific / disambiguating rules go first so that a
-// "Dublin, CA" or "Indianapolis" string lands in US before the broader
-// Ireland / India rules can claim them. Two-letter state codes require a
-// preceding comma (", CA") so they don't false-positive on prose words.
-const COUNTRY_RULES: ReadonlyArray<CountryRule> = [
-  { pattern: /\b(united states|usa|u\.s\.a\.?|us)\b/i, country: 'US' },
-  { pattern: /,\s*(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b/i, country: 'US' },
-  { pattern: /\b(california|new york state|texas|florida|washington state|massachusetts|illinois|pennsylvania|colorado|oregon|georgia|virginia|new jersey)\b/i, country: 'US' },
-  { pattern: /\b(san francisco|sf bay|silicon valley|new york city|nyc|los angeles|chicago|seattle|austin|boston|denver|atlanta|miami|portland|san diego|dallas|houston|phoenix|philadelphia|washington dc|minneapolis|detroit|charlotte|nashville|raleigh|salt lake city|cincinnati|columbus|indianapolis|baltimore|orlando)\b/i, country: 'US' },
-  { pattern: /\bcanada\b|\b(toronto|vancouver|montreal|ottawa|calgary|edmonton|quebec)\b|,\s*(ON|BC|AB|QC|MB|SK|NS|NB|PE|NL|YT|NT|NU)\b/i, country: 'Canada' },
-  { pattern: /\b(united kingdom|u\.k\.?|england|scotland|wales|northern ireland|london|manchester|edinburgh|leeds|liverpool|bristol|glasgow)\b/i, country: 'UK' },
-  { pattern: /\b(ireland|dublin|cork|galway|limerick)\b/i, country: 'Ireland' },
-  { pattern: /\b(germany|berlin|munich|hamburg|frankfurt|cologne|stuttgart)\b/i, country: 'Germany' },
-  { pattern: /\b(france|paris|lyon|marseille|toulouse|nice)\b/i, country: 'France' },
-  { pattern: /\b(spain|madrid|barcelona|valencia|seville|bilbao)\b/i, country: 'Spain' },
-  { pattern: /\b(netherlands|amsterdam|rotterdam|the hague|utrecht|eindhoven)\b/i, country: 'Netherlands' },
-  { pattern: /\b(italy|rome|milan|turin|naples|florence)\b/i, country: 'Italy' },
-  { pattern: /\b(india|bangalore|bengaluru|mumbai|delhi|hyderabad|chennai|pune|kolkata|noida|gurgaon|gurugram)\b/i, country: 'India' },
-  { pattern: /\b(australia|sydney|melbourne|brisbane|perth|adelaide)\b/i, country: 'Australia' },
-  { pattern: /\b(new zealand|auckland|wellington)\b/i, country: 'New Zealand' },
-  { pattern: /\bsingapore\b/i, country: 'Singapore' },
-  { pattern: /\b(japan|tokyo|osaka|kyoto|yokohama)\b/i, country: 'Japan' },
-  { pattern: /\b(china|beijing|shanghai|shenzhen|guangzhou|hong kong)\b/i, country: 'China' },
-  { pattern: /\b(korea|seoul|busan)\b/i, country: 'South Korea' },
-  { pattern: /\b(brazil|brasil|sao paulo|rio de janeiro|brasilia)\b/i, country: 'Brazil' },
-  { pattern: /\b(mexico|cdmx|mexico city|guadalajara|monterrey)\b/i, country: 'Mexico' },
-  { pattern: /\b(argentina|buenos aires|cordoba)\b/i, country: 'Argentina' },
-  { pattern: /\b(europe|emea)\b/i, country: 'EU' },
-  { pattern: /\b(apac|asia[\s-]pacific)\b/i, country: 'APAC' },
-  { pattern: /\b(latam|latin america)\b/i, country: 'LATAM' },
-  { pattern: /\b(aunz|anz)\b/i, country: 'Australia' },
-];
-
-// Returns canonical country label or undefined when no rule matches (bare 'Remote' stays undetected).
-// Region buckets ('EU', 'APAC', 'LATAM') are emitted for broad descriptors like 'Remote - Europe'.
-export function detectCountryFromLocation(location: string): string | undefined {
-  if (typeof location !== 'string' || location.trim().length === 0) return undefined;
-  for (const rule of COUNTRY_RULES) {
-    if (rule.pattern.test(location)) return rule.country;
+  const scanned = description.slice(0, DESCRIPTION_SCAN_LIMIT);
+  const fromHead = scanRules(scanned, SENIORITY_DESC_HEAD_RULES);
+  if (fromHead !== undefined) return fromHead;
+  const minYears = extractMinYears(description);
+  if (minYears !== undefined) {
+    if (minYears >= SENIOR_MIN_YEARS) return 'senior';
+    if (minYears === 0) return 'entry';
   }
-  return undefined;
+  return scanRules(scanned, SENIORITY_DESC_TAIL_RULES);
 }
+
+export { detectCountryFromLocation } from './geo.js';

@@ -16,6 +16,12 @@ export interface ProfileConfig {
   /** Filesystem path to the candidate's resume dump markdown (supports ~ expansion). */
   readonly resumeDumpPath: string;
   readonly skills: readonly string[];
+  /**
+   * Skills the candidate is deepest in or most wants to work in. These get extra
+   * ranking weight: their own keyword-match vote in rank fusion and lead position
+   * in the semantic query. Additive — entries need not repeat in `skills`.
+   */
+  readonly coreSkills?: readonly string[];
   /** Human-readable location, e.g. "Austin, TX". */
   readonly location: string;
   readonly remoteOk: boolean;
@@ -24,6 +30,12 @@ export interface ProfileConfig {
   readonly seniority: Seniority;
   /** Role families the candidate accepts, e.g. ["backend", "fullstack", "ai-engineer"]. */
   readonly roleFamily: readonly string[];
+  /**
+   * With allowedCountries set, also drop jobs whose location names a place the
+   * country detector cannot classify (presumed foreign). Arrangement-only strings
+   * ("Remote", "Hybrid", "Worldwide") are still kept. Off by default.
+   */
+  readonly strictLocation?: boolean;
   /**
    * Canonical country labels (matching {@link detectCountryFromLocation} output,
    * e.g. 'US', 'Canada', 'UK', 'EU'). When empty/undefined, no geo filter is applied.
@@ -162,11 +174,54 @@ export interface RankingConfig {
   readonly sourceTrust?: SourceTrustConfig;
   /** Reciprocal Rank Fusion toggle. Opt-in (default disabled); when enabled, replaces the multiplicative product score. */
   readonly fusion?: FusionConfig;
+  /** Local-embedding semantic signal, fused via RRF. Participates only when fusion.enabled. */
+  readonly semantic?: SemanticConfig;
+  /** Applied-history signal: boost jobs similar to past applications, annotate already-applied ones. Default disabled. */
+  readonly history?: HistoryConfig;
+  /** Cross-encoder reordering of the top-K ranked jobs. Opt-in (default disabled). */
+  readonly rerank?: RerankConfig;
+}
+
+export interface HistoryConfig {
+  readonly enabled: boolean;
+  /** Ceiling for the similarity-to-applied multiplier; values below 1 fall back to the default 1.15. */
+  readonly boostCap?: number;
+}
+
+export interface SemanticConfig {
+  readonly enabled: boolean;
+  readonly model?: string;
+  /** Max jobs (top-N by BM25) that get embedded. Absent means DEFAULT_SEMANTIC_CANDIDATE_LIMIT. */
+  readonly candidateLimit?: number;
+}
+
+export interface RerankConfig {
+  readonly enabled: boolean;
+  /** Cross-encoder model id. Absent means the rerank stage's default. */
+  readonly model?: string;
+  /** How many already-ranked jobs get reordered by the cross-encoder. Absent means 50. */
+  readonly topK?: number;
 }
 
 export interface FusionConfig {
   readonly enabled: boolean;
   readonly k: number;
+  /**
+   * How enabled fusion combines the signals.
+   * - `'rrf'` (default): reciprocal-rank fusion of BM25 + recency + role-fit + semantic lists.
+   * - `'blend'`: convex score blend of min-max-normalized BM25 and semantic, times an
+   *   optional seniority penalty. Uses score magnitude (not rank), so weak matches sink.
+   */
+  readonly mode?: 'rrf' | 'blend';
+  /** blend-mode weights for the convex combination; renormalized to sum 1. Default { bm25: 0.5, semantic: 0.5 }. */
+  readonly weights?: BlendWeights;
+  /** blend-mode: penalize jobs whose detected level exceeds the profile's target `seniority`. Default true. */
+  readonly seniorityPenalty?: boolean;
+}
+
+export interface BlendWeights {
+  readonly bm25: number;
+  readonly semantic: number;
 }
 
 export interface RecencyConfig {

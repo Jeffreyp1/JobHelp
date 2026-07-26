@@ -7,11 +7,13 @@ import type {
   RecencyConfig,
 } from '../types/index.js';
 import { DEFAULT_MAX_AGE, DEFAULT_RECENCY } from '../lib/config-ranking.js';
+import type { ApplicationEntry, JobVerdictEntry } from '../state/index.js';
 import { log } from '../lib/log.js';
 import { normalize } from './normalize.js';
 import { dedupe } from './dedupe.js';
 import { filter } from './filter.js';
-import { rank, buildRankPrecomputed } from './rank.js';
+import { rank, buildRankPrecomputed, type RankDeps } from './rank.js';
+import { partitionByVerdict } from './verdicts.js';
 
 // Per-call overrides. Each field wins over config for this call only; no disk writes.
 export interface PipelineOverrides {
@@ -21,6 +23,10 @@ export interface PipelineOverrides {
   readonly recencyEnabled?: boolean;
   // Clock injection for deterministic tests. Defaults to `new Date()`.
   readonly now?: Date;
+  // Applied-history entries forwarded to rank(); only consulted when ranking.history is enabled.
+  readonly applications?: readonly ApplicationEntry[];
+  // Client-AI job judgments: 'drop' verdicts suppress before ranking; 'skipped' demote in rank.
+  readonly verdicts?: readonly JobVerdictEntry[];
 }
 
 function applyOverrides(
@@ -61,15 +67,31 @@ export async function runPipeline(
   const t2 = Date.now();
   const filtered = await filter(deduped, effectiveConfig, now);
   const t3 = Date.now();
-  const precomputed = buildRankPrecomputed(filtered, effectiveConfig);
+  const { suppressedJobIds, demotions } = partitionByVerdict(filtered, overrides.verdicts ?? []);
+  const survivors =
+    suppressedJobIds.size === 0
+      ? filtered
+      : filtered.filter((job) => !suppressedJobIds.has(job.id));
+  const precomputed = buildRankPrecomputed(survivors, effectiveConfig);
   const t4 = Date.now();
-  const ranked = await rank(filtered, effectiveConfig, precomputed, now);
+  const rankDeps: RankDeps = {
+    ...(overrides.applications !== undefined ? { applications: overrides.applications } : {}),
+    ...(demotions.size > 0 ? { demotions } : {}),
+  };
+  const ranked = await rank(
+    survivors,
+    effectiveConfig,
+    precomputed,
+    now,
+    Object.keys(rankDeps).length > 0 ? rankDeps : undefined,
+  );
   const t5 = Date.now();
   log('info', 'pipeline.timing', {
     inputJobs: jobs.length,
     afterNormalize: normalized.length,
     afterDedupe: deduped.length,
     afterFilter: filtered.length,
+    afterSuppress: survivors.length,
     normalizeMs: t1 - t0,
     dedupeMs: t2 - t1,
     filterMs: t3 - t2,
