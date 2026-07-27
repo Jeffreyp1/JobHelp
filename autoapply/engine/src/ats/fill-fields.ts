@@ -1,4 +1,5 @@
 import type { FieldConcept, FreeformQuestion, GuessedField, StandingProfile } from '../types.ts';
+import type { FilledField } from './types.ts';
 import type { AtsConfig, DetectedField, ReactSelectClasses, Surface } from './form-config.ts';
 import { classifyLabelWithRules, loadLabelOverrides, answerFor } from '../match.ts';
 import { lookupApproved } from '../answer-bank.ts';
@@ -45,6 +46,7 @@ export interface FieldFillOutcome {
   filledKnown: number;
   readonly freeform: FreeformQuestion[];
   readonly guesses: GuessedField[];
+  readonly fields: FilledField[];
 }
 
 /** Fill every detected scalar field. Plain text-ish fields (text/email/tel/url/
@@ -74,26 +76,40 @@ export async function fillDetectedFields(
   }
   const landed = await batchFillText(surface, cfg, batch);
 
-  const outcome: FieldFillOutcome = { filledKnown: 0, freeform: [], guesses: [] };
+  const outcome: FieldFillOutcome = { filledKnown: 0, freeform: [], guesses: [], fields: [] };
+  const rec = (field: DetectedField, entry: Omit<FilledField, 'fieldKey' | 'question' | 'required'>): void => {
+    outcome.fields.push({ fieldKey: field.id, question: field.label, required: field.required, ...entry });
+  };
   for (const { field, skip, value, concept } of plans) {
     if (skip) continue;
     if (value !== undefined) {
       if (landed.has(field.id)) {
         outcome.filledKnown += 1;
+        rec(field, { value, source: 'profile' });
         continue;
       }
       if (concept !== null && EEO_CONCEPTS.has(concept) && (field.reactSelect || field.tag === 'select')) {
         const eeo = await eeoFill(surface, field, value, rs);
         if (eeo !== null) {
           outcome.filledKnown += 1;
-          if (eeo !== 'filled') outcome.guesses.push(eeo);
+          if (eeo !== 'filled') {
+            outcome.guesses.push(eeo);
+            rec(field, { value: eeo.answer, source: 'guessed', reason: eeo.reason });
+          } else {
+            rec(field, { value, source: 'profile' });
+          }
           continue;
         }
       } else {
         const result = await fillScalar(surface, field, value, rs);
         if (result.ok) {
           outcome.filledKnown += 1;
-          if (result.guess) outcome.guesses.push(result.guess);
+          if (result.guess) {
+            outcome.guesses.push(result.guess);
+            rec(field, { value: result.guess.answer, source: 'guessed', reason: result.guess.reason });
+          } else {
+            rec(field, { value, source: 'profile' });
+          }
           continue;
         }
       }
@@ -108,10 +124,15 @@ export async function fillDetectedFields(
       const result = await fillScalar(surface, field, replay.answer, rs);
       if (result.ok) {
         outcome.filledKnown += 1;
+        const options = question.options !== undefined ? { options: question.options } : {};
         if (!replay.exact) {
           outcome.guesses.push({ fieldKey: field.id, question: field.label, answer: replay.answer, reason: 'freeform' });
+          rec(field, { value: replay.answer, source: 'answer-bank', exact: false, reason: 'freeform', ...options });
         } else if (result.guess) {
           outcome.guesses.push(result.guess);
+          rec(field, { value: result.guess.answer, source: 'guessed', reason: result.guess.reason, ...options });
+        } else {
+          rec(field, { value: replay.answer, source: 'answer-bank', exact: true, ...options });
         }
         continue;
       }

@@ -64,7 +64,7 @@ function fakeAts(over: Partial<Ats> = {}): Ats {
     name: 'fake',
     matches: () => true,
     openForm: async () => undefined,
-    fill: async () => ({ filledKnown: 2, freeform: [], guesses: [], resumeUploaded: true }),
+    fill: async () => ({ filledKnown: 2, freeform: [], guesses: [], resumeUploaded: true, fields: [] }),
     applyFreeform: async () => [],
     validate: async () => ({ ok: true, blockers: [], captcha: false }),
     submit: async () => undefined,
@@ -88,6 +88,7 @@ describe('prefill phase never waits on answers', () => {
           freeform: [{ fieldKey: 'q1', label: 'Why us?', kind: 'textarea' }],
           guesses: [],
           resumeUploaded: true,
+          fields: [],
         }),
         applyFreeform: async () => {
           freeformApplied = true;
@@ -127,6 +128,7 @@ function leftoversFixture(over: Partial<LeftoversFile> = {}): LeftoversFile {
       ],
       guesses: [],
       resumeUploaded: true,
+      fields: [],
     },
     validation: VALIDATION_OK,
     now: () => '2026-07-16T00:00:00.000Z',

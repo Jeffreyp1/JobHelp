@@ -13,6 +13,7 @@ const FILL: FillOutcome = {
     { fieldKey: 'location', question: 'Location', answer: 'San Francisco', reason: 'dropdown' },
   ],
   resumeUploaded: true,
+  fields: [],
 };
 
 const VALIDATION: ValidationOutcome = {
@@ -121,7 +122,7 @@ describe('buildLeftovers', () => {
       url: 'https://example.com/job/123',
       company: 'Acme',
       role: 'SWE',
-      outcome: { filledKnown: 0, freeform: [], guesses: [], resumeUploaded: false },
+      outcome: { filledKnown: 0, freeform: [], guesses: [], resumeUploaded: false, fields: [] },
       validation: { ok: true, blockers: [], captcha: false },
       now: () => '2026-06-10T00:00:00.000Z',
     });

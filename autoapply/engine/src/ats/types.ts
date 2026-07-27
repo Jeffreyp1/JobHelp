@@ -4,6 +4,21 @@ import type { RepairCapture } from '../repair-artifact.ts';
 
 export type { FreeformQuestion };
 
+/** One filled control, recorded so the review artifact carries every answer the
+ * engine entered — not just a count. `source` says where the value came from;
+ * `exact` marks an answer-bank replay whose option set matched byte-for-byte. */
+export interface FilledField {
+  readonly fieldKey: string;
+  readonly question: string;
+  readonly value: string;
+  readonly source: 'profile' | 'answer-bank' | 'job-context' | 'drafted' | 'guessed';
+  readonly options?: readonly string[];
+  readonly exact?: boolean;
+  readonly required?: boolean;
+  readonly reason?: GuessedField['reason'];
+  readonly provenance?: string;
+}
+
 export interface FillOutcome {
   readonly filledKnown: number;
   readonly freeform: readonly FreeformQuestion[];
@@ -11,6 +26,7 @@ export interface FillOutcome {
    * closest available option — recorded so the user reviews them. */
   readonly guesses: readonly GuessedField[];
   readonly resumeUploaded: boolean;
+  readonly fields: readonly FilledField[];
 }
 
 export interface ValidationOutcome {

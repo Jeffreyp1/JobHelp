@@ -3,12 +3,10 @@ import type { Ats, FillOutcome, ValidationOutcome } from './types.ts';
 import type { StandingProfile } from '../types.ts';
 import { DEFAULT_REACT_SELECT, type AtsConfig, type DetectedField, type ReactSelectClasses } from './form-config.ts';
 import { withSelectorOverrides } from '../selector-overrides.ts';
-import { classifyLabelWithRules, loadLabelOverrides, answerFor } from '../match.ts';
-import { lookupApproved } from '../answer-bank.ts';
-import { detectChoiceGroups, fillChoiceGroup } from './choice-groups.ts';
+import { loadLabelOverrides } from '../match.ts';
 import { uploadFiles } from './upload.ts';
-import { EEO_CONCEPTS, eeoOption } from './eeo.ts';
 import { fillDetectedFields } from './fill-fields.ts';
+import { fillChoiceGroups } from './fill-choice-groups.ts';
 import { captureRepair, type RepairCapture } from '../repair-artifact.ts';
 import {
   SUCCESS_TEXT_RE,
@@ -153,42 +151,14 @@ export function makeAts(cfg0: AtsConfig): Ats {
       const fields = await cfg.detect(surface, cfg);
       detectCache.set(page, { fields, controlCount: await fillableControlCount(surface, cfg), stale: false });
       const filled = await fillDetectedFields(surface, cfg, fields, profile, rs);
-      const { freeform, guesses } = filled;
-
-      // Choice groups (radio/checkbox) aren't in `fields` — detect-controls skips
-      // them. Auto-select the option matching a profile value (EEO, yes/no); an
-      // unmatched group stays unselected for validate's requiredUncheckedGroups.
-      // Adapter toggle groups (styled button pairs, aria radiogroups) join the
-      // same loop; ones already carrying a selection are left alone.
-      const toggles = cfg.detectToggleGroups === undefined ? [] : await cfg.detectToggleGroups(surface, cfg);
-      for (const group of [...(await detectChoiceGroups(surface, cfg)), ...toggles]) {
-        if (group.checked === true) continue;
-        const concept = classifyLabelWithRules(group.label, cfg.name);
-        const profileValue = concept ? answerFor(concept, profile, group.label) : undefined;
-        const replay =
-          profileValue === undefined ? await lookupApproved(group.label, group.options.map((o) => o.label)) : null;
-        const value = profileValue ?? replay?.answer;
-        if (value === undefined) continue;
-        let target = value;
-        let declined = false;
-        // The EEO decline-or-blank remap translates profile-style values; a bank
-        // answer is already the concrete option text the human approved.
-        if (profileValue !== undefined && concept !== null && EEO_CONCEPTS.has(concept)) {
-          const choice = eeoOption(group.options.map((o) => o.label), value);
-          if (choice === null) continue;
-          target = choice.pick;
-          declined = choice.declined;
-        }
-        const r = await fillChoiceGroup(surface, group, target);
-        if (r.ok) {
-          filled.filledKnown += 1;
-          if (r.guessed || declined || (replay !== null && !replay.exact)) {
-            guesses.push({ fieldKey: group.key, question: group.label, answer: r.chosen ?? target, reason: 'dropdown' });
-          }
-        }
-      }
-
-      return { filledKnown: filled.filledKnown, freeform, guesses, resumeUploaded: upload.resumeUploaded };
+      const choice = await fillChoiceGroups(surface, cfg, profile);
+      return {
+        filledKnown: filled.filledKnown + choice.filled,
+        freeform: filled.freeform,
+        guesses: [...filled.guesses, ...choice.guesses],
+        resumeUploaded: upload.resumeUploaded,
+        fields: [...filled.fields, ...choice.fields],
+      };
     },
 
     async applyFreeform(page: Page, answers: Record<string, string>): Promise<readonly string[]> {

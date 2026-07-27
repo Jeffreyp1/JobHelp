@@ -49,26 +49,46 @@ VALUES never live here — they stay in the profile, which the updater cannot wr
 - Increment `usedCount` / set `lastUsedAt` on reuse.
 - Read-modify-write the whole file; preserve entries you didn't touch.
 
-## Review report — `<job dir>/autoapply-review.json`
+## Review artifact — `<job dir>/autoapply-review.json` (schemaVersion 2)
+
+One canonical shape, written by BOTH the engine and this skill (the engine's
+`review-artifact.ts` is the source of truth; its reader tolerates the two
+pre-v2 legacy shapes):
 
 ```json
 {
+  "schemaVersion": 2,
+  "jobId": "acme-software-engineer-2026-06-05",
   "company": "Acme",
   "role": "Software Engineer",
   "url": "https://…",
   "filledAt": "2026-06-09T20:15:00Z",
-  "fields": [
-    { "label": "Email", "value": "ada@example.com", "source": "profile", "review": false },
-    { "label": "Why this role?", "value": "…", "source": "drafted",
-      "provenance": "resume.v3.md: …", "review": true }
-  ],
+  "verdict": "review",
+  "green": 9,
+  "captcha": false,
   "blockers": ["Signature box left for you"],
-  "screenshotNote": "final state verified; no resets observed"
+  "fields": [
+    { "fieldKey": "email", "question": "Email", "value": "ada@example.com",
+      "source": "profile", "required": true },
+    { "fieldKey": "sponsor", "question": "Need sponsorship?", "value": "No",
+      "source": "answer-bank", "exact": true, "options": ["Yes", "No"] },
+    { "fieldKey": "why", "question": "Why this role?", "value": "…",
+      "source": "drafted", "reason": "freeform", "provenance": "resume.v3.md: …" }
+  ],
+  "notes": ["final state verified; no resets observed"]
 }
 ```
 
-`source` ∈ `profile | job-context | answer-bank | drafted`. `review: true` for
-every answer-bank and drafted value, and for any fuzzy dropdown pick.
+- `fields` records EVERY filled control: `source` ∈ `profile | job-context |
+  answer-bank | drafted | guessed`; `exact: true` only for an answer-bank replay
+  whose option set matched byte-for-byte; `reason` (`freeform | dropdown`) on
+  reviewable entries; `provenance` on drafted answers (resume file + bullet).
+- Reviewable (the old `review: true`) is derived, not stored: `drafted`,
+  `guessed`, or `answer-bank` without `exact: true`.
+- `verdict` ∈ `ready | review | blocked`; `green` = count of non-reviewable
+  fields; `blockers` = required fields left for the human.
+- A `verifier` block (per-run) and per-field `verifier` verdicts are added by
+  the answer-verification pass when it runs; absence means unverified.
 
 ## Status sidecar — `~/jobhelp/autoapply-status.json`
 

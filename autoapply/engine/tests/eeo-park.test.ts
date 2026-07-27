@@ -121,7 +121,7 @@ function fakeAts(over: Partial<Ats> = {}): Ats {
     name: 'fake',
     matches: () => true,
     openForm: async () => undefined,
-    fill: async () => ({ filledKnown: 2, freeform: [], guesses: [], resumeUploaded: true }),
+    fill: async () => ({ filledKnown: 2, freeform: [], guesses: [], resumeUploaded: true, fields: [] }),
     applyFreeform: async () => [],
     validate: async () => ({ ok: true, blockers: [], captcha: false }),
     submit: async () => undefined,
@@ -182,6 +182,7 @@ describe('applyOneJob — park status transitions', () => {
         freeform: [{ fieldKey: 'q1', label: 'Why us?', kind: 'text' }],
         guesses: [],
         resumeUploaded: true,
+        fields: [],
       }),
     });
     const row = await applyOneJob(PAGE, job, {}, makeDeps(sidecar, { ats }));

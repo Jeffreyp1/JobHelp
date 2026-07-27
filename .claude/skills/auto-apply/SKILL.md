@@ -170,8 +170,9 @@ After every batch and after any canary drift warning, check for repair artifacts
    reset them), each combobox shows its chosen option (not placeholder text),
    resume filename is attached, page title is unchanged (no accidental submit).
    Fix what's fixable; report the rest.
-8. **Park + report** — write `<job dir>/autoapply-review.json` (schema in
-   `reference.md`), update `~/jobhelp/autoapply-status.json` to `filled_parked`
+8. **Park + report** — write `<job dir>/autoapply-review.json` (schemaVersion 2,
+   schema in `reference.md`; every filled field gets a `fields[]` entry with its
+   `source`), update `~/jobhelp/autoapply-status.json` to `filled_parked`
    (or `blocked`/`failed` with reason). Leave the tab open.
 9. **Learn** — append newly drafted free-form answers to the answer bank with
    `approved: false`. Then append one line to `~/jobhelp/autoapply-gaps.jsonl`

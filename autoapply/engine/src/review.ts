@@ -1,5 +1,3 @@
-import { writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import type { GuessedField, ReviewField, ReviewReport, ReviewVerdict } from './types.ts';
 
 const WHY: Record<GuessedField['reason'], string> = {
@@ -40,10 +38,6 @@ export function buildReport(i: {
 /** A failed job (form never loaded, conversion error) still needs a row. */
 export function failedReport(reason: string): ReviewReport {
   return { verdict: 'blocked', green: 0, yellow: [], red: [{ field: reason, why: 'failed' }], captcha: false };
-}
-
-export async function writeReview(dir: string, report: ReviewReport): Promise<void> {
-  await writeFile(join(dir, 'autoapply-review.json'), JSON.stringify(report, null, 2));
 }
 
 export interface RunRow {
